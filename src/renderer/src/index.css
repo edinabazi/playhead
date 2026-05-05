@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-background: #050503;
+  --color-foreground: #ffffff;
+  --color-card: rgba(0, 0, 0, 0.75);
+  --color-card-foreground: #ffffff;
+  --color-primary: #ffff00;
+  --color-primary-foreground: #353500;
+  --color-secondary: rgba(255, 255, 255, 0.1);
+  --color-secondary-foreground: #ffffff;
+  --color-muted: rgba(255, 255, 255, 0.08);
+  --color-muted-foreground: #a6a6a2;
+  --color-accent: rgba(255, 255, 255, 0.1);
+  --color-accent-foreground: #ffffff;
+  --color-border: rgba(255, 255, 255, 0.2);
+  --color-input: rgba(255, 255, 255, 0.16);
+  --color-ring: #ffff00;
+}
+
+:root {
+  --background: #050503;
+  --foreground: #ffffff;
+  --card: rgba(0, 0, 0, 0.75);
+  --card-foreground: #ffffff;
+  --primary: #ffff00;
+  --primary-foreground: #353500;
+  --secondary: rgba(255, 255, 255, 0.1);
+  --secondary-foreground: #ffffff;
+  --muted: rgba(255, 255, 255, 0.08);
+  --muted-foreground: #a6a6a2;
+  --accent: rgba(255, 255, 255, 0.1);
+  --accent-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.2);
+  --input: rgba(255, 255, 255, 0.16);
+  --ring: #ffff00;
+  --text-main: #ffffff;
+  --text-secondary: #a6a6a2;
+  --text-tertiary: #787672;
+  --brand-primary: #ffff00;
+  --brand-primary-foreground: #353500;
+  --panel-glass: rgba(0, 0, 0, 0.62);
+  --panel-glass-soft: rgba(10, 10, 10, 0.18);
+  --surface-track: rgba(255, 255, 255, 0.055);
+  --surface-track-active: rgba(255, 255, 255, 0.11);
+  --surface-track-hover: rgba(255, 255, 255, 0.075);
+}
+
+* {
+  box-sizing: border-box;
+  cursor: default !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-synthesis-weight: none;
+  text-rendering: geometricPrecision;
+}
+
+.selectable,
+.selectable * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+button,
+canvas {
+  -webkit-app-region: no-drag;
+}
+
+.app-drag {
+  -webkit-app-region: drag;
+}
+
+.app-window {
+  border-radius: 49px;
+  isolation: isolate;
+  background: transparent;
+}
+
+.app-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: inherit;
+  background:
+    linear-gradient(144deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.025) 34%, rgba(0, 0, 0, 0) 72%),
+    radial-gradient(circle at 58% 35%, rgba(255, 255, 255, 0.075), transparent 31%),
+    linear-gradient(180deg, rgba(24, 24, 23, 0.88), rgba(15, 15, 14, 0.9)),
+    rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.56);
+}
+
+.app-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(118deg, transparent 0 18%, rgba(255, 255, 255, 0.065) 31%, transparent 46%),
+    linear-gradient(163deg, rgba(255, 255, 255, 0.04), transparent 38%),
+    radial-gradient(circle at 44% 82%, rgba(255, 255, 255, 0.035), transparent 20%);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.app-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background-image:
+    radial-gradient(circle at 25% 20%, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px),
+    radial-gradient(circle at 75% 68%, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px);
+  background-size:
+    18px 18px,
+    23px 23px;
+  mix-blend-mode: overlay;
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.app-shell > * {
+  position: relative;
+  z-index: 2;
+}
+
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+
+button,
+canvas,
+input,
+[role="button"],
+[data-radix-slider-root],
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+@theme inline {
+  @keyframes spinner-move {
+    to {
+      stroke-dashoffset: -100;
+    }
+  }
+  @keyframes spinner-dash {
+    0%,
+    100% {
+      stroke-dasharray: 15 85;
+    }
+    50% {
+      stroke-dasharray: 40 60;
+    }
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "name": "playhead",
+  "productName": "Playhead",
+  "version": "0.1.0",
+  "description": "Local-first desktop music player prototype with waveform playback.",
+  "author": "Edin",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && electron-vite build",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "dist:mac": "npm run build && electron-builder --mac dir",
+    "preview": "electron-vite preview"
+  },
+  "build": {
+    "appId": "com.playhead.app",
+    "productName": "Playhead",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/playhead-icon.png",
+        "to": "playhead-icon.png"
+      }
+    ],
+    "mac": {
+      "icon": "resources/playhead.icns",
+      "category": "public.app-category.music",
+      "target": [
+        "dir"
+      ]
+    }
+  },
+  "dependencies": {
+    "@fontsource/geist-mono": "^5.2.7",
+    "@fontsource/inter": "^5.2.8",
+    "@radix-ui/react-slider": "^1.3.6",
+    "@radix-ui/react-slot": "^1.2.4",
+    "chokidar": "^5.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.14.0",
+    "music-metadata": "^11.12.3",
+    "node-taglib-sharp": "^6.0.3",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "latest",
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "latest",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "^5.1.2",
+    "electron": "latest",
+    "electron-builder": "^26.8.1",
+    "electron-vite": "latest",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.8.3",
+    "tailwindcss": "latest",
+    "typescript": "latest",
+    "typescript-eslint": "^8.59.2",
+    "vite": "^7.3.2",
+    "vitest": "^4.1.5"
+  }
+}

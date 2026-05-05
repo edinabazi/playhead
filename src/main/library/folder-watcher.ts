@@ -1,0 +1,68 @@
+import type { FSWatcher } from "chokidar";
+import chokidar from "chokidar";
+import { BrowserWindow } from "electron";
+import { extname } from "node:path";
+import type { LibraryFolder } from "../../shared/library";
+import { audioExtensions } from "./constants";
+
+const notifyDelayMs = 650;
+
+let watcher: FSWatcher | null = null;
+let watchedFolders: LibraryFolder[] = [];
+const pendingNotifications = new Map<string, NodeJS.Timeout>();
+
+export async function watchLibraryFolders(folders: LibraryFolder[]): Promise<void> {
+  watchedFolders = folders;
+
+  if (watcher) {
+    await watcher.close();
+    watcher = null;
+  }
+
+  for (const timeout of pendingNotifications.values()) clearTimeout(timeout);
+  pendingNotifications.clear();
+
+  if (folders.length === 0) return;
+
+  watcher = chokidar.watch(
+    folders.map((folder) => folder.path),
+    {
+      awaitWriteFinish: {
+        stabilityThreshold: 500,
+        pollInterval: 100,
+      },
+      ignoreInitial: true,
+      ignored: (filePath, stats) =>
+        Boolean(stats?.isFile()) && !audioExtensions.has(extname(filePath).toLowerCase()),
+    },
+  );
+
+  watcher
+    .on("add", notifyFolderForPath)
+    .on("unlink", notifyFolderForPath)
+    .on("change", notifyFolderForPath);
+}
+
+export async function closeFolderWatcher(): Promise<void> {
+  if (!watcher) return;
+  await watcher.close();
+  watcher = null;
+}
+
+function notifyFolderForPath(filePath: string) {
+  const folder = watchedFolders.find((item) => filePath.startsWith(item.path));
+  if (!folder) return;
+
+  const previousTimeout = pendingNotifications.get(folder.id);
+  if (previousTimeout) clearTimeout(previousTimeout);
+
+  pendingNotifications.set(
+    folder.id,
+    setTimeout(() => {
+      pendingNotifications.delete(folder.id);
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send("library:folder-changed", folder.id);
+      }
+    }, notifyDelayMs),
+  );
+}
