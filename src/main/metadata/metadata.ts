@@ -11,6 +11,8 @@ function stringifyMetadataValue(value: unknown): string {
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (Array.isArray(value)) return value.map(stringifyMetadataValue).filter(Boolean).join(", ");
   if (typeof value === "object") {
+    if ("text" in value) return stringifyMetadataValue(value.text);
+    if ("description" in value) return stringifyMetadataValue(value.description);
     try {
       return JSON.stringify(value);
     } catch {
@@ -46,6 +48,22 @@ function metadataRecord(values: Record<string, unknown>): Record<string, string>
       .map(([key, value]) => [key, stringifyMetadataValue(value)])
       .filter(([, value]) => value),
   );
+}
+
+function cleanTextValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{")) return trimmed;
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (parsed && typeof parsed === "object" && "text" in parsed) {
+      return stringifyMetadataValue(parsed.text).trim();
+    }
+  } catch {
+    // Keep the user's literal text when it is not JSON from parsed metadata.
+  }
+
+  return trimmed;
 }
 
 function editableFromCommon(common: Record<string, unknown>): EditableTrackMetadata {
@@ -86,17 +104,17 @@ export async function readTrackMetadata(filePath: string): Promise<TrackMetadata
 
 function cleanEditableMetadata(metadata: EditableTrackMetadata): EditableTrackMetadata {
   return {
-    title: metadata.title.trim(),
-    artist: metadata.artist.trim(),
-    album: metadata.album.trim(),
-    albumArtist: metadata.albumArtist.trim(),
-    genre: metadata.genre.trim(),
-    year: metadata.year.trim(),
-    trackNumber: metadata.trackNumber.trim(),
-    diskNumber: metadata.diskNumber.trim(),
-    composer: metadata.composer.trim(),
-    bpm: metadata.bpm.trim(),
-    comment: metadata.comment.trim(),
+    title: cleanTextValue(metadata.title),
+    artist: cleanTextValue(metadata.artist),
+    album: cleanTextValue(metadata.album),
+    albumArtist: cleanTextValue(metadata.albumArtist),
+    genre: cleanTextValue(metadata.genre),
+    year: cleanTextValue(metadata.year),
+    trackNumber: cleanTextValue(metadata.trackNumber),
+    diskNumber: cleanTextValue(metadata.diskNumber),
+    composer: cleanTextValue(metadata.composer),
+    bpm: cleanTextValue(metadata.bpm),
+    comment: cleanTextValue(metadata.comment),
   };
 }
 

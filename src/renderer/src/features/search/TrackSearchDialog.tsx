@@ -69,7 +69,7 @@ export function TrackSearchDialog({
   return (
     <DialogOverlay
       {...dialogOverlayMotion}
-      className="fixed inset-0 z-50 flex justify-center bg-black/45 px-6 pt-[12vh]"
+      className="app-modal-overlay fixed inset-0 z-50 flex justify-center bg-black/45 px-6 pt-[12vh]"
       onClick={onClose}
     >
       <DialogPanel

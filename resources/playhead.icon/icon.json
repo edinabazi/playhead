@@ -1,13 +1,24 @@
 {
   "fill" : {
-    "automatic-gradient" : "display-p3:0.03658,0.02838,0.00406,1.00000"
+    "automatic-gradient" : "display-p3:0.12806,0.12806,0.12806,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
-          "image-name" : "image 4 [Vectorizedd].png",
-          "name" : "image 4 [Vectorizedd]"
+          "blend-mode" : "normal",
+          "fill" : "automatic",
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "Group 1.png",
+          "name" : "Group 1",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         }
       ],
       "shadow" : {

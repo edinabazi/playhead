@@ -6,15 +6,19 @@ import { getArtwork } from "../artwork";
 import { audioExtensions } from "./constants";
 import { cleanTitle, makeId } from "./ids";
 
-async function findAudioFiles(folderPath: string): Promise<string[]> {
+function normalizeExtensions(extensions?: string[]): Set<string> {
+  if (!extensions || extensions.length === 0) return audioExtensions;
+  return new Set(extensions.map((extension) => extension.toLowerCase()));
+}
+
+async function findAudioFiles(folderPath: string, extensions = audioExtensions): Promise<string[]> {
   const entries = await readdir(folderPath, { withFileTypes: true });
   const files = await Promise.all(
     entries.map(async (entry) => {
       const entryPath = join(folderPath, entry.name);
 
-      if (entry.isDirectory()) return findAudioFiles(entryPath);
-      if (entry.isFile() && audioExtensions.has(extname(entry.name).toLowerCase()))
-        return [entryPath];
+      if (entry.isDirectory()) return findAudioFiles(entryPath, extensions);
+      if (entry.isFile() && extensions.has(extname(entry.name).toLowerCase())) return [entryPath];
 
       return [];
     }),
@@ -37,6 +41,10 @@ export async function buildTrack(filePath: string, folderId: string): Promise<Li
       title: metadata.common.title || cleanTitle(filePath),
       artist: metadata.common.artist || "Unknown Artist",
       album: metadata.common.album,
+      albumArtist: metadata.common.albumartist,
+      trackNumber: metadata.common.track.no || undefined,
+      diskNumber: metadata.common.disk.no || undefined,
+      year: metadata.common.year,
       artwork: await getArtwork(trackId, metadata.common.picture),
       duration: metadata.format.duration || 0,
       folderId,
@@ -54,7 +62,10 @@ export async function buildTrack(filePath: string, folderId: string): Promise<Li
   }
 }
 
-export async function scanFolderPath(folderPath: string): Promise<ScannedFolder> {
+export async function scanFolderPath(
+  folderPath: string,
+  extensions?: string[],
+): Promise<ScannedFolder> {
   const folderInfo = await stat(folderPath);
   if (!folderInfo.isDirectory()) throw new Error("Selected path is not a folder.");
 
@@ -65,7 +76,7 @@ export async function scanFolderPath(folderPath: string): Promise<ScannedFolder>
     trackIds: [],
   };
 
-  const audioFiles = await findAudioFiles(folderPath);
+  const audioFiles = await findAudioFiles(folderPath, normalizeExtensions(extensions));
   const tracks = await Promise.all(audioFiles.map((filePath) => buildTrack(filePath, folder.id)));
   folder.trackIds = tracks.map((track) => track.id);
 

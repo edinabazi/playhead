@@ -132,7 +132,7 @@ export function MetadataDialog({
   return (
     <DialogOverlay
       {...dialogOverlayMotion}
-      className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-6"
+      className="app-modal-overlay fixed inset-0 z-50 grid place-items-center bg-black/45 p-6"
       onClick={onClose}
     >
       <DialogPanel
@@ -221,7 +221,7 @@ export function MetadataDialog({
                   >
                     <span>{field.label}</span>
                     <input
-                      className="h-9 rounded-[13px] border border-white/10 bg-white/[0.045] px-3 text-[13px] text-foreground outline-none transition-colors focus:border-primary/70 disabled:opacity-60"
+                      className="h-9 rounded-[13px] border border-white/10 bg-white/[0.045] px-3 text-[13px] text-foreground outline-none disabled:opacity-60"
                       value={form[field.key]}
                       disabled={!metadata?.canSave}
                       onChange={(event) => updateField(field.key, event.target.value)}
@@ -233,7 +233,7 @@ export function MetadataDialog({
               <label className="mt-3 flex min-w-0 flex-col gap-1 text-[12px] text-muted-foreground">
                 <span>Comment</span>
                 <textarea
-                  className="min-h-20 resize-none rounded-[13px] border border-white/10 bg-white/[0.045] px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:border-primary/70 disabled:opacity-60"
+                  className="min-h-20 resize-none rounded-[13px] border border-white/10 bg-white/[0.045] px-3 py-2 text-[13px] text-foreground outline-none disabled:opacity-60"
                   value={form.comment}
                   disabled={!metadata?.canSave}
                   onChange={(event) => updateField("comment", event.target.value)}

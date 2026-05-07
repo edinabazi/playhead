@@ -10,6 +10,7 @@ import {
   useMemo,
   type CSSProperties,
   type HTMLAttributes,
+  type ReactNode,
 } from "react";
 import {
   motion,
@@ -42,7 +43,7 @@ interface SliderProps extends Omit<HTMLAttributes<HTMLDivElement>, "onChange" | 
   showValue?: boolean;
   valuePosition?: ValuePosition;
   formatValue?: (v: number) => string;
-  label?: string;
+  label?: ReactNode;
   disabled?: boolean;
   trackClassName?: string;
   trackStyle?: CSSProperties;
@@ -51,6 +52,8 @@ interface SliderProps extends Omit<HTMLAttributes<HTMLDivElement>, "onChange" | 
   hideFill?: boolean;
   thumbColor?: string;
   thumbBorderColor?: string;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +110,7 @@ interface ValueDisplayProps {
   max: number;
   step: number;
   formatValue: (v: number) => string;
-  label?: string;
+  label?: ReactNode;
   isRange: boolean;
   isInteracting: boolean;
 }
@@ -301,6 +304,8 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
       hideFill = false,
       thumbColor,
       thumbBorderColor,
+      onInteractionStart,
+      onInteractionEnd,
       className,
       ...props
     },
@@ -332,7 +337,6 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
       snappedValue: number;
       cursorX: number;
     } | null>(null);
-    const [focusedThumb, setFocusedThumb] = useState<number | null>(null);
     const [showHoverTooltip, setShowHoverTooltip] = useState(false);
     const hoverDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -522,6 +526,7 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
 
         dragging.current = true;
         setIsPressed(true);
+        onInteractionStart?.();
 
         const motionX = activeDragThumb.current === 0 ? motionX0 : motionX1;
 
@@ -540,7 +545,18 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
 
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
-      [disabled, isRange, min, max, step, motionX0, motionX1, clampForRange, emitChange],
+      [
+        disabled,
+        isRange,
+        min,
+        max,
+        step,
+        motionX0,
+        motionX1,
+        clampForRange,
+        emitChange,
+        onInteractionStart,
+      ],
     );
 
     const handlePointerMove = useCallback(
@@ -572,6 +588,7 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
       dragging.current = false;
       setIsPressed(false);
       setHoverPreview(null);
+      onInteractionEnd?.();
 
       // Spring settle to final quantized position
       const tw = trackWidthRef.current;
@@ -580,7 +597,7 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
       const snapped = pixelToValue(currentPx, min, max, step, tw);
       const snappedPx = valueToPixel(snapped, min, max, tw);
       animate(motionX, snappedPx, springs.moderate);
-    }, [min, max, step, motionX0, motionX1]);
+    }, [min, max, step, motionX0, motionX1, onInteractionEnd]);
 
     // --- Radix keyboard handler ---
     const handleRadixChange = useCallback(
@@ -679,17 +696,6 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
               border: thumbBorderColor ? `1px solid ${thumbBorderColor}` : undefined,
             }}
           />
-          {/* Focus ring */}
-          <motion.span
-            className="absolute rounded-full border border-[#6B97FF] pointer-events-none"
-            initial={false}
-            animate={{
-              opacity: focusedThumb === index ? 1 : 0,
-              width: THUMB_SIZE + 4,
-              height: THUMB_SIZE + 4,
-            }}
-            transition={springs.fast}
-          />
         </motion.span>
       );
     };
@@ -764,7 +770,7 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
             max={max}
             step={step}
             disabled={disabled}
-            aria-label={label}
+            aria-label={typeof label === "string" ? label : "Slider"}
             className="absolute inset-0 opacity-0 pointer-events-none"
             style={{ height: THUMB_SIZE }}
           >
@@ -774,19 +780,11 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
             <SliderPrimitive.Thumb
               className="block outline-none"
               style={{ width: THUMB_SIZE, height: THUMB_SIZE }}
-              onFocus={(e) => {
-                if (e.currentTarget.matches(":focus-visible")) setFocusedThumb(0);
-              }}
-              onBlur={() => setFocusedThumb((prev) => (prev === 0 ? null : prev))}
             />
             {isRange && (
               <SliderPrimitive.Thumb
                 className="block outline-none"
                 style={{ width: THUMB_SIZE, height: THUMB_SIZE }}
-                onFocus={(e) => {
-                  if (e.currentTarget.matches(":focus-visible")) setFocusedThumb(1);
-                }}
-                onBlur={() => setFocusedThumb((prev) => (prev === 1 ? null : prev))}
               />
             )}
           </SliderPrimitive.Root>
@@ -964,9 +962,11 @@ interface SliderComfortableProps extends Omit<
   max?: number;
   step?: number;
   variant?: "pips" | "scrubber";
-  label?: string;
+  label?: ReactNode;
   formatValue?: (v: number) => string;
   disabled?: boolean;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
 }
 
 const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
@@ -981,6 +981,8 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
       label,
       formatValue = String,
       disabled = false,
+      onInteractionStart,
+      onInteractionEnd,
       className,
       ...props
     },
@@ -1034,7 +1036,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
     const fillPercent = useMotionValue(
       max === min ? 0 : Math.max(0, Math.min(1, (value - min) / (max - min))),
     );
-    // Small offset when value is at min so the handle line stays visible
+    // Small offset when value is at min so the handle stays reachable.
     const zeroTarget = variant === "pips" ? 8 : 17;
     const zeroOffset = useMotionValue(value === min ? zeroTarget : 0);
 
@@ -1042,10 +1044,6 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
     const handleLeftStyle = useTransform(
       [fillPercent, zeroOffset] as MotionValue<number>[],
       ([p, zo]) => `calc(${(p as number) * 100}% - 8px + ${zo as number}px)`,
-    );
-    const handleLineLeftStyle = useTransform(
-      [fillPercent, zeroOffset] as MotionValue<number>[],
-      ([p, zo]) => `calc(${(p as number) * 100}% - 9px + ${zo as number}px)`,
     );
     // Pips-specific: offset by px-3 (12px) padding so fill edge aligns with active pip center
     const pipsFillWidthStyle = useTransform(
@@ -1149,6 +1147,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         e.preventDefault();
         dragging.current = true;
         setIsPressed(true);
+        onInteractionStart?.();
         const newVal = getValueFromX(e.clientX);
         onChange(newVal);
         const newPercent = Math.max(0, Math.min(1, (newVal - min) / (max - min)));
@@ -1156,7 +1155,17 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         animate(zeroOffset, newVal === min ? zeroTarget : 0, springs.fast);
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
-      [disabled, getValueFromX, onChange, fillPercent, zeroOffset, zeroTarget, min, max],
+      [
+        disabled,
+        getValueFromX,
+        onChange,
+        onInteractionStart,
+        fillPercent,
+        zeroOffset,
+        zeroTarget,
+        min,
+        max,
+      ],
     );
 
     const handlePointerMove = useCallback(
@@ -1179,7 +1188,8 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
       dragging.current = false;
       setIsPressed(false);
       setHoverPreview(null);
-    }, []);
+      onInteractionEnd?.();
+    }, [onInteractionEnd]);
 
     // Resize handle drag handlers (direct cursor position)
     const handleResizePointerDown = useCallback(
@@ -1190,13 +1200,24 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         e.stopPropagation();
         handleDragging.current = true;
         setIsPressed(true);
+        onInteractionStart?.();
         const newVal = getValueFromX(e.clientX);
         onChange(newVal);
         fillPercent.set(Math.max(0, Math.min(1, (newVal - min) / (max - min))));
         animate(zeroOffset, newVal === min ? zeroTarget : 0, springs.fast);
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
-      [disabled, getValueFromX, onChange, fillPercent, zeroOffset, zeroTarget, min, max],
+      [
+        disabled,
+        getValueFromX,
+        onChange,
+        onInteractionStart,
+        fillPercent,
+        zeroOffset,
+        zeroTarget,
+        min,
+        max,
+      ],
     );
 
     const handleResizePointerMove = useCallback(
@@ -1214,7 +1235,8 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
       handleDragging.current = false;
       setIsPressed(false);
       setHoverPreview(null);
-    }, []);
+      onInteractionEnd?.();
+    }, [onInteractionEnd]);
 
     const handleRadixChange = useCallback(
       (newValues: number[]) => {
@@ -1290,9 +1312,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
             className,
           )}
           initial={false}
-          animate={{
-            outline: isFocused ? "1px solid #6B97FF" : "1px solid transparent",
-          }}
+          animate={{}}
           transition={springs.fast}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -1453,28 +1473,6 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
               style={{
                 width: fillWidthStyle,
                 backgroundColor: "color-mix(in srgb, var(--foreground) 8%, transparent)",
-              }}
-            />
-          )}
-
-          {/* Scrubber: handle line */}
-          {variant === "scrubber" && (
-            <motion.div
-              className="absolute rounded-full pointer-events-none z-10"
-              initial={false}
-              animate={{
-                top: isActive ? 7 : 8,
-                bottom: isActive ? 7 : 8,
-                backgroundColor: isFocused
-                  ? "var(--foreground)"
-                  : isHovered
-                    ? "color-mix(in srgb, var(--foreground) 50%, transparent)"
-                    : "color-mix(in srgb, var(--foreground) 25%, transparent)",
-              }}
-              transition={springs.fast}
-              style={{
-                left: handleLineLeftStyle,
-                width: 2,
               }}
             />
           )}

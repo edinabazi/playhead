@@ -7,8 +7,55 @@ import {
 } from "../../../../shared/library";
 
 const playlistName = "New Playlist";
+const unknownArtist = "Unknown Artist";
+const unknownAlbum = "Unknown Album";
 
 export { emptyLibraryState };
+
+export type LibraryArtist = {
+  id: string;
+  name: string;
+  trackIds: string[];
+};
+
+export type LibraryAlbum = {
+  id: string;
+  title: string;
+  artist: string;
+  artwork?: LibraryTrack["artwork"];
+  trackIds: string[];
+  year?: number;
+};
+
+function normalizeKey(value: string): string {
+  return value.trim().toLowerCase() || "unknown";
+}
+
+export function getTrackArtist(track: LibraryTrack): string {
+  return track.albumArtist || track.artist || unknownArtist;
+}
+
+export function getTrackAlbum(track: LibraryTrack): string {
+  return track.album || unknownAlbum;
+}
+
+function getAlbumId(track: LibraryTrack): string {
+  return `${normalizeKey(getTrackArtist(track))}::${normalizeKey(getTrackAlbum(track))}`;
+}
+
+function sortTracksByTitle(tracks: LibraryTrack[]): LibraryTrack[] {
+  return tracks.slice().sort((a, b) => a.title.localeCompare(b.title));
+}
+
+function sortAlbumTracks(tracks: LibraryTrack[]): LibraryTrack[] {
+  return tracks.slice().sort((a, b) => {
+    const diskDelta = (a.diskNumber || 0) - (b.diskNumber || 0);
+    if (diskDelta !== 0) return diskDelta;
+    const trackDelta = (a.trackNumber || 0) - (b.trackNumber || 0);
+    if (trackDelta !== 0) return trackDelta;
+    return a.title.localeCompare(b.title);
+  });
+}
 
 export function mergeScannedFolder(state: LibraryState, scanned: ScannedFolder): LibraryState {
   const tracks = Object.fromEntries(
@@ -36,9 +83,65 @@ export function mergeScannedFolder(state: LibraryState, scanned: ScannedFolder):
   };
 }
 
+export function getAllLibraryTracks(state: LibraryState): LibraryTrack[] {
+  return sortTracksByTitle(Object.values(state.tracks));
+}
+
+export function getLibraryArtists(state: LibraryState): LibraryArtist[] {
+  const artists = new Map<string, LibraryArtist>();
+
+  for (const track of Object.values(state.tracks)) {
+    const name = getTrackArtist(track);
+    const id = normalizeKey(name);
+    const artist = artists.get(id) || { id, name, trackIds: [] };
+    artist.trackIds.push(track.id);
+    artists.set(id, artist);
+  }
+
+  return Array.from(artists.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function getLibraryAlbums(state: LibraryState): LibraryAlbum[] {
+  const albums = new Map<string, LibraryAlbum>();
+
+  for (const track of Object.values(state.tracks)) {
+    const id = getAlbumId(track);
+    const album = albums.get(id) || {
+      id,
+      title: getTrackAlbum(track),
+      artist: getTrackArtist(track),
+      artwork: track.artwork,
+      trackIds: [],
+      year: track.year,
+    };
+    album.trackIds.push(track.id);
+    if (!album.artwork && track.artwork) album.artwork = track.artwork;
+    if (!album.year && track.year) album.year = track.year;
+    albums.set(id, album);
+  }
+
+  return Array.from(albums.values()).sort((a, b) => a.title.localeCompare(b.title));
+}
+
 export function getSourceTracks(state: LibraryState): LibraryTrack[] {
   const source = state.selectedSource;
   if (!source) return [];
+
+  if (source.type === "library-tracks") return getAllLibraryTracks(state);
+
+  if (source.type === "library-artist") {
+    return sortTracksByTitle(
+      Object.values(state.tracks).filter((track) => normalizeKey(getTrackArtist(track)) === source.id),
+    );
+  }
+
+  if (source.type === "library-album") {
+    return sortAlbumTracks(
+      Object.values(state.tracks).filter((track) => getAlbumId(track) === source.id),
+    );
+  }
+
+  if (source.type === "library-artists" || source.type === "library-albums") return [];
 
   if (source.type === "loved") {
     return (state.favoriteTrackIds || [])

@@ -1,14 +1,12 @@
 import type { LibraryTrack } from "../../../../shared/library";
 import { AnimatePresence, motion } from "framer-motion";
+import { SliderComfortable } from "@/components/ui/slider";
+import { Tooltip } from "@/components/ui/tooltip";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
 import { TrackArtwork } from "@/features/tracks/TrackArtwork";
 import { IconButton } from "./IconButton";
-import {
-  PlayPauseMorphIcon,
-  SkipBackFilledIcon,
-  SkipForwardFilledIcon,
-} from "./media-icons";
+import { PlayPauseMorphIcon, SkipBackFilledIcon, SkipForwardFilledIcon } from "./media-icons";
 import type { RepeatMode } from "./types";
 import { WaveformEmptyState } from "./WaveformEmptyState";
 
@@ -17,51 +15,50 @@ export function Player({
   isPlaying,
   isLoading,
   hasWaveform,
+  reduceMotion,
   isFavorite,
   currentTime,
   duration,
   error,
-  canvasRef,
+  waveformRef,
   shuffleEnabled,
   repeatMode,
+  volume,
   onTogglePlayback,
   onPreviousTrack,
   onNextTrack,
   onToggleShuffle,
   onCycleRepeat,
   onToggleFavorite,
-  onSeekPointer,
-  onPointerScrubStart,
-  onPointerScrubMove,
-  onPointerScrubEnd,
+  onVolumeChange,
 }: {
   activeTrack: LibraryTrack | null;
   isPlaying: boolean;
   isLoading: boolean;
   hasWaveform: boolean;
+  reduceMotion: boolean;
   isFavorite: boolean;
   currentTime: number;
   duration: number;
   error: string;
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  waveformRef: React.Ref<HTMLDivElement>;
   shuffleEnabled: boolean;
   repeatMode: RepeatMode;
+  volume: number;
   onTogglePlayback: () => void;
   onPreviousTrack: () => void;
   onNextTrack: () => void;
   onToggleShuffle: () => void;
   onCycleRepeat: () => void;
   onToggleFavorite: () => void;
-  onSeekPointer: (clientX: number) => void;
-  onPointerScrubStart: () => void;
-  onPointerScrubMove: () => boolean;
-  onPointerScrubEnd: () => void;
+  onVolumeChange: (volume: number) => void;
 }) {
   const icons = useIcons();
   const HeartIcon = icons.heart;
   const MusicIcon = icons.music;
   const ShuffleIcon = icons.shuffle;
   const RepeatIcon = icons.repeat;
+  const VolumeIcon = icons["volume-2"];
 
   return (
     <section className="flex shrink-0 flex-col gap-[10px] px-4 pt-4 overflow-hidden">
@@ -132,63 +129,53 @@ export function Player({
           </div>
 
           <div className="flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
-            <button
-              className={`no-drag transition hover:text-foreground disabled:opacity-40 ${
-                isFavorite ? "text-primary" : "text-muted-foreground"
-              }`}
-              title={isFavorite ? "Remove favorite" : "Favorite"}
-              disabled={!activeTrack}
-              onClick={onToggleFavorite}
-            >
-              <HeartIcon size={18} strokeWidth={1.7} fill={isFavorite ? "currentColor" : "none"} />
-            </button>
+            <Tooltip content={isFavorite ? "Remove from Loved" : "Add to Loved"} side="top">
+              <button
+                className={`no-drag transition hover:text-foreground disabled:opacity-40 ${
+                  isFavorite ? "text-primary" : "text-muted-foreground"
+                }`}
+                title={isFavorite ? "Remove from Loved" : "Add to Loved"}
+                disabled={!activeTrack}
+                onClick={onToggleFavorite}
+              >
+                <HeartIcon
+                  size={18}
+                  strokeWidth={1.7}
+                  fill={isFavorite ? "currentColor" : "none"}
+                />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
 
       <div className="relative mt-4 flex flex-col">
         <div className="relative h-[74px] overflow-hidden rounded-[20px]">
-          <motion.div
-            className="absolute inset-0"
-            animate={{
-              opacity: hasWaveform ? 1 : 0,
-              y: hasWaveform ? 0 : 7,
-              filter: hasWaveform ? "blur(0px)" : "blur(8px)",
-            }}
-            transition={{
-              type: "spring",
-              stiffness: 360,
-              damping: 32,
-              mass: 0.78,
-              opacity: { duration: 0.22 },
-              filter: { duration: 0.28 },
-            }}
-          >
-            <canvas
-              ref={canvasRef}
-              className="no-drag h-full w-full rounded-[2px]"
-              onPointerDown={(event) => {
-                event.currentTarget.setPointerCapture(event.pointerId);
-                onPointerScrubStart();
-                onSeekPointer(event.clientX);
+          <motion.div className="absolute inset-0 overflow-hidden rounded-[2px]">
+            <motion.div
+              className="h-full origin-left"
+              animate={{
+                clipPath: hasWaveform ? "inset(0% 0% 0% 0%)" : "inset(0% 100% 0% 0%)",
+                opacity: hasWaveform ? 1 : 0,
               }}
-              onPointerMove={(event) => {
-                if (onPointerScrubMove()) onSeekPointer(event.clientX);
+              transition={{
+                clipPath: {
+                  duration: reduceMotion ? 0 : 0.55,
+                  ease: [0.22, 1, 0.36, 1],
+                },
+                opacity: { duration: reduceMotion ? 0 : hasWaveform ? 0.08 : 0.18 },
               }}
-              onPointerUp={(event) => {
-                event.currentTarget.releasePointerCapture(event.pointerId);
-                onPointerScrubEnd();
-              }}
-              onPointerCancel={onPointerScrubEnd}
-            />
+            >
+              <div ref={waveformRef} className="no-drag h-full w-full rounded-[2px]" />
+            </motion.div>
           </motion.div>
 
           <AnimatePresence mode="wait">
             {!hasWaveform && (
               <WaveformEmptyState
                 key={activeTrack ? "loading-waveform" : "empty-waveform"}
-                isLoading={isLoading}
-                hasTrack={Boolean(activeTrack)}
+                isLoading={isLoading || !activeTrack}
+                reduceMotion={reduceMotion}
               />
             )}
           </AnimatePresence>
@@ -199,56 +186,72 @@ export function Player({
         </div>
       </div>
 
-      <div className="flex items-center justify-center gap-3 py-1">
-        <IconButton
-          title={shuffleEnabled ? "Shuffle on" : "Shuffle"}
-          active={shuffleEnabled}
-          onClick={onToggleShuffle}
-        >
-          <ShuffleIcon size={20} strokeWidth={1.8} />
-        </IconButton>
-        <div className="flex items-center gap-[6px]">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center py-1">
+        <div />
+        <div className="flex items-center justify-center gap-3">
           <IconButton
-            title="Previous"
-            onClick={onPreviousTrack}
-            disabled={!activeTrack || isLoading}
+            title={shuffleEnabled ? "Shuffle on" : "Shuffle"}
+            active={shuffleEnabled}
+            onClick={onToggleShuffle}
           >
-            <SkipBackFilledIcon size={16} />
+            <ShuffleIcon size={20} strokeWidth={1.8} />
           </IconButton>
-          <button
-            className="no-drag grid size-12 place-items-center rounded-full bg-white text-black transition duration-150 hover:bg-white/90 active:scale-[0.98] disabled:opacity-40"
-            title={isPlaying ? "Pause" : "Play"}
-            onClick={onTogglePlayback}
-            disabled={!activeTrack || isLoading}
+          <div className="flex items-center gap-[6px]">
+            <IconButton
+              title="Previous"
+              onClick={onPreviousTrack}
+              disabled={!activeTrack || isLoading}
+            >
+              <SkipBackFilledIcon size={16} />
+            </IconButton>
+            <button
+              className="no-drag grid size-12 place-items-center rounded-full bg-white text-black transition duration-150 hover:bg-white/90 active:scale-[0.98] disabled:opacity-40"
+              title={isPlaying ? "Pause" : "Play"}
+              onClick={onTogglePlayback}
+              disabled={!activeTrack || isLoading}
+            >
+              <span className="relative grid size-6 place-items-center overflow-hidden">
+                <PlayPauseMorphIcon
+                  playing={isPlaying}
+                  size={24}
+                  className={isPlaying ? "" : "translate-x-px"}
+                />
+              </span>
+            </button>
+            <IconButton title="Next" onClick={onNextTrack} disabled={!activeTrack || isLoading}>
+              <SkipForwardFilledIcon size={16} />
+            </IconButton>
+          </div>
+          <IconButton
+            title={
+              repeatMode === "one" ? "Repeat one" : repeatMode === "all" ? "Repeat all" : "Repeat"
+            }
+            active={repeatMode !== "off"}
+            onClick={onCycleRepeat}
           >
-            <span className="relative grid size-6 place-items-center overflow-hidden">
-              <PlayPauseMorphIcon
-                playing={isPlaying}
-                size={24}
-                className={isPlaying ? "" : "translate-x-px"}
-              />
+            <span className="relative grid place-items-center">
+              <RepeatIcon size={20} strokeWidth={1.8} />
+              {repeatMode === "one" && (
+                <span className="absolute -right-1 -top-1 grid size-3 place-items-center rounded-full bg-primary text-[8px] font-bold leading-none text-black">
+                  1
+                </span>
+              )}
             </span>
-          </button>
-          <IconButton title="Next" onClick={onNextTrack} disabled={!activeTrack || isLoading}>
-            <SkipForwardFilledIcon size={16} />
           </IconButton>
         </div>
-        <IconButton
-          title={
-            repeatMode === "one" ? "Repeat one" : repeatMode === "all" ? "Repeat all" : "Repeat"
-          }
-          active={repeatMode !== "off"}
-          onClick={onCycleRepeat}
-        >
-          <span className="relative grid place-items-center">
-            <RepeatIcon size={20} strokeWidth={1.8} />
-            {repeatMode === "one" && (
-              <span className="absolute -right-1 -top-1 grid size-3 place-items-center rounded-full bg-primary text-[8px] font-bold leading-none text-black">
-                1
-              </span>
-            )}
-          </span>
-        </IconButton>
+        <div className="no-drag ml-auto w-[152px]">
+          <SliderComfortable
+            value={Math.round(volume * 100)}
+            min={0}
+            max={100}
+            step={1}
+            variant="scrubber"
+            label={<VolumeIcon size={15} strokeWidth={1.8} />}
+            formatValue={(value) => `${Math.round(value)}%`}
+            className="h-7 border-white/10 bg-white/[0.045]"
+            onChange={(value) => onVolumeChange(value / 100)}
+          />
+        </div>
       </div>
 
       <div className="h-4 text-center text-[12px] leading-4 text-muted-foreground">{error}</div>

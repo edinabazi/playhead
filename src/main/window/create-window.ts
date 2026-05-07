@@ -12,7 +12,7 @@ export function createWindow(): void {
     title: "Playhead",
     icon: iconPath,
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 32, y: 54 },
+    trafficLightPosition: { x: 35, y: 38 },
     hasShadow: false,
     backgroundColor: "#00000000",
     transparent: true,

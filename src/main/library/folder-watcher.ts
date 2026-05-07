@@ -9,10 +9,18 @@ const notifyDelayMs = 650;
 
 let watcher: FSWatcher | null = null;
 let watchedFolders: LibraryFolder[] = [];
+let watchedExtensions = audioExtensions;
 const pendingNotifications = new Map<string, NodeJS.Timeout>();
 
-export async function watchLibraryFolders(folders: LibraryFolder[]): Promise<void> {
+export async function watchLibraryFolders(
+  folders: LibraryFolder[],
+  extensions?: string[],
+): Promise<void> {
   watchedFolders = folders;
+  watchedExtensions =
+    extensions && extensions.length > 0
+      ? new Set(extensions.map((extension) => extension.toLowerCase()))
+      : audioExtensions;
 
   if (watcher) {
     await watcher.close();
@@ -33,7 +41,7 @@ export async function watchLibraryFolders(folders: LibraryFolder[]): Promise<voi
       },
       ignoreInitial: true,
       ignored: (filePath, stats) =>
-        Boolean(stats?.isFile()) && !audioExtensions.has(extname(filePath).toLowerCase()),
+        Boolean(stats?.isFile()) && !watchedExtensions.has(extname(filePath).toLowerCase()),
     },
   );
 

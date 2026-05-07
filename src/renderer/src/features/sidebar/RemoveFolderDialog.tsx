@@ -1,36 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import {
-  DialogForm,
   DialogOverlay,
+  DialogPanel,
   dialogOverlayMotion,
   dialogPanelMotion,
 } from "@/components/ui/dialog-motion";
 import { useIcons } from "@/lib/icon-context";
+import type { LibraryFolder } from "../../../../shared/library";
 
-export function CreatePlaylistDialog({
-  title = "Create Playlist",
-  description = "Name the playlist before adding it to Playhead.",
-  initialName = "",
-  submitLabel = "Create",
-  onCreate,
+export function RemoveFolderDialog({
+  folder,
+  onConfirm,
   onClose,
 }: {
-  title?: string;
-  description?: string;
-  initialName?: string;
-  submitLabel?: string;
-  onCreate: (name: string) => void;
+  folder: LibraryFolder;
+  onConfirm: () => void;
   onClose: () => void;
 }) {
   const icons = useIcons();
-  const [name, setName] = useState(initialName);
-  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    inputRef.current?.focus();
-
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
@@ -39,32 +30,25 @@ export function CreatePlaylistDialog({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  const submit = () => {
-    const trimmedName = name.trim();
-    if (!trimmedName) return;
-    onCreate(trimmedName);
-  };
-
   return createPortal(
     <DialogOverlay
       {...dialogOverlayMotion}
       className="app-modal-overlay no-drag fixed inset-0 z-[10000] grid place-items-center bg-black/40 px-5"
       onPointerDown={onClose}
     >
-      <DialogForm
+      <DialogPanel
         {...dialogPanelMotion}
-        className="w-full max-w-[360px] rounded-[28px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-3 shadow-2xl"
+        className="w-full max-w-[380px] rounded-[28px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-3 shadow-2xl"
         onPointerDown={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
       >
         <div className="flex items-start justify-between gap-3 px-2 pt-1">
           <div>
-            <h2 className="text-[15px] font-semibold leading-6 text-foreground">{title}</h2>
+            <h2 className="text-[15px] font-semibold leading-6 text-foreground">
+              Remove {folder.name}?
+            </h2>
             <p className="mt-1 text-[13px] font-medium leading-5 text-muted-foreground">
-              {description}
+              This removes the folder from Playhead. If any of its tracks are in playlists, they
+              will be removed from those playlists too. Your music files will stay where they are.
             </p>
           </div>
           <button
@@ -77,25 +61,19 @@ export function CreatePlaylistDialog({
           </button>
         </div>
 
-        <div className="mt-4 px-2">
-          <input
-            ref={inputRef}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="h-10 w-full rounded-[18px] border border-white/10 bg-white/[0.055] px-3 text-[14px] font-medium text-foreground outline-none"
-            placeholder="Playlist name"
-          />
-        </div>
-
         <div className="mt-4 flex justify-end gap-2 px-2 pb-1">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={!name.trim()}>
-            {submitLabel}
+          <Button
+            type="button"
+            className="bg-red-500 text-white hover:bg-red-400 active:bg-red-600"
+            onClick={onConfirm}
+          >
+            Remove Folder
           </Button>
         </div>
-      </DialogForm>
+      </DialogPanel>
     </DialogOverlay>,
     document.body,
   );

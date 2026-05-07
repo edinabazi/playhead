@@ -16,6 +16,7 @@ import {
   Heart,
   ImageIcon,
   Info,
+  Keyboard,
   ListMusic,
   ListPlus,
   Lightbulb,
@@ -53,6 +54,8 @@ import {
   Trash2,
   User,
   Users,
+  Volume2,
+  AudioWaveform,
   X,
   Pencil,
 } from "lucide-react";
@@ -104,6 +107,7 @@ export type IconName =
   | "globe"
   | "user"
   | "image"
+  | "keyboard"
   | "link"
   | "check"
   | "rotate-ccw"
@@ -120,6 +124,8 @@ export type IconName =
   | "music"
   | "shuffle"
   | "skip-forward"
+  | "volume-2"
+  | "audio-waveform"
   | "repeat";
 
 export const iconLibraryOrder: IconLibrary[] = ["lucide"];
@@ -165,6 +171,7 @@ const lucideMap: Record<IconName, IconComponent> = {
   globe: Globe,
   user: User,
   image: ImageIcon,
+  keyboard: Keyboard,
   info: Info,
   "list-plus": ListPlus,
   "folder-open": FolderOpen,
@@ -181,6 +188,8 @@ const lucideMap: Record<IconName, IconComponent> = {
   music: Music,
   shuffle: Shuffle,
   "skip-forward": SkipForward,
+  "volume-2": Volume2,
+  "audio-waveform": AudioWaveform,
   repeat: Repeat,
 };
 

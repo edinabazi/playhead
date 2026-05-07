@@ -2,7 +2,6 @@
 
 import {
   useRef,
-  useState,
   useEffect,
   createContext,
   useContext,
@@ -52,11 +51,8 @@ const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
       measureItems();
     }, [measureItems, children]);
 
-    const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
-
     const activeRect = activeIndex !== null ? itemRects[activeIndex] : null;
     const checkedRect = checkedIndex != null ? itemRects[checkedIndex] : null;
-    const focusRect = focusedIndex !== null ? itemRects[focusedIndex] : null;
     const isHoveringOther = activeIndex !== null && activeIndex !== checkedIndex;
     const shape = useShape();
 
@@ -78,12 +74,10 @@ const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
             if (indexAttr != null) {
               const idx = Number(indexAttr);
               setActiveIndex(idx);
-              setFocusedIndex((e.target as HTMLElement).matches(":focus-visible") ? idx : null);
             }
           }}
           onBlur={(e) => {
             if (containerRef.current?.contains(e.relatedTarget as Node)) return;
-            setFocusedIndex(null);
             setActiveIndex(null);
           }}
           onKeyDown={(e) => {
@@ -155,27 +149,6 @@ const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
                   left: activeRect.left,
                   width: activeRect.width,
                   height: activeRect.height,
-                }}
-                exit={{ opacity: 0, transition: { duration: 0.06 } }}
-                transition={{
-                  ...springs.fast,
-                  opacity: { duration: 0.08 },
-                }}
-              />
-            )}
-          </AnimatePresence>
-
-          {/* Focus ring */}
-          <AnimatePresence>
-            {focusRect && (
-              <motion.div
-                className={`absolute ${shape.focusRing} pointer-events-none z-20 border border-[#6B97FF]`}
-                initial={false}
-                animate={{
-                  left: focusRect.left - 2,
-                  top: focusRect.top - 2,
-                  width: focusRect.width + 4,
-                  height: focusRect.height + 4,
                 }}
                 exit={{ opacity: 0, transition: { duration: 0.06 } }}
                 transition={{

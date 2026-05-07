@@ -37,7 +37,7 @@ export function SidebarGroup({
 
   return (
     <section
-      className="no-drag flex flex-col gap-[15px]"
+      className="no-drag flex flex-col gap-1"
       onPointerEnter={() => setIsHovered(true)}
       onPointerLeave={() => setIsHovered(false)}
     >
@@ -54,7 +54,7 @@ export function SidebarGroup({
           />
         </button>
         <div
-          className={`flex items-center gap-[13px] transition-opacity duration-150 ${
+          className={`flex items-center gap-2 transition-opacity duration-150 ${
             isHovered ? "opacity-100" : "opacity-0"
           }`}
         >
@@ -83,7 +83,7 @@ export function SidebarGroup({
       <AnimatePresence initial={false}>
         {!collapsed && (
           <motion.div
-            className="flex flex-col gap-[9px] overflow-hidden"
+            className="-mx-2 flex flex-col gap-1 overflow-hidden px-2"
             initial={{ height: 0, opacity: 0, y: -4 }}
             animate={{ height: "auto", opacity: 1, y: 0 }}
             exit={{ height: 0, opacity: 0, y: -4 }}
@@ -96,4 +96,3 @@ export function SidebarGroup({
     </section>
   );
 }
-

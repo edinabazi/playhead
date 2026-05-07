@@ -1,11 +1,12 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { dialog, ipcMain, shell } from "electron";
+import { app, dialog, ipcMain, shell } from "electron";
 import type { EditableTrackMetadata, LibraryFolder, LibraryState } from "../../shared/library";
 import { readTrackMetadata, saveTrackMetadata } from "../metadata/metadata";
 import { watchLibraryFolders } from "./folder-watcher";
 import { scanFolderPath } from "./scanner";
-import { readLibraryState, writeLibraryState } from "./store";
+import { normalizeLibraryState, readLibraryState, writeLibraryState } from "./store";
 
 export function registerLibraryIpc(): void {
   ipcMain.handle("library:get-state", () => readLibraryState());
@@ -14,7 +15,7 @@ export function registerLibraryIpc(): void {
     return writeLibraryState(state);
   });
 
-  ipcMain.handle("library:select-folder", async () => {
+  ipcMain.handle("library:select-folder", async (_event, extensions?: string[]) => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory"],
       title: "Add music folder",
@@ -22,20 +23,29 @@ export function registerLibraryIpc(): void {
 
     if (result.canceled || !result.filePaths[0]) return null;
 
-    return scanFolderPath(result.filePaths[0]);
+    return scanFolderPath(result.filePaths[0], extensions);
   });
 
-  ipcMain.handle("library:scan-folder", async (_event, folder: LibraryFolder) => {
-    return scanFolderPath(folder.path);
-  });
+  ipcMain.handle(
+    "library:scan-folder",
+    async (_event, folder: LibraryFolder, extensions?: string[]) => {
+      return scanFolderPath(folder.path, extensions);
+    },
+  );
 
-  ipcMain.handle("library:scan-folder-path", async (_event, folderPath: string) => {
-    return scanFolderPath(folderPath);
-  });
+  ipcMain.handle(
+    "library:scan-folder-path",
+    async (_event, folderPath: string, extensions?: string[]) => {
+      return scanFolderPath(folderPath, extensions);
+    },
+  );
 
-  ipcMain.handle("library:watch-folders", async (_event, folders: LibraryFolder[]) => {
-    await watchLibraryFolders(folders);
-  });
+  ipcMain.handle(
+    "library:watch-folders",
+    async (_event, folders: LibraryFolder[], extensions?: string[]) => {
+      await watchLibraryFolders(folders, extensions);
+    },
+  );
 
   ipcMain.handle("library:get-audio-url", (_event, filePath: string) => {
     return pathToFileURL(filePath).toString();
@@ -59,5 +69,39 @@ export function registerLibraryIpc(): void {
 
   ipcMain.handle("library:show-item", (_event, filePath: string) => {
     shell.showItemInFolder(filePath);
+  });
+
+  ipcMain.handle("library:open-data-folder", async () => {
+    await shell.openPath(app.getPath("userData"));
+  });
+
+  ipcMain.handle("library:clear-waveform-cache", async () => {
+    await rm(join(app.getPath("userData"), "waveforms"), { recursive: true, force: true });
+  });
+
+  ipcMain.handle("library:export-backup", async (_event, state: LibraryState) => {
+    const result = await dialog.showSaveDialog({
+      title: "Export Playhead Backup",
+      defaultPath: "playhead-library-backup.json",
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+
+    if (result.canceled || !result.filePath) return false;
+    await writeFile(result.filePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    return true;
+  });
+
+  ipcMain.handle("library:import-backup", async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Import Playhead Backup",
+      properties: ["openFile"],
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+
+    if (result.canceled || !result.filePaths[0]) return null;
+
+    const raw = await readFile(result.filePaths[0], "utf8");
+    const imported = await normalizeLibraryState(JSON.parse(raw) as Partial<LibraryState>);
+    return writeLibraryState(imported);
   });
 }

@@ -55,6 +55,22 @@
   -webkit-user-select: none;
 }
 
+.cursor-ew-resize,
+.cursor-ew-resize * {
+  cursor: ew-resize !important;
+}
+
+.cursor-text,
+.cursor-text * {
+  cursor: text !important;
+}
+
+*:focus,
+*:focus-visible,
+*:active {
+  outline: none !important;
+}
+
 html,
 body,
 #root {
@@ -72,6 +88,7 @@ body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   font-synthesis-weight: none;
   text-rendering: geometricPrecision;
+  letter-spacing: -0.3px;
 }
 
 .selectable,
@@ -100,10 +117,19 @@ canvas {
   overflow: hidden;
   border-radius: inherit;
   background:
-    linear-gradient(144deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.025) 34%, rgba(0, 0, 0, 0) 72%),
+    linear-gradient(
+      144deg,
+      rgba(255, 255, 255, 0.11) 0%,
+      rgba(255, 255, 255, 0.025) 34%,
+      rgba(0, 0, 0, 0) 72%
+    ),
     radial-gradient(circle at 58% 35%, rgba(255, 255, 255, 0.075), transparent 31%),
-    linear-gradient(180deg, rgba(24, 24, 23, 0.88), rgba(15, 15, 14, 0.9)),
-    rgba(0, 0, 0, 0.75);
+    linear-gradient(
+      180deg,
+      rgba(24, 24, 23, var(--app-transparency, 0.88)),
+      rgba(15, 15, 14, var(--app-transparency, 0.9))
+    ),
+    rgba(0, 0, 0, calc(var(--app-transparency, 0.88) * 0.83));
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
@@ -146,6 +172,22 @@ canvas {
   z-index: 2;
 }
 
+.app-modal-overlay {
+  border-radius: 49px;
+  overflow: hidden;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.001ms !important;
+}
+
 .thin-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
@@ -186,6 +228,37 @@ input,
     }
     50% {
       stroke-dasharray: 40 60;
+    }
+  }
+
+  @keyframes active-waveform {
+    0% {
+      transform: scaleY(0.5);
+      opacity: 0.55;
+    }
+    17% {
+      transform: scaleY(0.78);
+      opacity: 0.78;
+    }
+    31% {
+      transform: scaleY(0.43);
+      opacity: 0.58;
+    }
+    48% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+    66% {
+      transform: scaleY(0.62);
+      opacity: 0.7;
+    }
+    82% {
+      transform: scaleY(0.88);
+      opacity: 0.86;
+    }
+    100% {
+      transform: scaleY(0.5);
+      opacity: 0.55;
     }
   }
 }

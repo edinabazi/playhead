@@ -20,6 +20,7 @@ export function TrackRowMenu({
   anchorPoint,
   onOpenChange,
   onAddToPlaylist,
+  onCreatePlaylist,
   onRemoveFromPlaylist,
   onShowInFolder,
   onShowMetadata,
@@ -32,6 +33,7 @@ export function TrackRowMenu({
   anchorPoint: MenuAnchorPoint | null;
   onOpenChange: (open: boolean, point: MenuAnchorPoint | null) => void;
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
+  onCreatePlaylist: (track: LibraryTrack) => void;
   onRemoveFromPlaylist: (trackId: string) => void;
   onShowInFolder: (track: LibraryTrack) => void;
   onShowMetadata: (track: LibraryTrack) => void;
@@ -123,11 +125,7 @@ export function TrackRowMenu({
                   onMouseEnter={() => setPlaylistOpen(true)}
                 >
                   <Dropdown className="w-52 bg-[rgba(10,10,10,0.96)]">
-                    {playlists.length === 0 ? (
-                      <div className="px-2 py-2 text-[13px] text-muted-foreground">
-                        No playlists
-                      </div>
-                    ) : (
+                    {playlists.length > 0 &&
                       playlists.map((playlist, index) => (
                         <MenuItem
                           key={playlist.id}
@@ -141,8 +139,17 @@ export function TrackRowMenu({
                             setPlaylistOpen(false);
                           }}
                         />
-                      ))
-                    )}
+                      ))}
+                    <MenuItem
+                      icon={icons.plus}
+                      label="Create Playlist"
+                      index={playlists.length}
+                      onSelect={() => {
+                        onCreatePlaylist(track);
+                        onOpenChange(false, null);
+                        setPlaylistOpen(false);
+                      }}
+                    />
                   </Dropdown>
                 </div>
               )}

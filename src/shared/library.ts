@@ -1,4 +1,14 @@
-export type SourceType = "folder" | "playlist" | "loved";
+export type LibraryMode = "folder" | "library";
+
+export type SourceType =
+  | "folder"
+  | "playlist"
+  | "loved"
+  | "library-artists"
+  | "library-artist"
+  | "library-albums"
+  | "library-album"
+  | "library-tracks";
 
 export type LibraryFolder = {
   id: string;
@@ -14,6 +24,10 @@ export type LibraryTrack = {
   title: string;
   artist: string;
   album?: string;
+  albumArtist?: string;
+  trackNumber?: number;
+  diskNumber?: number;
+  year?: number;
   artwork?: LibraryArtwork;
   duration: number;
   folderId: string;
@@ -73,6 +87,40 @@ export type LibraryState = {
   playlists: LibraryPlaylist[];
   favoriteTrackIds: string[];
   selectedSource: SelectedSource | null;
+  settings: AppSettings;
+};
+
+export type AppSettings = {
+  library: LibrarySettings;
+  playback: PlaybackSettings;
+  appearance: AppearanceSettings;
+  session: SessionSettings;
+};
+
+export type LibrarySettings = {
+  mode: LibraryMode;
+  enabledAudioExtensions: string[];
+  watchFolders: boolean;
+  rescanOnLaunch: boolean;
+};
+
+export type PlaybackSettings = {
+  seekStepSeconds: number;
+  volumeStepPercent: number;
+  rememberTrackPositions: boolean;
+  restoreLastSession: boolean;
+  skipUnavailableTracks: boolean;
+};
+
+export type AppearanceSettings = {
+  appTransparency: number;
+  reduceMotion: boolean;
+};
+
+export type SessionSettings = {
+  activeTrackId: string | null;
+  selectedTrackIds: string[];
+  trackPositions: Record<string, number>;
 };
 
 export type ScannedFolder = {
@@ -85,9 +133,9 @@ export type MediaCommand = "play-pause" | "next" | "previous";
 export type PlayheadApi = {
   getLibraryState: () => Promise<LibraryState>;
   saveLibraryState: (state: LibraryState) => Promise<LibraryState>;
-  selectMusicFolder: () => Promise<ScannedFolder | null>;
-  scanFolder: (folder: LibraryFolder) => Promise<ScannedFolder>;
-  scanFolderPath: (path: string) => Promise<ScannedFolder>;
+  selectMusicFolder: (extensions?: string[]) => Promise<ScannedFolder | null>;
+  scanFolder: (folder: LibraryFolder, extensions?: string[]) => Promise<ScannedFolder>;
+  scanFolderPath: (path: string, extensions?: string[]) => Promise<ScannedFolder>;
   getDroppedFilePath: (file: File) => string;
   getAudioFileUrl: (path: string) => Promise<string>;
   readAudioFile: (path: string) => Promise<ArrayBuffer>;
@@ -97,11 +145,58 @@ export type PlayheadApi = {
     folderId: string,
     metadata: EditableTrackMetadata,
   ) => Promise<LibraryTrack>;
-  watchLibraryFolders: (folders: LibraryFolder[]) => Promise<void>;
+  watchLibraryFolders: (folders: LibraryFolder[], extensions?: string[]) => Promise<void>;
   showItemInFolder: (path: string) => Promise<void>;
+  openDataFolder: () => Promise<void>;
+  clearWaveformCache: () => Promise<void>;
+  exportLibraryBackup: (state: LibraryState) => Promise<boolean>;
+  importLibraryBackup: () => Promise<LibraryState | null>;
   onMediaCommand: (callback: (command: MediaCommand) => void) => () => void;
   onFolderChanged: (callback: (folderId: string) => void) => () => void;
 };
+
+export const defaultLibrarySettings = (): LibrarySettings => ({
+  mode: "library",
+  enabledAudioExtensions: [
+    ".aac",
+    ".aif",
+    ".aiff",
+    ".flac",
+    ".m4a",
+    ".mp3",
+    ".ogg",
+    ".opus",
+    ".wav",
+  ],
+  watchFolders: true,
+  rescanOnLaunch: false,
+});
+
+export const defaultPlaybackSettings = (): PlaybackSettings => ({
+  seekStepSeconds: 5,
+  volumeStepPercent: 5,
+  rememberTrackPositions: true,
+  restoreLastSession: true,
+  skipUnavailableTracks: true,
+});
+
+export const defaultAppearanceSettings = (): AppearanceSettings => ({
+  appTransparency: 95,
+  reduceMotion: false,
+});
+
+export const defaultSessionSettings = (): SessionSettings => ({
+  activeTrackId: null,
+  selectedTrackIds: [],
+  trackPositions: {},
+});
+
+export const defaultAppSettings = (): AppSettings => ({
+  library: defaultLibrarySettings(),
+  playback: defaultPlaybackSettings(),
+  appearance: defaultAppearanceSettings(),
+  session: defaultSessionSettings(),
+});
 
 export const emptyLibraryState = (): LibraryState => ({
   folders: [],
@@ -109,4 +204,5 @@ export const emptyLibraryState = (): LibraryState => ({
   playlists: [],
   favoriteTrackIds: [],
   selectedSource: null,
+  settings: defaultAppSettings(),
 });
