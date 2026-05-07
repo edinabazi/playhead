@@ -35,7 +35,7 @@ export function TrackCell({
       tabIndex={0}
       draggable={draggable}
       data-track-id={trackId}
-      className={`group flex w-full min-w-0 items-center justify-between rounded-[16px] px-[10px] py-[7px] text-left transition-[opacity,background-color,transform] duration-150 ${
+      className={`group flex w-full min-w-0 items-center justify-between rounded-[16px] px-[10px] py-[7px] text-left transition-[opacity,transform] duration-150 ${
         selected ? "bg-[var(--surface-track-active)]" : "hover:bg-[var(--surface-track-hover)]"
       } ${dragging ? "scale-[0.99] opacity-35" : ""}`}
       onClick={onClick}

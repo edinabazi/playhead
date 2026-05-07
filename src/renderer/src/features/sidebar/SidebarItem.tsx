@@ -25,7 +25,7 @@ export function SidebarItem({
   label: string;
   detail: string;
   onClick: () => void;
-  onDropTrack?: (trackId: string) => void;
+  onDropTrack?: (trackIds: string[]) => void;
   onContextMenu?: (point: MenuAnchorPoint) => void;
 }) {
   const [isDropTarget, setIsDropTarget] = useState(false);
@@ -80,8 +80,22 @@ export function SidebarItem({
         if (!onDropTrack) return;
         event.preventDefault();
         event.stopPropagation();
-        const trackId = event.dataTransfer.getData("application/x-playhead-track-id");
-        if (trackId) onDropTrack(trackId);
+        const trackIdsPayload = event.dataTransfer.getData("application/x-playhead-track-ids");
+        const fallbackTrackId = event.dataTransfer.getData("application/x-playhead-track-id");
+        let trackIds = fallbackTrackId ? [fallbackTrackId] : [];
+
+        if (trackIdsPayload) {
+          try {
+            const parsedTrackIds = JSON.parse(trackIdsPayload);
+            if (Array.isArray(parsedTrackIds)) {
+              trackIds = parsedTrackIds.filter((trackId): trackId is string => typeof trackId === "string");
+            }
+          } catch {
+            trackIds = fallbackTrackId ? [fallbackTrackId] : [];
+          }
+        }
+
+        if (trackIds.length > 0) onDropTrack(trackIds);
         setIsDropTarget(false);
       }}
       onDragEnter={(event) => {

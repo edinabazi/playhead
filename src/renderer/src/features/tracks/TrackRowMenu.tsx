@@ -13,6 +13,7 @@ import type { LibraryPlaylist, LibraryTrack } from "../../../../shared/library";
 
 export function TrackRowMenu({
   track,
+  selectedTracks,
   playlists,
   selectedPlaylist,
   menuIcon: MenuIcon,
@@ -20,12 +21,14 @@ export function TrackRowMenu({
   anchorPoint,
   onOpenChange,
   onAddToPlaylist,
+  onAddTracksToPlaylist,
   onCreatePlaylist,
   onRemoveFromPlaylist,
   onShowInFolder,
   onShowMetadata,
 }: {
   track: LibraryTrack;
+  selectedTracks?: LibraryTrack[];
   playlists: LibraryPlaylist[];
   selectedPlaylist: LibraryPlaylist | null;
   menuIcon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
@@ -33,6 +36,7 @@ export function TrackRowMenu({
   anchorPoint: MenuAnchorPoint | null;
   onOpenChange: (open: boolean, point: MenuAnchorPoint | null) => void;
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
+  onAddTracksToPlaylist?: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (track: LibraryTrack) => void;
   onRemoveFromPlaylist: (trackId: string) => void;
   onShowInFolder: (track: LibraryTrack) => void;
@@ -49,6 +53,9 @@ export function TrackRowMenu({
   const InfoIcon = icons.info;
   const ChevronRightIcon = icons["chevron-right"];
   const fileManagerName = getNativeFileManagerName();
+  const tracksForAction =
+    selectedTracks && selectedTracks.length > 1 ? selectedTracks : [track];
+  const isMultiTrackMenu = tracksForAction.length > 1;
 
   useEffect(() => {
     if (!open) return;
@@ -132,9 +139,13 @@ export function TrackRowMenu({
                           icon={icons["list-music"]}
                           label={playlist.name}
                           index={index}
-                          checked={playlist.trackIds.includes(track.id)}
+                          checked={tracksForAction.every((item) => playlist.trackIds.includes(item.id))}
                           onSelect={() => {
-                            onAddToPlaylist(track, playlist);
+                            if (isMultiTrackMenu && onAddTracksToPlaylist) {
+                              onAddTracksToPlaylist(tracksForAction, playlist);
+                            } else {
+                              onAddToPlaylist(track, playlist);
+                            }
                             onOpenChange(false, null);
                             setPlaylistOpen(false);
                           }}
@@ -154,7 +165,7 @@ export function TrackRowMenu({
                 </div>
               )}
             </div>
-            {selectedPlaylist && (
+            {!isMultiTrackMenu && selectedPlaylist && (
               <MenuItem
                 icon={icons.x}
                 label="Remove from Playlist"
@@ -165,25 +176,29 @@ export function TrackRowMenu({
                 }}
               />
             )}
-            <DropdownSeparator />
-            <MenuItem
-              icon={FinderIcon}
-              label={`Show in ${fileManagerName}`}
-              index={2}
-              onSelect={() => {
-                onShowInFolder(track);
-                onOpenChange(false, null);
-              }}
-            />
-            <MenuItem
-              icon={InfoIcon}
-              label="Metadata"
-              index={3}
-              onSelect={() => {
-                onShowMetadata(track);
-                onOpenChange(false, null);
-              }}
-            />
+            {!isMultiTrackMenu && (
+              <>
+                <DropdownSeparator />
+                <MenuItem
+                  icon={FinderIcon}
+                  label={`Show in ${fileManagerName}`}
+                  index={2}
+                  onSelect={() => {
+                    onShowInFolder(track);
+                    onOpenChange(false, null);
+                  }}
+                />
+                <MenuItem
+                  icon={InfoIcon}
+                  label="Metadata"
+                  index={3}
+                  onSelect={() => {
+                    onShowMetadata(track);
+                    onOpenChange(false, null);
+                  }}
+                />
+              </>
+            )}
           </Dropdown>
         </div>
       )}

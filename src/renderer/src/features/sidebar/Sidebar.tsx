@@ -51,7 +51,7 @@ export function Sidebar({
   onOpenSettings: () => void;
   onCreatePlaylist: () => void;
   onSelectSource: (source: SelectedSource) => void;
-  onDropTrackToPlaylist: (trackId: string, playlist: LibraryPlaylist) => void;
+  onDropTrackToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
   onRenamePlaylist: (playlist: LibraryPlaylist) => void;
   onDeletePlaylist: (playlist: LibraryPlaylist) => void;
@@ -195,7 +195,7 @@ export function Sidebar({
                   label={playlist.name}
                   detail={`${playlist.trackIds.length}`}
                   onClick={() => onSelectSource({ type: "playlist", id: playlist.id })}
-                  onDropTrack={(trackId) => onDropTrackToPlaylist(trackId, playlist)}
+                  onDropTrack={(trackIds) => onDropTrackToPlaylist(trackIds, playlist)}
                   onContextMenu={(point) =>
                     setContextMenu({ type: "playlist", item: playlist, point })
                   }

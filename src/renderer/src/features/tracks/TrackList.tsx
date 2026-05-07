@@ -16,11 +16,13 @@ export function TrackList({
   selectedTrackIds,
   scrollToTrackId,
   selectedPlaylist,
+  canReorderTracks = true,
   playlists,
   favoriteTrackIds,
   onSelectTrack,
   onPlayTrack,
   onAddToPlaylist,
+  onAddTracksToPlaylist,
   onCreatePlaylist,
   onToggleFavorite,
   onRemoveFromPlaylist,
@@ -35,17 +37,19 @@ export function TrackList({
   selectedTrackIds: string[];
   scrollToTrackId: string | null;
   selectedPlaylist: LibraryPlaylist | null;
+  canReorderTracks?: boolean;
   playlists: LibraryPlaylist[];
   favoriteTrackIds: string[];
-  onSelectTrack: (track: LibraryTrack) => void;
+  onSelectTrack: (track: LibraryTrack, event?: React.MouseEvent<HTMLDivElement>) => void;
   onPlayTrack: (track: LibraryTrack) => void;
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
+  onAddTracksToPlaylist: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (track: LibraryTrack) => void;
   onToggleFavorite: (track: LibraryTrack) => void;
   onRemoveFromPlaylist: (trackId: string) => void;
   onShowInFolder: (track: LibraryTrack) => void;
   onShowMetadata: (track: LibraryTrack) => void;
-  onReorderTrack: (trackId: string, targetTrackId: string, edge?: "before" | "after") => void;
+  onReorderTrack: (trackIds: string[], targetTrackId: string, edge?: "before" | "after") => void;
   onScrolledToTrack: () => void;
 }) {
   const icons = useIcons();
@@ -53,13 +57,16 @@ export function TrackList({
   const MenuIcon = icons.ellipsis;
   const [menuTrackId, setMenuTrackId] = useState<string | null>(null);
   const [contextMenuPoint, setContextMenuPoint] = useState<MenuAnchorPoint | null>(null);
-  const [draggedTrackId, setDraggedTrackId] = useState<string | null>(null);
+  const [draggedTrackIds, setDraggedTrackIds] = useState<string[]>([]);
   const [dropIndicator, setDropIndicator] = useState<{
     trackId: string;
     edge: "before" | "after";
   } | null>(null);
   const [hasBottomFade, setHasBottomFade] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const selectedTracks = selectedTrackIds
+    .map((trackId) => tracks.find((track) => track.id === trackId))
+    .filter((track): track is LibraryTrack => Boolean(track));
 
   const updateBottomFade = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -119,12 +126,12 @@ export function TrackList({
                       draggable
                       trackId={track.id}
                       selected={selectedTrackIds.includes(track.id)}
-                      dragging={draggedTrackId === track.id}
-                      onClick={() => onSelectTrack(track)}
+                      dragging={draggedTrackIds.includes(track.id)}
+                      onClick={(event) => onSelectTrack(track, event)}
                       onDoubleClick={() => onPlayTrack(track)}
                       onContextMenu={(event) => {
                         event.preventDefault();
-                        onSelectTrack(track);
+                        if (!selectedTrackIds.includes(track.id)) onSelectTrack(track);
                         setContextMenuPoint({ x: event.clientX, y: event.clientY, align: "left" });
                         setMenuTrackId(track.id);
                       }}
@@ -132,15 +139,32 @@ export function TrackList({
                         if (event.key === "Enter") onPlayTrack(track);
                       }}
                       onDragStart={(event) => {
-                        setDraggedTrackId(track.id);
+                        const draggedIds = selectedTrackIds.includes(track.id)
+                          ? selectedTrackIds
+                          : [track.id];
+                        const draggedTracks = draggedIds
+                          .map((trackId) => tracks.find((item) => item.id === trackId))
+                          .filter((item): item is LibraryTrack => Boolean(item));
+                        setDraggedTrackIds(draggedIds);
                         event.dataTransfer.effectAllowed = "move";
                         event.dataTransfer.setData("application/x-playhead-track-id", track.id);
+                        event.dataTransfer.setData(
+                          "application/x-playhead-track-ids",
+                          JSON.stringify(draggedIds),
+                        );
+                        if (draggedTracks.length > 1) {
+                          const dragImage = createTrackStackDragImage(draggedTracks);
+                          document.body.appendChild(dragImage);
+                          event.dataTransfer.setDragImage(dragImage, 26, 24);
+                          window.setTimeout(() => dragImage.remove(), 0);
+                        }
                       }}
                       onDragEnd={() => {
-                        setDraggedTrackId(null);
+                        setDraggedTrackIds([]);
                         setDropIndicator(null);
                       }}
                       onDragOver={(event) => {
+                        if (!canReorderTracks) return;
                         event.preventDefault();
                         event.dataTransfer.dropEffect = "move";
 
@@ -150,6 +174,7 @@ export function TrackList({
                         setDropIndicator({ trackId: track.id, edge });
                       }}
                       onDragLeave={(event) => {
+                        if (!canReorderTracks) return;
                         if (event.currentTarget.contains(event.relatedTarget as Node | null))
                           return;
                         setDropIndicator((current) =>
@@ -157,16 +182,15 @@ export function TrackList({
                         );
                       }}
                       onDrop={(event) => {
+                        if (!canReorderTracks) return;
                         event.preventDefault();
-                        const draggedTrackId = event.dataTransfer.getData(
-                          "application/x-playhead-track-id",
-                        );
-                        if (draggedTrackId) {
+                        const draggedTrackIds = getDraggedTrackIds(event.dataTransfer);
+                        if (draggedTrackIds.length > 0) {
                           const edge =
                             dropIndicator?.trackId === track.id ? dropIndicator.edge : "before";
-                          void onReorderTrack(draggedTrackId, track.id, edge);
+                          void onReorderTrack(draggedTrackIds, track.id, edge);
                         }
-                        setDraggedTrackId(null);
+                        setDraggedTrackIds([]);
                         setDropIndicator(null);
                       }}
                     >
@@ -226,6 +250,9 @@ export function TrackList({
                         />
                         <TrackRowMenu
                           track={track}
+                          selectedTracks={
+                            selectedTrackIds.includes(track.id) ? selectedTracks : [track]
+                          }
                           playlists={playlists}
                           selectedPlaylist={selectedPlaylist}
                           menuIcon={MenuIcon}
@@ -236,6 +263,7 @@ export function TrackList({
                             setMenuTrackId(nextOpen ? track.id : null);
                           }}
                           onAddToPlaylist={onAddToPlaylist}
+                          onAddTracksToPlaylist={onAddTracksToPlaylist}
                           onCreatePlaylist={onCreatePlaylist}
                           onRemoveFromPlaylist={onRemoveFromPlaylist}
                           onShowInFolder={onShowInFolder}
@@ -258,6 +286,111 @@ export function TrackList({
       </div>
     </section>
   );
+}
+
+function createTrackStackDragImage(tracks: LibraryTrack[]) {
+  const preview = document.createElement("div");
+  const visibleTracks = tracks.slice(0, 3);
+
+  Object.assign(preview.style, {
+    position: "fixed",
+    top: "-1000px",
+    left: "-1000px",
+    width: "244px",
+    height: "72px",
+    pointerEvents: "none",
+    zIndex: "9999",
+  });
+
+  visibleTracks
+    .slice()
+    .reverse()
+    .forEach((track, reversedIndex) => {
+      const index = visibleTracks.length - 1 - reversedIndex;
+      const card = document.createElement("div");
+      const title = document.createElement("div");
+      const artist = document.createElement("div");
+      const badge = document.createElement("div");
+
+      Object.assign(card.style, {
+        position: "absolute",
+        inset: "0",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        gap: "3px",
+        boxSizing: "border-box",
+        padding: "10px 44px 10px 14px",
+        border: "1px solid rgba(255, 255, 255, 0.13)",
+        borderRadius: "16px",
+        background: "rgba(22, 22, 22, 0.94)",
+        boxShadow: "0 18px 38px rgba(0, 0, 0, 0.34)",
+        color: "white",
+        transform: `translate(${index * 7}px, ${index * 6}px) rotate(${(index - 1) * 1.5}deg)`,
+        opacity: `${1 - index * 0.14}`,
+      });
+
+      Object.assign(title.style, {
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        fontSize: "13px",
+        fontWeight: "700",
+        lineHeight: "16px",
+      });
+
+      Object.assign(artist.style, {
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        color: "rgba(255, 255, 255, 0.62)",
+        fontSize: "12px",
+        fontWeight: "600",
+        lineHeight: "15px",
+      });
+
+      Object.assign(badge.style, {
+        position: "absolute",
+        right: "11px",
+        top: "50%",
+        display: "grid",
+        width: "28px",
+        height: "28px",
+        placeItems: "center",
+        borderRadius: "999px",
+        background: "var(--color-primary, #ffff00)",
+        color: "black",
+        fontSize: "12px",
+        fontWeight: "800",
+        transform: "translateY(-50%)",
+      });
+
+      title.textContent = track.title;
+      artist.textContent = track.artist;
+      badge.textContent = `${tracks.length}`;
+      card.append(title, artist, badge);
+      preview.appendChild(card);
+    });
+
+  return preview;
+}
+
+function getDraggedTrackIds(dataTransfer: DataTransfer) {
+  const trackIdsPayload = dataTransfer.getData("application/x-playhead-track-ids");
+  const fallbackTrackId = dataTransfer.getData("application/x-playhead-track-id");
+
+  if (!trackIdsPayload) return fallbackTrackId ? [fallbackTrackId] : [];
+
+  try {
+    const parsedTrackIds = JSON.parse(trackIdsPayload);
+    if (Array.isArray(parsedTrackIds)) {
+      return parsedTrackIds.filter((trackId): trackId is string => typeof trackId === "string");
+    }
+  } catch {
+    return fallbackTrackId ? [fallbackTrackId] : [];
+  }
+
+  return fallbackTrackId ? [fallbackTrackId] : [];
 }
 
 function DropIndicator() {

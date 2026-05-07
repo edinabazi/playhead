@@ -15,7 +15,7 @@ import {
 } from "../../shared/library";
 import { getMediaArtworkSrc } from "@/lib/artwork";
 import { isEditableTarget } from "@/lib/dom";
-import { moveItem } from "@/lib/list";
+import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
 import { isMacPlatform } from "@/lib/platform";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
@@ -112,6 +112,10 @@ export function App() {
   const didLoadLibraryRef = useRef(false);
   const didRestoreSessionRef = useRef(false);
   const lastPositionSaveRef = useRef(0);
+  const selectionAnchorTrackIdRef = useRef<string | null>(null);
+  const trackLoadRequestIdRef = useRef(0);
+  const trackLoadQueueRef = useRef(Promise.resolve());
+  const loadedTrackIdRef = useRef<string | null>(null);
 
   const [library, setLibrary] = useState<LibraryState>(emptyLibraryState);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
@@ -201,7 +205,11 @@ export function App() {
   ) => {
     const wavesurfer = wavesurferRef.current;
     if (!wavesurfer) return;
+    const requestId = trackLoadRequestIdRef.current + 1;
+    trackLoadRequestIdRef.current = requestId;
+    loadedTrackIdRef.current = null;
 
+    wavesurfer.pause();
     setIsLoadingTrack(true);
     setError("");
     setActiveTrackId(track.id);
@@ -222,8 +230,18 @@ export function App() {
 
     try {
       const arrayBuffer = toArrayBuffer(await window.playhead.readAudioFile(track.path));
+      if (requestId !== trackLoadRequestIdRef.current) return;
+
       const blob = new Blob([arrayBuffer], { type: getAudioMimeType(track.path) });
-      await wavesurfer.loadBlob(blob);
+      await (trackLoadQueueRef.current = trackLoadQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (requestId !== trackLoadRequestIdRef.current) return;
+          await wavesurfer.loadBlob(blob);
+        }));
+      if (requestId !== trackLoadRequestIdRef.current) return;
+
+      loadedTrackIdRef.current = track.id;
       setHasWaveform(true);
       setDuration(wavesurfer.getDuration() || track.duration || 0);
       if (startTime > 0) {
@@ -240,6 +258,8 @@ export function App() {
         }
       }
     } catch {
+      if (requestId !== trackLoadRequestIdRef.current) return;
+      loadedTrackIdRef.current = null;
       setError("This track could not be loaded.");
       setHasWaveform(false);
       if (autoplay && allowSkipUnavailable && library.settings.playback.skipUnavailableTracks) {
@@ -247,7 +267,7 @@ export function App() {
         playAdjacentTrackRef.current();
       }
     } finally {
-      setIsLoadingTrack(false);
+      if (requestId === trackLoadRequestIdRef.current) setIsLoadingTrack(false);
     }
   }, [
     library.settings.playback.rememberTrackPositions,
@@ -720,27 +740,70 @@ export function App() {
     [library, persistLibrary],
   );
 
+  const addTracksToPlaylist = useCallback(
+    async (trackIds: string[], playlist: LibraryPlaylist) => {
+      const trackIdsToAdd = trackIds.filter(
+        (trackId, index) =>
+          library.tracks[trackId] &&
+          !playlist.trackIds.includes(trackId) &&
+          trackIds.indexOf(trackId) === index,
+      );
+      if (trackIdsToAdd.length === 0) return;
+
+      const now = new Date().toISOString();
+      await persistLibrary({
+        ...library,
+        playlists: library.playlists.map((item) =>
+          item.id === playlist.id
+            ? { ...item, trackIds: [...item.trackIds, ...trackIdsToAdd], updatedAt: now }
+            : item,
+        ),
+      });
+
+      const firstTrack = library.tracks[trackIdsToAdd[0]];
+      if (trackIdsToAdd.length === 1 && firstTrack) {
+        showTrackActionToast({
+          action: "Added to playlist",
+          track: firstTrack,
+          detail: playlist.name,
+        });
+        return;
+      }
+
+      showSimpleActionToast(`${trackIdsToAdd.length} tracks added to ${playlist.name}.`);
+    },
+    [library, persistLibrary],
+  );
+
   const reorderTrack = useCallback(
-    async (trackId: string, targetTrackId: string, edge: "before" | "after" = "before") => {
-      if (trackId === targetTrackId) return;
+    async (trackIds: string[], targetTrackId: string, edge: "before" | "after" = "before") => {
+      if (trackIds.includes(targetTrackId)) return;
 
       const source = library.selectedSource;
       if (!source) return;
+      const uniqueTrackIds = trackIds.filter((trackId, index) => trackIds.indexOf(trackId) === index);
+      if (uniqueTrackIds.length === 0) return;
 
       if (source.type === "folder") {
         const folder = library.folders.find((item) => item.id === source.id);
         if (!folder) return;
-        const fromIndex = folder.trackIds.indexOf(trackId);
+        const trackIdsToMove = folder.trackIds.filter((trackId) => uniqueTrackIds.includes(trackId));
+        if (trackIdsToMove.length === 0) return;
         const targetIndex = folder.trackIds.indexOf(targetTrackId);
-        const toIndex = edge === "after" ? targetIndex + 1 : targetIndex;
-        if (fromIndex === -1 || targetIndex === -1) return;
+        if (targetIndex === -1) return;
+        const nextTrackIds =
+          trackIdsToMove.length === 1
+            ? moveItem(
+                folder.trackIds,
+                folder.trackIds.indexOf(trackIdsToMove[0]),
+                edge === "after" ? targetIndex + 1 : targetIndex,
+              )
+            : moveItemsBeforeOrAfter(folder.trackIds, trackIdsToMove, targetTrackId, edge);
 
         await persistLibrary({
           ...library,
           folders: library.folders.map((item) =>
-            item.id === folder.id
-              ? { ...item, trackIds: moveItem(item.trackIds, fromIndex, toIndex) }
-              : item,
+            item.id === folder.id ? { ...item, trackIds: nextTrackIds } : item,
           ),
         });
         return;
@@ -748,17 +811,25 @@ export function App() {
 
       const playlist = library.playlists.find((item) => item.id === source.id);
       if (!playlist) return;
-      const fromIndex = playlist.trackIds.indexOf(trackId);
+      const trackIdsToMove = playlist.trackIds.filter((trackId) => uniqueTrackIds.includes(trackId));
+      if (trackIdsToMove.length === 0) return;
       const targetIndex = playlist.trackIds.indexOf(targetTrackId);
-      const toIndex = edge === "after" ? targetIndex + 1 : targetIndex;
-      if (fromIndex === -1 || targetIndex === -1) return;
+      if (targetIndex === -1) return;
+      const nextTrackIds =
+        trackIdsToMove.length === 1
+          ? moveItem(
+              playlist.trackIds,
+              playlist.trackIds.indexOf(trackIdsToMove[0]),
+              edge === "after" ? targetIndex + 1 : targetIndex,
+            )
+          : moveItemsBeforeOrAfter(playlist.trackIds, trackIdsToMove, targetTrackId, edge);
       const now = new Date().toISOString();
 
       await persistLibrary({
         ...library,
         playlists: library.playlists.map((item) =>
           item.id === playlist.id
-            ? { ...item, trackIds: moveItem(item.trackIds, fromIndex, toIndex), updatedAt: now }
+            ? { ...item, trackIds: nextTrackIds, updatedAt: now }
             : item,
         ),
       });
@@ -774,6 +845,12 @@ export function App() {
       const selectedTrack = selectedTrackIds[0] ? library.tracks[selectedTrackIds[0]] : null;
       const nextTrack = activeTrack || selectedTrack || tracks[0];
       if (nextTrack) await selectTrack(nextTrack, true);
+      return;
+    }
+
+    if (loadedTrackIdRef.current !== activeTrackId) {
+      const activeTrack = library.tracks[activeTrackId];
+      if (activeTrack) await selectTrack(activeTrack, true);
       return;
     }
 
@@ -808,6 +885,40 @@ export function App() {
     [setPlayerVolume],
   );
 
+  const selectTrackInList = useCallback(
+    (track: LibraryTrack, event?: React.MouseEvent<HTMLDivElement>) => {
+      const isRangeSelection = Boolean(event?.shiftKey);
+      const isToggleSelection = Boolean(event?.metaKey || event?.ctrlKey);
+
+      if (isRangeSelection) {
+        const anchorTrackId = selectionAnchorTrackIdRef.current || selectedTrackIds[0] || track.id;
+        const anchorIndex = tracks.findIndex((item) => item.id === anchorTrackId);
+        const targetIndex = tracks.findIndex((item) => item.id === track.id);
+
+        if (anchorIndex !== -1 && targetIndex !== -1) {
+          const start = Math.min(anchorIndex, targetIndex);
+          const end = Math.max(anchorIndex, targetIndex);
+          setSelectedTrackIds(tracks.slice(start, end + 1).map((item) => item.id));
+          return;
+        }
+      }
+
+      if (isToggleSelection) {
+        selectionAnchorTrackIdRef.current = track.id;
+        setSelectedTrackIds((current) =>
+          current.includes(track.id)
+            ? current.filter((trackId) => trackId !== track.id)
+            : [...current, track.id],
+        );
+        return;
+      }
+
+      selectionAnchorTrackIdRef.current = track.id;
+      setSelectedTrackIds([track.id]);
+    },
+    [selectedTrackIds, tracks],
+  );
+
   const selectAdjacentTrackInList = useCallback(
     (direction: 1 | -1) => {
       if (tracks.length === 0) return;
@@ -828,6 +939,7 @@ export function App() {
             : tracks.length - 1
           : clamp(currentIndex + direction, 0, tracks.length - 1);
       const nextTrack = tracks[nextIndex];
+      selectionAnchorTrackIdRef.current = nextTrack.id;
       setSelectedTrackIds([nextTrack.id]);
       setScrollToTrackId(nextTrack.id);
     },
@@ -1019,8 +1131,6 @@ export function App() {
       wavesurfer.on("ready", (nextDuration) => {
         setDuration(nextDuration || 0);
         setCurrentTime(wavesurfer.getCurrentTime());
-        setHasWaveform(true);
-        setIsLoadingTrack(false);
       }),
       wavesurfer.on("timeupdate", (time) => {
         setCurrentTime(time);
@@ -1256,7 +1366,7 @@ export function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
           onSelectSource={(source) => void persistLibrary({ ...library, selectedSource: source })}
-          onDropTrackToPlaylist={(trackId, playlist) => void addTrackToPlaylist(trackId, playlist)}
+          onDropTrackToPlaylist={(trackIds, playlist) => void addTracksToPlaylist(trackIds, playlist)}
           onRemoveFolder={(folder) => setFolderPendingRemoval(folder)}
           onRenamePlaylist={(playlist) => setRenamingPlaylistId(playlist.id)}
           onDeletePlaylist={(playlist) => {
@@ -1338,11 +1448,18 @@ export function App() {
                   selectedTrackIds={selectedTrackIds}
                   scrollToTrackId={scrollToTrackId}
                   selectedPlaylist={selectedPlaylist}
+                  canReorderTracks={selectedSource?.type !== "library-tracks"}
                   playlists={library.playlists}
                   favoriteTrackIds={library.favoriteTrackIds || []}
-                  onSelectTrack={(track) => setSelectedTrackIds([track.id])}
+                  onSelectTrack={selectTrackInList}
                   onPlayTrack={(track) => selectTrack(track, true)}
                   onAddToPlaylist={(track, playlist) => addTrackToPlaylist(track.id, playlist)}
+                  onAddTracksToPlaylist={(tracks, playlist) =>
+                    addTracksToPlaylist(
+                      tracks.map((track) => track.id),
+                      playlist,
+                    )
+                  }
                   onCreatePlaylist={(track) => {
                     setTrackPendingPlaylistCreation(track);
                     setIsCreatePlaylistOpen(true);
