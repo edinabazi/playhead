@@ -67,6 +67,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
+    "ieee754": "^1.2.1",
     "lucide-react": "^1.14.0",
     "music-metadata": "^11.12.3",
     "node-taglib-sharp": "^6.0.3",
