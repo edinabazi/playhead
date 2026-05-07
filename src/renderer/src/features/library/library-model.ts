@@ -15,6 +15,7 @@ export { emptyLibraryState };
 export type LibraryArtist = {
   id: string;
   name: string;
+  artworkSet: LibraryTrack["artwork"][];
   trackIds: string[];
 };
 
@@ -89,12 +90,24 @@ export function getAllLibraryTracks(state: LibraryState): LibraryTrack[] {
 
 export function getLibraryArtists(state: LibraryState): LibraryArtist[] {
   const artists = new Map<string, LibraryArtist>();
+  const artworkSourcesByArtist = new Map<string, Set<string>>();
 
   for (const track of Object.values(state.tracks)) {
     const name = getTrackArtist(track);
     const id = normalizeKey(name);
-    const artist = artists.get(id) || { id, name, trackIds: [] };
+    const artist = artists.get(id) || { id, name, artworkSet: [], trackIds: [] };
     artist.trackIds.push(track.id);
+
+    const artworkSrc = track.artwork?.dataUrl || track.artwork?.src;
+    if (track.artwork && artworkSrc) {
+      const artworkSources = artworkSourcesByArtist.get(id) || new Set<string>();
+      if (!artworkSources.has(artworkSrc)) {
+        artist.artworkSet.push(track.artwork);
+        artworkSources.add(artworkSrc);
+        artworkSourcesByArtist.set(id, artworkSources);
+      }
+    }
+
     artists.set(id, artist);
   }
 
@@ -131,7 +144,9 @@ export function getSourceTracks(state: LibraryState): LibraryTrack[] {
 
   if (source.type === "library-artist") {
     return sortTracksByTitle(
-      Object.values(state.tracks).filter((track) => normalizeKey(getTrackArtist(track)) === source.id),
+      Object.values(state.tracks).filter(
+        (track) => normalizeKey(getTrackArtist(track)) === source.id,
+      ),
     );
   }
 

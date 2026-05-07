@@ -9,6 +9,7 @@ import type { LibraryAlbum, LibraryArtist } from "@/features/library/library-mod
 import { useIcons } from "@/lib/icon-context";
 import type { LibraryFolder, LibraryMode, LibraryTrack } from "../../../../shared/library";
 import { TrackArtwork } from "@/features/tracks/TrackArtwork";
+import { ArtistArtwork } from "@/features/library/ArtistArtwork";
 
 type SearchResult =
   | { type: "artist"; artist: LibraryArtist }
@@ -247,9 +248,11 @@ export function TrackSearchDialog({
                         <AlbumIcon size={18} strokeWidth={1.6} />
                       )}
                     </div>
+                  ) : result.type === "artist" ? (
+                    <ArtistArtwork artist={result.artist} fallbackIcon={ArtistIcon} />
                   ) : (
                     <div className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-white/10">
-                      <ArtistIcon size={18} strokeWidth={1.6} />
+                      <AlbumIcon size={18} strokeWidth={1.6} />
                     </div>
                   )}
                   <div className="min-w-0 flex-1">

@@ -1,6 +1,7 @@
 import { useIcons } from "@/lib/icon-context";
 import { TrackCell } from "@/features/tracks/TrackCell";
 import type { LibraryAlbum, LibraryArtist } from "./library-model";
+import { ArtistArtwork } from "./ArtistArtwork";
 
 export function LibraryBrowser({
   emptyLabel,
@@ -33,9 +34,7 @@ export function LibraryBrowser({
               {artists?.map((artist) => (
                 <TrackCell key={artist.id} onClick={() => onSelectArtist?.(artist)}>
                   <div className="flex min-w-0 flex-1 items-center gap-3 pr-6">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-white/10 text-muted-foreground">
-                      <icons.user size={18} strokeWidth={1.8} />
-                    </span>
+                    <ArtistArtwork artist={artist} fallbackIcon={icons.user} />
                     <span className="min-w-0">
                       <span className="block truncate text-[14px] font-semibold leading-[1.18] text-foreground">
                         {artist.name}

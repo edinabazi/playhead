@@ -28,6 +28,7 @@ const baseState: LibraryState = {
       trackNumber: 2,
       diskNumber: 1,
       duration: 1,
+      artwork: { mimeType: "image/png", src: "file:///cover-a.png" },
       folderId: "folder-1",
     },
     "track-2": {
@@ -41,6 +42,7 @@ const baseState: LibraryState = {
       trackNumber: 1,
       diskNumber: 1,
       duration: 2,
+      artwork: { mimeType: "image/png", src: "file:///cover-b.png" },
       folderId: "folder-1",
     },
   },
@@ -79,14 +81,24 @@ describe("library model", () => {
 
   it("builds library artists and albums", () => {
     expect(getLibraryArtists(baseState)).toEqual([
-      { id: "album artist", name: "Album Artist", trackIds: ["track-1", "track-2"] },
+      {
+        id: "album artist",
+        name: "Album Artist",
+        artworkSet: [
+          { mimeType: "image/png", src: "file:///cover-a.png" },
+          { mimeType: "image/png", src: "file:///cover-b.png" },
+        ],
+        trackIds: ["track-1", "track-2"],
+      },
     ]);
-    expect(getLibraryAlbums(baseState).map((album) => ({
-      id: album.id,
-      title: album.title,
-      artist: album.artist,
-      trackIds: album.trackIds,
-    }))).toEqual([
+    expect(
+      getLibraryAlbums(baseState).map((album) => ({
+        id: album.id,
+        title: album.title,
+        artist: album.artist,
+        trackIds: album.trackIds,
+      })),
+    ).toEqual([
       {
         id: "album artist::album",
         title: "Album",

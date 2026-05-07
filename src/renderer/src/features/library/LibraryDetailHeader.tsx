@@ -1,5 +1,6 @@
 import { useIcons } from "@/lib/icon-context";
 import type { LibraryAlbum, LibraryArtist } from "./library-model";
+import { ArtistArtwork } from "./ArtistArtwork";
 
 export function LibraryDetailHeader({
   artist,
@@ -38,15 +39,22 @@ export function LibraryDetailHeader({
       >
         <ChevronLeftIcon size={14} strokeWidth={1.8} />
       </button>
-      <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-[14px] bg-white/10 text-muted-foreground">
-        {albumArtworkSrc ? (
-          <img className="size-full object-contain" src={albumArtworkSrc} alt="" draggable={false} />
-        ) : artist ? (
-          <UserIcon size={20} strokeWidth={1.8} />
-        ) : (
-          <MusicIcon size={20} strokeWidth={1.8} />
-        )}
-      </div>
+      {artist ? (
+        <ArtistArtwork artist={artist} fallbackIcon={UserIcon} size="md" />
+      ) : (
+        <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-[14px] bg-white/10 text-muted-foreground">
+          {albumArtworkSrc ? (
+            <img
+              className="size-full object-contain"
+              src={albumArtworkSrc}
+              alt=""
+              draggable={false}
+            />
+          ) : (
+            <MusicIcon size={20} strokeWidth={1.8} />
+          )}
+        </div>
+      )}
       <div className="min-w-0">
         <div className="text-[12px] font-medium leading-4 text-muted-foreground">{type}</div>
         <h2 className="truncate text-[18px] font-semibold leading-6 text-foreground">{title}</h2>
