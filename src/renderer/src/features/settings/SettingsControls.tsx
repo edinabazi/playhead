@@ -14,7 +14,7 @@ export function SettingsFooter({
   onSave: () => void;
 }) {
   return (
-    <div className="mt-4 flex shrink-0 items-center justify-between">
+    <div className="absolute inset-x-0 bottom-0 z-10 flex shrink-0 items-center justify-between bg-[rgba(10,10,10,0.58)] px-5 py-4 backdrop-blur-xl">
       <span className="text-[12px] font-medium text-muted-foreground">{status}</span>
       <div className="flex items-center gap-2">
         <button

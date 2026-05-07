@@ -1,3 +1,4 @@
+import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
@@ -61,23 +62,26 @@ export function SidebarGroup({
           {secondaryActions.map((action) => {
             const Icon = action.icon;
             return (
-              <button
-                key={action.label}
-                className="no-drag text-muted-foreground hover:text-foreground"
-                title={action.label}
-                onClick={action.onClick}
-              >
-                <Icon size={15} strokeWidth={1.7} />
-              </button>
+              <Tooltip key={action.label} content={action.label} side="top" sideOffset={7}>
+                <button
+                  className="no-drag text-muted-foreground hover:text-foreground"
+                  aria-label={action.label}
+                  onClick={action.onClick}
+                >
+                  <Icon size={15} strokeWidth={1.7} />
+                </button>
+              </Tooltip>
             );
           })}
-          <button
-            className="no-drag text-muted-foreground hover:text-foreground"
-            title={actionLabel}
-            onClick={onAction}
-          >
-            <ActionIcon size={15} strokeWidth={1.7} />
-          </button>
+          <Tooltip content={actionLabel} side="top" sideOffset={7}>
+            <button
+              className="no-drag text-muted-foreground hover:text-foreground"
+              aria-label={actionLabel}
+              onClick={onAction}
+            >
+              <ActionIcon size={15} strokeWidth={1.7} />
+            </button>
+          </Tooltip>
         </div>
       </div>
       <AnimatePresence initial={false}>

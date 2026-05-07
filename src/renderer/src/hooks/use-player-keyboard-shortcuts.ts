@@ -20,7 +20,7 @@ export function usePlayerKeyboardShortcuts({
   onTogglePlayback: () => void;
   onSeekBy: (offset: number) => void;
   onChangeVolumeBy: (offset: number) => void;
-  onSelectAdjacentTrack: (direction: 1 | -1) => void;
+  onSelectAdjacentTrack: (direction: 1 | -1, step?: number) => void;
   onPlaySelectedTrack: () => void;
   onToggleSelectedTrackFavorite: () => void;
 }) {
@@ -80,13 +80,13 @@ export function usePlayerKeyboardShortcuts({
 
       if (event.code === "ArrowUp" && !event.metaKey && !event.ctrlKey && !event.altKey) {
         event.preventDefault();
-        onSelectAdjacentTrack(-1);
+        onSelectAdjacentTrack(-1, event.shiftKey ? 10 : 1);
         return;
       }
 
       if (event.code === "ArrowDown" && !event.metaKey && !event.ctrlKey && !event.altKey) {
         event.preventDefault();
-        onSelectAdjacentTrack(1);
+        onSelectAdjacentTrack(1, event.shiftKey ? 10 : 1);
         return;
       }
 

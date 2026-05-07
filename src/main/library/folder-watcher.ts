@@ -6,6 +6,26 @@ import type { LibraryFolder } from "../../shared/library";
 import { audioExtensions } from "./constants";
 
 const notifyDelayMs = 650;
+const ignoredDirectoryNames = new Set([
+  ".cache",
+  ".git",
+  ".next",
+  ".nuxt",
+  ".output",
+  ".parcel-cache",
+  ".pnpm-store",
+  ".svelte-kit",
+  ".turbo",
+  ".venv",
+  ".vite",
+  "bower_components",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+  "target",
+  "vendor",
+]);
 
 let watcher: FSWatcher | null = null;
 let watchedFolders: LibraryFolder[] = [];
@@ -40,8 +60,13 @@ export async function watchLibraryFolders(
         pollInterval: 100,
       },
       ignoreInitial: true,
-      ignored: (filePath, stats) =>
-        Boolean(stats?.isFile()) && !watchedExtensions.has(extname(filePath).toLowerCase()),
+      ignored: (filePath, stats) => {
+        if (stats?.isDirectory() && ignoredDirectoryNames.has(filePath.split(/[\\/]/).pop() || "")) {
+          return true;
+        }
+
+        return Boolean(stats?.isFile()) && !watchedExtensions.has(extname(filePath).toLowerCase());
+      },
     },
   );
 

@@ -45,6 +45,7 @@ export function SettingsDialog({
   libraryFolders,
   isScanning,
   onAddLibraryFolder,
+  onDropLibraryFolderPaths,
   onLibrarySettingsChange,
   onRemoveLibraryFolder,
   playbackSettings,
@@ -59,6 +60,7 @@ export function SettingsDialog({
   libraryFolders: LibraryFolder[];
   isScanning: boolean;
   onAddLibraryFolder: () => void;
+  onDropLibraryFolderPaths: (folderPaths: string[]) => void;
   onLibrarySettingsChange: (settings: LibrarySettings) => void;
   onRemoveLibraryFolder: (folder: LibraryFolder) => void;
   playbackSettings: PlaybackSettings;
@@ -148,8 +150,8 @@ export function SettingsDialog({
       keys: ["→"],
       detail: `${savedPlaybackSettings.seekStepSeconds} seconds. Hold Shift for ${shiftSeekStep} seconds.`,
     },
-    { action: "Select previous track", keys: ["↑"] },
-    { action: "Select next track", keys: ["↓"] },
+    { action: "Select previous track", keys: ["↑"], detail: "Hold Shift to jump 10 tracks." },
+    { action: "Select next track", keys: ["↓"], detail: "Hold Shift to jump 10 tracks." },
     { action: "Play selected track", keys: ["Enter"] },
     { action: "Love selected track", keys: ["L"] },
     {
@@ -318,7 +320,7 @@ export function SettingsDialog({
     >
       <DialogPanel
         {...dialogPanelMotion}
-        className={`flex h-155 w-full max-w-205 overflow-hidden rounded-4xl border border-white/10 bg-[rgba(10,10,10,0.96)] shadow-2xl backdrop-blur-3xl ${
+        className={`flex h-[80dvh] w-full max-w-205 overflow-hidden rounded-4xl border border-white/10 bg-[rgba(10,10,10,0.96)] shadow-2xl backdrop-blur-3xl ${
           isTransparencyPreviewing ? "border-0 bg-transparent shadow-none backdrop-blur-none" : ""
         }`}
         onPointerDown={(event) => event.stopPropagation()}
@@ -379,7 +381,7 @@ export function SettingsDialog({
           </div>
 
           <div
-            className={`flex min-h-0 flex-1 flex-col px-5 pb-5 ${
+            className={`relative flex min-h-0 flex-1 flex-col px-5 pb-0 ${
               isTransparencyPreviewing && activeCategory !== "appearance"
                 ? "pointer-events-none"
                 : ""
@@ -402,6 +404,7 @@ export function SettingsDialog({
                 onChange={setDraftLibrarySettings}
                 onToggleExtension={toggleExtension}
                 onAddFolder={onAddLibraryFolder}
+                onDropFolderPaths={onDropLibraryFolderPaths}
                 onRemoveFolder={onRemoveLibraryFolder}
                 onReset={resetLibrarySettings}
                 onSave={saveLibrarySettings}

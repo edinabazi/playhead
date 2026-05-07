@@ -6,6 +6,7 @@ import {
   Bell,
   Brain,
   Check,
+  ChevronLeft,
   ChevronRight,
   ChevronsDownUp,
   Circle,
@@ -71,6 +72,7 @@ export type IconComponent = ComponentType<IconComponentProps>;
 export type IconLibrary = "lucide";
 
 export type IconName =
+  | "chevron-left"
   | "chevron-right"
   | "chevrons-down-up"
   | "x"
@@ -135,6 +137,7 @@ export const iconLibraryLabels: Record<IconLibrary, string> = {
 };
 
 const lucideMap: Record<IconName, IconComponent> = {
+  "chevron-left": ChevronLeft,
   "chevron-right": ChevronRight,
   "chevrons-down-up": ChevronsDownUp,
   x: X,

@@ -30,6 +30,9 @@ export type LibraryTrack = {
   year?: number;
   artwork?: LibraryArtwork;
   duration: number;
+  audioFormat?: string;
+  sampleRate?: number;
+  bpm?: number;
   folderId: string;
 };
 

@@ -10,6 +10,22 @@ import { PlayPauseMorphIcon, SkipBackFilledIcon, SkipForwardFilledIcon } from ".
 import type { RepeatMode } from "./types";
 import { WaveformEmptyState } from "./WaveformEmptyState";
 
+function formatAudioFormat(track: LibraryTrack): string {
+  const extension = track.fileName.split(".").pop() || "";
+  const format = extension || track.audioFormat || "";
+  return format.toUpperCase();
+}
+
+function formatSampleRate(sampleRate?: number): string | null {
+  if (!sampleRate) return null;
+  return `${Number((sampleRate / 1000).toFixed(1))} KHZ`;
+}
+
+function formatBpm(bpm?: number): string | null {
+  if (!bpm) return null;
+  return `${Math.round(bpm)} BPM`;
+}
+
 export function Player({
   activeTrack,
   isPlaying,
@@ -19,7 +35,6 @@ export function Player({
   isFavorite,
   currentTime,
   duration,
-  error,
   waveformRef,
   shuffleEnabled,
   repeatMode,
@@ -40,7 +55,6 @@ export function Player({
   isFavorite: boolean;
   currentTime: number;
   duration: number;
-  error: string;
   waveformRef: React.Ref<HTMLDivElement>;
   shuffleEnabled: boolean;
   repeatMode: RepeatMode;
@@ -58,10 +72,17 @@ export function Player({
   const ShuffleIcon = icons.shuffle;
   const RepeatIcon = icons.repeat;
   const VolumeIcon = icons["volume-2"];
+  const trackInfo = activeTrack
+    ? [
+        formatAudioFormat(activeTrack),
+        formatSampleRate(activeTrack.sampleRate),
+        formatBpm(activeTrack.bpm),
+      ].filter((part): part is string => Boolean(part))
+    : [];
 
   return (
     <section className="flex shrink-0 flex-col gap-[10px] px-4 pt-4 overflow-hidden">
-      <div className="flex h-[60px] items-center gap-3">
+      <div className="app-drag flex h-[60px] items-center gap-3">
         <div className="relative size-16 shrink-0 overflow-hidden rounded-[12px]">
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
@@ -176,7 +197,13 @@ export function Player({
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center py-1">
-        <div />
+        <div className="min-w-0 pr-4">
+          {trackInfo.length > 0 && (
+            <div className="truncate font-mono text-[11px] font-medium uppercase leading-none text-muted-foreground">
+              {trackInfo.join(" · ")}
+            </div>
+          )}
+        </div>
         <div className="flex items-center justify-center gap-3">
           <IconButton
             title={shuffleEnabled ? "Shuffle on" : "Shuffle"}
@@ -242,8 +269,6 @@ export function Player({
           />
         </div>
       </div>
-
-      <div className="h-4 text-center text-[12px] leading-4 text-muted-foreground">{error}</div>
     </section>
   );
 }

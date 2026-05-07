@@ -17,7 +17,7 @@ export function PlaybackSettingsPane({
 }) {
   return (
     <>
-      <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pb-20 pr-1">
         <SettingsOptionGroup
           title="Seek step"
           description="Choose how far left and right arrows jump."

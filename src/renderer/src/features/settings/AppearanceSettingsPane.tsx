@@ -25,7 +25,7 @@ export function AppearanceSettingsPane({
 }) {
   return (
     <>
-      <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pb-20 pr-1">
         <div
           className={`rounded-[22px] border border-white/10 bg-white/[0.035] p-4 transition-opacity ${
             isTransparencyPreviewing ? "pointer-events-auto border-0 !bg-transparent" : ""

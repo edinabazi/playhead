@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useIcons } from "@/lib/icon-context";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
 import type { LibraryPlaylist, LibraryTrack } from "../../../../shared/library";
@@ -62,19 +62,10 @@ export function TrackList({
     trackId: string;
     edge: "before" | "after";
   } | null>(null);
-  const [hasBottomFade, setHasBottomFade] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const selectedTracks = selectedTrackIds
     .map((trackId) => tracks.find((track) => track.id === trackId))
     .filter((track): track is LibraryTrack => Boolean(track));
-
-  const updateBottomFade = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const remainingScroll = container.scrollHeight - container.scrollTop - container.clientHeight;
-    setHasBottomFade(remainingScroll > 2);
-  }, []);
 
   useEffect(() => {
     if (!scrollToTrackId) return;
@@ -82,21 +73,11 @@ export function TrackList({
     const row = scrollContainerRef.current?.querySelector<HTMLElement>(
       `[data-track-id="${CSS.escape(scrollToTrackId)}"]`,
     );
-    row?.scrollIntoView({ block: "center" });
+    if (row && scrollContainerRef.current) {
+      scrollRowIntoNearestView(row, scrollContainerRef.current);
+    }
     onScrolledToTrack();
   }, [onScrolledToTrack, scrollToTrackId, tracks]);
-
-  useEffect(() => {
-    updateBottomFade();
-
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const resizeObserver = new ResizeObserver(updateBottomFade);
-    resizeObserver.observe(container);
-
-    return () => resizeObserver.disconnect();
-  }, [tracks, updateBottomFade]);
 
   return (
     <section className="-mb-4 flex min-h-0 flex-1 flex-col gap-[14px]">
@@ -104,7 +85,6 @@ export function TrackList({
         <div
           ref={scrollContainerRef}
           className="thin-scrollbar no-drag h-full min-h-0 overflow-y-auto pr-2"
-          onScroll={updateBottomFade}
         >
           {tracks.length === 0 ? (
             <div className="flex h-full min-h-[180px] items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.025] text-[14px] text-muted-foreground">
@@ -215,11 +195,6 @@ export function TrackList({
             </div>
           )}
         </div>
-        <div
-          className={`pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-background/20 backdrop-blur-md transition-opacity duration-200 [mask-image:linear-gradient(to_bottom,transparent,black_70%)] ${
-            hasBottomFade ? "opacity-100" : "opacity-0"
-          }`}
-        />
       </div>
     </section>
   );
@@ -231,4 +206,19 @@ function DropIndicator() {
       <div className="absolute -top-px left-2 right-2 h-0.5 rounded-full bg-primary" />
     </div>
   );
+}
+
+function scrollRowIntoNearestView(row: HTMLElement, container: HTMLElement) {
+  const rowRect = row.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+
+  if (rowRect.top < containerRect.top) {
+    container.scrollTop += rowRect.top - containerRect.top;
+    return;
+  }
+
+  const bottomOffset = rowRect.height;
+  if (rowRect.bottom > containerRect.bottom - bottomOffset) {
+    container.scrollTop += rowRect.bottom - (containerRect.bottom - bottomOffset);
+  }
 }

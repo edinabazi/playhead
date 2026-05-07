@@ -1,9 +1,22 @@
-import { app, BrowserWindow, globalShortcut, nativeImage } from "electron";
+import { app, BrowserWindow, globalShortcut, nativeImage, protocol } from "electron";
 import { join } from "node:path";
 import { closeFolderWatcher } from "./library/folder-watcher";
 import { registerLibraryIpc } from "./library/library-ipc";
 import { registerMediaShortcuts } from "./media/media-shortcuts";
 import { createWindow } from "./window/create-window";
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "playhead-media",
+    privileges: {
+      standard: true,
+      secure: true,
+      stream: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+]);
 
 app.whenReady().then(() => {
   app.setName("Playhead");

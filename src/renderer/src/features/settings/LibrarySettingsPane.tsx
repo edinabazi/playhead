@@ -1,5 +1,7 @@
 import { Switch } from "@/components/ui/switch";
 import type { IconComponent } from "@/lib/icon-context";
+import { getFolderPickerName } from "@/lib/platform";
+import { cn } from "@/lib/utils";
 import type { LibraryFolder, LibrarySettings } from "../../../../shared/library";
 import { SettingsFooter } from "./SettingsControls";
 import { fileFormatOptions } from "./settings-config";
@@ -13,6 +15,7 @@ export function LibrarySettingsPane({
   onChange,
   onToggleExtension,
   onAddFolder,
+  onDropFolderPaths,
   onRemoveFolder,
   onReset,
   onSave,
@@ -32,6 +35,7 @@ export function LibrarySettingsPane({
   onChange: (settings: LibrarySettings) => void;
   onToggleExtension: (extension: string) => void;
   onAddFolder: () => void;
+  onDropFolderPaths: (folderPaths: string[]) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
   onReset: () => void;
   onSave: () => void;
@@ -41,7 +45,7 @@ export function LibrarySettingsPane({
 
   return (
     <>
-      <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pb-20 pr-1">
         <DisplayModeCard
           settings={settings}
           folderIcon={FolderOpenIcon}
@@ -56,6 +60,7 @@ export function LibrarySettingsPane({
           loaderIcon={icons.loader}
           removeIcon={icons.x}
           onAddFolder={onAddFolder}
+          onDropFolderPaths={onDropFolderPaths}
           onRemoveFolder={onRemoveFolder}
         />
         <FileFormatsCard
@@ -106,41 +111,63 @@ function DisplayModeCard({
   onChange: (settings: LibrarySettings) => void;
 }) {
   const options = [
-    { mode: "library" as const, label: "Library", icon: libraryIcon },
-    { mode: "folder" as const, label: "Folder", icon: folderIcon },
+    {
+      mode: "library" as const,
+      label: "Library",
+      icon: libraryIcon,
+      description: "Combines folders into one library.",
+    },
+    {
+      mode: "folder" as const,
+      label: "Folder",
+      icon: folderIcon,
+      description: "Keeps your folders visible.",
+    },
   ];
 
   return (
     <div className="rounded-[22px] border border-white/10 bg-white/[0.035] p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h4 className="text-[14px] font-semibold leading-5 text-foreground">Display mode</h4>
-          <p className="mt-1 max-w-[420px] text-[12px] font-medium leading-4 text-muted-foreground">
-            Choose how Playhead organizes these folders.
+          <h4 className="text-balance text-[14px] font-semibold leading-5 text-foreground">
+            Display mode
+          </h4>
+          <p className="mt-1 max-w-[520px] text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
+            Choose how Playhead displays your music library.
           </p>
         </div>
-        <div className="grid grid-cols-2 rounded-full border border-white/10 bg-black/20 p-0.5">
-          {options.map((option) => {
-            const OptionIcon = option.icon;
-            const active = settings.mode === option.mode;
+      </div>
 
-            return (
-              <button
-                key={option.mode}
-                type="button"
-                className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition ${
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-                }`}
-                onClick={() => onChange({ ...settings, mode: option.mode })}
-              >
-                <OptionIcon size={14} strokeWidth={1.9} />
-                <span>{option.label}</span>
-              </button>
-            );
-          })}
-        </div>
+      <div className="mt-4 grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-black/15 p-1">
+        {options.map((option) => {
+          const OptionIcon = option.icon;
+          const active = settings.mode === option.mode;
+
+          return (
+            <button
+              key={option.mode}
+              type="button"
+              aria-pressed={active}
+              className={cn(
+                "flex min-h-12 items-center gap-2 rounded-[14px] px-3 text-left transition-colors",
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
+              )}
+              onClick={() => onChange({ ...settings, mode: option.mode })}
+            >
+              <OptionIcon size={18} strokeWidth={1.9} className="shrink-0" />
+              <span className="min-w-0">
+                <span className="block truncate text-[13px] font-semibold leading-4">
+                  {option.label}
+                </span>
+                <span className="block truncate text-[11px] font-medium leading-4 opacity-75">
+                  {option.description}
+                </span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -154,6 +181,7 @@ function WatchedFoldersCard({
   loaderIcon: LoaderIcon,
   removeIcon: RemoveIcon,
   onAddFolder,
+  onDropFolderPaths,
   onRemoveFolder,
 }: {
   folders: LibraryFolder[];
@@ -163,10 +191,47 @@ function WatchedFoldersCard({
   loaderIcon: IconComponent;
   removeIcon: IconComponent;
   onAddFolder: () => void;
+  onDropFolderPaths: (folderPaths: string[]) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
 }) {
+  const folderPickerName = getFolderPickerName();
+
+  const setDragging = (
+    event: React.DragEvent<HTMLDivElement | HTMLButtonElement>,
+    dragging: boolean,
+  ) => {
+    event.currentTarget.dataset.dragging = String(dragging);
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement | HTMLButtonElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDragging(event, true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement | HTMLButtonElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setDragging(event, false);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement | HTMLButtonElement>) => {
+    event.preventDefault();
+    setDragging(event, false);
+
+    const folderPaths = Array.from(event.dataTransfer.files)
+      .map((file) => window.playhead.getDroppedFilePath(file))
+      .filter((folderPath) => folderPath.length > 0);
+
+    if (folderPaths.length > 0) onDropFolderPaths(folderPaths);
+  };
+
   return (
-    <div className="rounded-[22px] border border-white/10 bg-white/[0.035] p-4">
+    <div
+      className="rounded-[22px] border border-white/10 bg-white/[0.035] p-4 transition-colors data-[dragging=true]:border-primary/55 data-[dragging=true]:bg-primary/[0.045]"
+      onDragOver={folders.length > 0 ? handleDragOver : undefined}
+      onDragLeave={folders.length > 0 ? handleDragLeave : undefined}
+      onDrop={folders.length > 0 ? handleDrop : undefined}
+    >
       <div className="flex items-center justify-between gap-4">
         <div>
           <h4 className="text-[14px] font-semibold leading-5 text-foreground">Watched folders</h4>
@@ -191,11 +256,30 @@ function WatchedFoldersCard({
 
       <div className="mt-4 space-y-2">
         {folders.length === 0 ? (
-          <div className="rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-3">
-            <p className="text-[12px] font-medium leading-4 text-muted-foreground">
-              No folders added yet.
-            </p>
-          </div>
+          <button
+            type="button"
+            className="group flex min-h-[92px] w-full flex-col items-center justify-center rounded-[16px] border border-dashed border-white/15 bg-white/[0.03] px-4 py-4 text-center transition-colors hover:border-primary/45 hover:bg-primary/[0.07] disabled:opacity-55 data-[dragging=true]:border-primary/65 data-[dragging=true]:bg-primary/[0.1]"
+            title="Add folder"
+            disabled={isScanning}
+            onClick={onAddFolder}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <span className="grid size-9 place-items-center rounded-xl border border-white/10 bg-white/[0.05] text-foreground transition-colors group-hover:border-primary/35">
+              {isScanning ? (
+                <LoaderIcon size={18} strokeWidth={1.9} className="animate-spin" />
+              ) : (
+                <FolderPlusIcon size={18} strokeWidth={1.9} />
+              )}
+            </span>
+            <span className="mt-2 text-[13px] font-semibold leading-5 text-foreground">
+              {isScanning ? "Scanning..." : "Drop folders here"}
+            </span>
+            <span className="text-[12px] font-medium leading-5 text-muted-foreground">
+              or click to choose from {folderPickerName}
+            </span>
+          </button>
         ) : (
           folders.map((folder) => (
             <div
