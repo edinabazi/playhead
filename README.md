@@ -40,8 +40,6 @@ Playhead was designed and built by a designer, developer, and DJ hobbyist who al
 
 ## Screenshots
 
-> Replace these with real screenshots from the app.
-
 <p align="center">
   <img src="./docs/assets/screenshot_1.png" alt="Playhead library view" />
 </p>
@@ -141,7 +139,7 @@ Playhead is in active development and should currently be treated as beta softwa
 Current limitations:
 
 - macOS is the only packaged target right now.
-- Windows and Linux support may return later.
+- Windows and Linux support will be coming later.
 - Builds may be unsigned or not notarized during early development.
 - Metadata writing depends on supported formats.
 - Some behavior may change as the app stabilizes.
@@ -256,15 +254,15 @@ pnpm build
 
 ## Roadmap ideas
 
-These are not promises, just likely areas of exploration:
-
 - Better waveform performance and caching
 - More metadata format coverage
 - More keyboard-first workflows
 - Better playlist and crate-style organization
 - Improved folder-mode filtering
 - More polished macOS packaging
-- Possible Windows and Linux support later
+- Windows and Linux support
+
+If you have any feature requests or bugs to report, please feel free to open an issue.
 
 ## License
 
