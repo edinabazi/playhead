@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
-import { toast } from "sonner";
 import WaveSurfer from "wavesurfer.js";
 import {
   type EditableTrackMetadata,
@@ -32,6 +31,11 @@ import { DeletePlaylistDialog } from "@/features/sidebar/DeletePlaylistDialog";
 import { RemoveFolderDialog } from "@/features/sidebar/RemoveFolderDialog";
 import { Sidebar } from "@/features/sidebar/Sidebar";
 import { TrackList } from "@/features/tracks/TrackList";
+import {
+  showFolderActionToast,
+  showSimpleActionToast,
+  showTrackActionToast,
+} from "@/features/toasts/action-toasts";
 import {
   createPlaylist,
   emptyLibraryState,
@@ -95,31 +99,6 @@ function normalizeSourceForMode(state: LibraryState): LibraryState {
   }
 
   return state;
-}
-
-function LovedTrackToast({ track }: { track: LibraryTrack }) {
-  const artworkSrc = getMediaArtworkSrc(track);
-
-  return (
-    <div className="flex w-[320px] items-center gap-3 rounded-[20px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-3 text-foreground shadow-2xl backdrop-blur-xl">
-      <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-[14px] bg-white/10 text-[16px] font-semibold text-muted-foreground">
-        {artworkSrc ? (
-          <img className="size-full object-contain" src={artworkSrc} alt="" draggable={false} />
-        ) : (
-          <span>{track.title.slice(0, 1).toUpperCase()}</span>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[12px] font-semibold leading-4 text-primary">Added to Loved</p>
-        <p className="mt-0.5 truncate text-[13px] font-semibold leading-4 text-foreground">
-          {track.title}
-        </p>
-        <p className="mt-0.5 truncate text-[12px] font-medium leading-4 text-muted-foreground">
-          {track.artist}
-        </p>
-      </div>
-    </div>
-  );
 }
 
 export function App() {
@@ -264,6 +243,7 @@ export function App() {
       setError("This track could not be loaded.");
       setHasWaveform(false);
       if (autoplay && allowSkipUnavailable && library.settings.playback.skipUnavailableTracks) {
+        showTrackActionToast({ action: "Skipped unavailable track", track });
         playAdjacentTrackRef.current();
       }
     } finally {
@@ -311,8 +291,10 @@ export function App() {
             : { type: "folder" as const, id: scanned.folder.id },
       };
       await persistLibrary(nextState);
+      showFolderActionToast({ folder: scanned.folder, trackCount: scanned.tracks.length });
     } catch {
       setError("Could not scan that folder.");
+      showSimpleActionToast("Could not scan that folder.", "error");
     } finally {
       setIsScanning(false);
     }
@@ -335,8 +317,10 @@ export function App() {
               ? { type: "library-tracks" as const }
               : { type: "folder" as const, id: scanned.folder.id },
         });
+        showFolderActionToast({ folder: scanned.folder, trackCount: scanned.tracks.length });
       } catch {
         setError("Drop a folder that contains audio files.");
+        showSimpleActionToast("Drop a folder that contains audio files.", "error");
       } finally {
         setIsScanning(false);
       }
@@ -470,7 +454,7 @@ export function App() {
     async (action: AdvancedSettingsAction) => {
       if (action === "open-data-folder") {
         await window.playhead.openDataFolder();
-        return "Opened Playhead's data folder.";
+        return "Data folder opened.";
       }
 
       if (action === "clear-waveform-cache") {
@@ -530,6 +514,15 @@ export function App() {
         ],
         selectedSource: { type: "playlist", id: playlist.id },
       });
+      if (track) {
+        showTrackActionToast({
+          action: "Playlist created",
+          track,
+          detail: `Added to ${playlist.name}`,
+        });
+      } else {
+        showSimpleActionToast(`Playlist created: ${playlist.name}`);
+      }
       setIsCreatePlaylistOpen(false);
       setTrackPendingPlaylistCreation(null);
     },
@@ -610,6 +603,7 @@ export function App() {
 
   const deletePlaylist = useCallback(
     async (playlistId: string) => {
+      const deletedPlaylist = library.playlists.find((playlist) => playlist.id === playlistId);
       const nextPlaylists = library.playlists.filter((playlist) => playlist.id !== playlistId);
 
       await persistLibrary({
@@ -622,6 +616,7 @@ export function App() {
               : null
             : library.selectedSource,
       });
+      if (deletedPlaylist) showSimpleActionToast(`Playlist deleted: ${deletedPlaylist.name}`);
     },
     [library, persistLibrary],
   );
@@ -667,10 +662,10 @@ export function App() {
             : library.selectedSource,
       });
 
-      if (track && !wasFavorite) {
-        toast.custom(() => <LovedTrackToast track={track} />, {
-          duration: 2600,
-          unstyled: true,
+      if (track) {
+        showTrackActionToast({
+          action: wasFavorite ? "Removed from Loved" : "Added to Loved",
+          track,
         });
       }
     },
@@ -694,6 +689,7 @@ export function App() {
 
       await persistLibrary(nextState);
       setMetadataDialog({ track: updatedTrack });
+      showTrackActionToast({ action: "Metadata saved", track: updatedTrack });
       return updatedTrack;
     },
     [library, persistLibrary],
@@ -702,6 +698,7 @@ export function App() {
   const addTrackToPlaylist = useCallback(
     async (trackId: string, playlist: LibraryPlaylist) => {
       if (playlist.trackIds.includes(trackId)) return;
+      const track = library.tracks[trackId];
       const now = new Date().toISOString();
 
       await persistLibrary({
@@ -712,6 +709,13 @@ export function App() {
             : item,
         ),
       });
+      if (track) {
+        showTrackActionToast({
+          action: "Added to playlist",
+          track,
+          detail: playlist.name,
+        });
+      }
     },
     [library, persistLibrary],
   );
@@ -1240,6 +1244,8 @@ export function App() {
         <Sidebar
           folders={library.folders}
           libraryMode={library.settings.library.mode}
+          artistCount={libraryArtists.length}
+          albumCount={libraryAlbums.length}
           trackCount={libraryTrackCount}
           playlists={library.playlists}
           lovedCount={hasLovedTracks ? library.favoriteTrackIds.length : 0}

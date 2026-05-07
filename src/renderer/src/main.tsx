@@ -15,7 +15,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <ShapeProvider defaultShape="rounded">
       <IconProvider defaultLibrary="lucide">
         <App />
-        <Toaster position="bottom-right" offset={{ right: 34, bottom: 30 }} richColors closeButton />
+        <Toaster position="bottom-right" offset={{ right: 34, bottom: 30 }} />
       </IconProvider>
     </ShapeProvider>
   </React.StrictMode>,

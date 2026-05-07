@@ -18,6 +18,7 @@ import {
   dialogOverlayMotion,
   dialogPanelMotion,
 } from "@/components/ui/dialog-motion";
+import { showSimpleActionToast } from "@/features/toasts/action-toasts";
 import { useIcons } from "@/lib/icon-context";
 import { getPrimaryModifierLabel } from "@/lib/platform";
 
@@ -316,9 +317,16 @@ export function SettingsDialog({
   const executeAdvancedAction = async (action: AdvancedSettingsAction) => {
     setPendingAdvancedAction(action);
     try {
-      await onAdvancedAction(action);
-    } catch {
-      // The action handlers own user-facing failure copy for now.
+      const message = await onAdvancedAction(action);
+      showSimpleActionToast(
+        message,
+        message.includes("canceled") || message.startsWith("Add a folder") ? "info" : "success",
+      );
+    } catch (error) {
+      showSimpleActionToast(
+        error instanceof Error ? error.message : "That action could not be completed.",
+        "error",
+      );
     } finally {
       setPendingAdvancedAction(null);
       setAdvancedActionPendingConfirmation(null);

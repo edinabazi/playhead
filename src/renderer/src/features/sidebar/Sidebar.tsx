@@ -20,6 +20,8 @@ import { SidebarEmpty, SidebarItem } from "./SidebarItem";
 export function Sidebar({
   folders,
   libraryMode,
+  artistCount,
+  albumCount,
   trackCount,
   playlists,
   lovedCount,
@@ -37,6 +39,8 @@ export function Sidebar({
 }: {
   folders: LibraryFolder[];
   libraryMode: LibraryMode;
+  artistCount: number;
+  albumCount: number;
   trackCount: number;
   playlists: LibraryPlaylist[];
   lovedCount: number;
@@ -106,7 +110,7 @@ export function Sidebar({
                 active={selectedSource?.type === "library-artists"}
                 icon={icons.user}
                 label="Artists"
-                detail=""
+                detail={`${artistCount}`}
                 onClick={() => onSelectSource({ type: "library-artists" })}
               />
               <SidebarItem
@@ -114,7 +118,7 @@ export function Sidebar({
                 active={selectedSource?.type === "library-albums"}
                 icon={icons["square-library"]}
                 label="Albums"
-                detail=""
+                detail={`${albumCount}`}
                 onClick={() => onSelectSource({ type: "library-albums" })}
               />
               <SidebarItem
