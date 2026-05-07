@@ -12,13 +12,13 @@
   "scripts": {
     "dev": "electron-vite dev",
     "typecheck": "tsc --noEmit",
-    "build": "pnpm typecheck && electron-vite build",
+    "build": "tsc --noEmit && electron-vite build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "dist": "pnpm dist:mac",
-    "dist:mac": "pnpm build && electron-builder --mac --publish never",
+    "dist": "npm run dist:mac",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
     "preview": "electron-vite preview"
   },
   "pnpm": {
@@ -67,7 +67,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
-    "ieee754": "^1.2.1",
     "lucide-react": "^1.14.0",
     "music-metadata": "^11.12.3",
     "node-taglib-sharp": "^6.0.3",

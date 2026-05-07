@@ -13,6 +13,7 @@ on:
     paths:
       - package.json
       - pnpm-lock.yaml
+      - package-lock.json
       - src/**
       - resources/**
       - electron.vite.config.ts
@@ -95,15 +96,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.tag || github.ref }}
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10.32.0
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm ${{ matrix.script }}
+          cache: npm
+      - run: npm ci
+      - run: npm run ${{ matrix.script }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
