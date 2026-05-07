@@ -1,4 +1,3 @@
-import electron from "electron";
 import type { IpcRendererEvent } from "electron";
 import type {
   EditableTrackMetadata,
@@ -7,6 +6,7 @@ import type {
   MediaCommand,
   PlayheadApi,
 } from "../shared/library";
+import { electron } from "./electron";
 
 const { contextBridge, ipcRenderer, webUtils } = electron;
 

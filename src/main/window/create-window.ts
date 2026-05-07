@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import electron from "electron";
+import { electron } from "../electron";
 
 const { BrowserWindow } = electron;
 

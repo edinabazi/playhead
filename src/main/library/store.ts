@@ -1,6 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import electron from "electron";
 import {
   defaultAppSettings,
   defaultLibrarySettings,
@@ -9,6 +8,7 @@ import {
   type LibrarySettings,
   type LibraryState,
 } from "../../shared/library";
+import { electron } from "../electron";
 import { materializeStoredArtwork } from "../artwork";
 
 const { app } = electron;

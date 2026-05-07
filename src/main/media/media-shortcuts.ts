@@ -1,5 +1,5 @@
-import electron from "electron";
 import type { MediaCommand } from "../../shared/library";
+import { electron } from "../electron";
 
 const { BrowserWindow, globalShortcut } = electron;
 

@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { join } from "node:path";
-import electron from "electron";
 import type { LibraryArtwork, LibraryState } from "../shared/library";
+import { electron } from "./electron";
 
 const { app, nativeImage } = electron;
 

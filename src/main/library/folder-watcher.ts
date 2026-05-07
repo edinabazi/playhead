@@ -1,8 +1,8 @@
 import type { FSWatcher } from "chokidar";
 import chokidar from "chokidar";
-import electron from "electron";
 import { extname } from "node:path";
 import type { LibraryFolder } from "../../shared/library";
+import { electron } from "../electron";
 import { audioExtensions } from "./constants";
 
 const { BrowserWindow } = electron;
