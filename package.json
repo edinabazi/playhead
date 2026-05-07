@@ -16,10 +16,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "dist": "npm run build && electron-builder",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:linux": "npm run build && electron-builder --linux",
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --publish never",
     "preview": "electron-vite preview"
   },
   "build": {
@@ -57,6 +57,7 @@
     "linux": {
       "icon": "resources/playhead-icon.png",
       "category": "Audio",
+      "maintainer": "Edin Abazi <edinabazi@users.noreply.github.com>",
       "target": [
         "AppImage",
         "deb"
