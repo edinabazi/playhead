@@ -1,9 +1,9 @@
 import type { LibraryTrack } from "../../../../shared/library";
 import { AnimatePresence, motion } from "framer-motion";
 import { SliderComfortable } from "@/components/ui/slider";
-import { Tooltip } from "@/components/ui/tooltip";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
+import { FavoriteHeartButton } from "@/features/tracks/FavoriteHeartButton";
 import { TrackArtwork } from "@/features/tracks/TrackArtwork";
 import { IconButton } from "./IconButton";
 import { PlayPauseMorphIcon, SkipBackFilledIcon, SkipForwardFilledIcon } from "./media-icons";
@@ -54,7 +54,6 @@ export function Player({
   onVolumeChange: (volume: number) => void;
 }) {
   const icons = useIcons();
-  const HeartIcon = icons.heart;
   const MusicIcon = icons.music;
   const ShuffleIcon = icons.shuffle;
   const RepeatIcon = icons.repeat;
@@ -129,22 +128,12 @@ export function Player({
           </div>
 
           <div className="flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
-            <Tooltip content={isFavorite ? "Remove from Loved" : "Add to Loved"} side="top">
-              <button
-                className={`no-drag transition hover:text-foreground disabled:opacity-40 ${
-                  isFavorite ? "text-primary" : "text-muted-foreground"
-                }`}
-                title={isFavorite ? "Remove from Loved" : "Add to Loved"}
-                disabled={!activeTrack}
-                onClick={onToggleFavorite}
-              >
-                <HeartIcon
-                  size={18}
-                  strokeWidth={1.7}
-                  fill={isFavorite ? "currentColor" : "none"}
-                />
-              </button>
-            </Tooltip>
+            <FavoriteHeartButton
+              active={isFavorite}
+              disabled={!activeTrack}
+              tooltipSide="left"
+              onClick={onToggleFavorite}
+            />
           </div>
         </div>
       </div>

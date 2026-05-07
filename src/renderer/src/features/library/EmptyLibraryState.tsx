@@ -19,6 +19,8 @@ export function EmptyLibraryState({
 }) {
   const icons = useIcons();
   const FolderPlusIcon = icons["folder-plus"];
+  const LibraryIcon = icons["list-music"];
+  const FolderIcon = icons["folder-open"];
   const folderPickerName = getFolderPickerName();
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -55,51 +57,72 @@ export function EmptyLibraryState({
       }}
       onDrop={handleDrop}
     >
-      <div className="group relative grid w-full max-w-[560px] place-items-center overflow-hidden rounded-[36px] border border-white/[0.08] bg-white/[0.035] px-8 py-12 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] data-[dragging=true]:border-primary/60 data-[dragging=true]:bg-primary/[0.05]">
-        <div className="absolute inset-0 opacity-80">
-          <div className="absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.035] blur-3xl" />
+      <div className="group relative grid w-full max-w-[610px] place-items-center overflow-hidden rounded-[38px] border border-white/[0.09] bg-[rgba(255,255,255,0.035)] px-8 py-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_30px_90px_rgba(0,0,0,0.2)] data-[dragging=true]:border-primary/60 data-[dragging=true]:bg-primary/[0.045]">
+        <div className="pointer-events-none absolute inset-0 opacity-90">
+          <div className="absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+          <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.035] blur-3xl" />
+          <div className="absolute bottom-10 left-1/2 h-28 w-[420px] -translate-x-1/2 rounded-full bg-primary/[0.035] blur-3xl" />
         </div>
 
-        <div className="relative grid size-20 place-items-center overflow-hidden rounded-[24px]">
-          <img className="size-20" src={playheadIcon} alt="" draggable={false} />
+        <div className="relative grid size-[74px] place-items-center overflow-hidden rounded-[23px] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+          <img className="size-[74px]" src={playheadIcon} alt="" draggable={false} />
         </div>
 
-        <div className="relative mt-3">
-          <h2 className="text-2xl font-semibold leading-tight tracking-tighter text-foreground">
-            Build your library
+        <div className="relative mt-4">
+          <h2 className="text-[28px] font-semibold leading-none tracking-[-0.02em] text-foreground">
+            Add your music
           </h2>
-          <p className="mx-auto mt-3 max-w-[360px] text-[14px] font-medium leading-6 text-muted-foreground">
-            Drop a music folder here, or choose one from {folderPickerName}. Playhead will scan the
-            folder and keep it updated.
+          <p className="mx-auto mt-3 max-w-[410px] text-[14px] font-medium leading-6 text-muted-foreground">
+            Drop a folder here or choose one from {folderPickerName}. <br />
+            Playhead will scan it and keep it updated.
           </p>
         </div>
 
-        <div className="relative mt-6 grid w-full max-w-[360px] grid-cols-2 gap-2 rounded-[18px] bg-white/[0.045] p-1">
+        <div className="relative mt-6 grid w-full max-w-[420px] grid-cols-2 gap-1 rounded-full border border-white/10 bg-black/20 p-1">
           {[
-            { mode: "library" as const, label: "Library", description: "Artists and albums" },
-            { mode: "folder" as const, label: "Folder", description: "Browse folders" },
-          ].map((option) => (
-            <button
-              key={option.mode}
-              type="button"
-              className={`rounded-[14px] px-3 py-2 text-left transition ${
-                libraryMode === option.mode
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-              }`}
-              onClick={() => onLibraryModeChange(option.mode)}
-            >
-              <span className="block text-[13px] font-semibold leading-4">{option.label}</span>
-              <span className="block text-[11px] font-medium leading-4 opacity-75">
-                {option.description}
-              </span>
-            </button>
-          ))}
+            {
+              mode: "library" as const,
+              label: "Library",
+              description: "Artists, albums, tracks",
+              icon: LibraryIcon,
+            },
+            {
+              mode: "folder" as const,
+              label: "Folder",
+              description: "Browse folders",
+              icon: FolderIcon,
+            },
+          ].map((option) => {
+            const OptionIcon = option.icon;
+
+            return (
+              <button
+                key={option.mode}
+                type="button"
+                className={`flex min-h-12 items-center gap-2 rounded-full px-4 text-left transition ${
+                  libraryMode === option.mode
+                    ? "bg-primary text-primary-foreground shadow-[0_12px_34px_rgba(255,255,0,0.08)]"
+                    : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                }`}
+                onClick={() => onLibraryModeChange(option.mode)}
+              >
+                <OptionIcon size={17} strokeWidth={1.9} className="shrink-0" />
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] font-semibold leading-4">
+                    {option.label}
+                  </span>
+                  <span className="block truncate text-[11px] font-medium leading-4 opacity-72">
+                    {option.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="relative mt-7 flex items-center gap-3">
+        <div className="relative mt-7 flex flex-col items-center gap-3">
           <motion.button
-            className="no-drag flex h-[49px] items-center justify-center gap-2 rounded-[33px] bg-primary px-6 text-[14px] font-medium leading-none text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.48),0_14px_34px_rgba(255,255,0,0.08)] transition-colors disabled:opacity-55"
+            className="no-drag flex h-[50px] items-center justify-center gap-2 rounded-full bg-foreground/10 px-7 text-[14px] font-semibold leading-none text-foreground transition-colors disabled:opacity-55"
             title="Add folder"
             disabled={isScanning}
             whileHover={{ y: -1 }}

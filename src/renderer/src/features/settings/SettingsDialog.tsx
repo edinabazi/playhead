@@ -151,14 +151,18 @@ export function SettingsDialog({
       keys: ["→"],
       detail: `${savedPlaybackSettings.seekStepSeconds} seconds. Hold Shift for ${shiftSeekStep} seconds.`,
     },
+    { action: "Select previous track", keys: ["↑"] },
+    { action: "Select next track", keys: ["↓"] },
+    { action: "Play selected track", keys: ["Enter"] },
+    { action: "Love selected track", keys: ["L"] },
     {
       action: "Volume up",
-      keys: ["↑"],
+      keys: [`${modifierLabel} ↑`],
       detail: `${savedPlaybackSettings.volumeStepPercent}%. Hold Shift for ${shiftVolumeStep}%.`,
     },
     {
       action: "Volume down",
-      keys: ["↓"],
+      keys: [`${modifierLabel} ↓`],
       detail: `${savedPlaybackSettings.volumeStepPercent}%. Hold Shift for ${shiftVolumeStep}%.`,
     },
   ];

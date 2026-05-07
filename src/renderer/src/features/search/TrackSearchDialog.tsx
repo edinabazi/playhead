@@ -6,17 +6,19 @@ import {
   dialogPanelMotion,
 } from "@/components/ui/dialog-motion";
 import { useIcons } from "@/lib/icon-context";
-import type { LibraryFolder, LibraryTrack } from "../../../../shared/library";
+import type { LibraryFolder, LibraryMode, LibraryTrack } from "../../../../shared/library";
 import { TrackArtwork } from "@/features/tracks/TrackArtwork";
 
 export function TrackSearchDialog({
   tracks,
   folders,
+  libraryMode,
   onSelectTrack,
   onClose,
 }: {
   tracks: LibraryTrack[];
   folders: LibraryFolder[];
+  libraryMode: LibraryMode;
   onSelectTrack: (track: LibraryTrack) => void;
   onClose: () => void;
 }) {
@@ -141,9 +143,11 @@ export function TrackSearchDialog({
                     {track.artist}
                   </div>
                 </div>
-                <div className="max-w-[170px] truncate text-right text-[12px] font-medium text-[var(--text-tertiary)]">
-                  {folderNames.get(track.folderId) || "Folder"}
-                </div>
+                {libraryMode === "folder" && (
+                  <div className="max-w-[170px] truncate text-right text-[12px] font-medium text-[var(--text-tertiary)]">
+                    {folderNames.get(track.folderId) || "Folder"}
+                  </div>
+                )}
               </button>
             ))
           )}

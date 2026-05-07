@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
+import { toast } from "sonner";
 import WaveSurfer from "wavesurfer.js";
 import {
   type EditableTrackMetadata,
@@ -94,6 +95,31 @@ function normalizeSourceForMode(state: LibraryState): LibraryState {
   }
 
   return state;
+}
+
+function LovedTrackToast({ track }: { track: LibraryTrack }) {
+  const artworkSrc = getMediaArtworkSrc(track);
+
+  return (
+    <div className="flex w-[320px] items-center gap-3 rounded-[20px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-3 text-foreground shadow-2xl backdrop-blur-xl">
+      <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-[14px] bg-white/10 text-[16px] font-semibold text-muted-foreground">
+        {artworkSrc ? (
+          <img className="size-full object-contain" src={artworkSrc} alt="" draggable={false} />
+        ) : (
+          <span>{track.title.slice(0, 1).toUpperCase()}</span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] font-semibold leading-4 text-primary">Added to Loved</p>
+        <p className="mt-0.5 truncate text-[13px] font-semibold leading-4 text-foreground">
+          {track.title}
+        </p>
+        <p className="mt-0.5 truncate text-[12px] font-medium leading-4 text-muted-foreground">
+          {track.artist}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export function App() {
@@ -624,8 +650,10 @@ export function App() {
 
   const toggleFavoriteTrack = useCallback(
     async (trackId: string) => {
+      const track = library.tracks[trackId];
       const favoriteTrackIds = new Set(library.favoriteTrackIds || []);
-      if (favoriteTrackIds.has(trackId)) favoriteTrackIds.delete(trackId);
+      const wasFavorite = favoriteTrackIds.has(trackId);
+      if (wasFavorite) favoriteTrackIds.delete(trackId);
       else favoriteTrackIds.add(trackId);
 
       await persistLibrary({
@@ -638,6 +666,13 @@ export function App() {
               : null
             : library.selectedSource,
       });
+
+      if (track && !wasFavorite) {
+        toast.custom(() => <LovedTrackToast track={track} />, {
+          duration: 2600,
+          unstyled: true,
+        });
+      }
     },
     [library, persistLibrary],
   );
@@ -768,6 +803,42 @@ export function App() {
     },
     [setPlayerVolume],
   );
+
+  const selectAdjacentTrackInList = useCallback(
+    (direction: 1 | -1) => {
+      if (tracks.length === 0) return;
+
+      const selectedTrackId = selectedTrackIds[0] || null;
+      let currentIndex = selectedTrackId
+        ? tracks.findIndex((track) => track.id === selectedTrackId)
+        : -1;
+
+      if (currentIndex === -1 && activeTrackId) {
+        currentIndex = tracks.findIndex((track) => track.id === activeTrackId);
+      }
+
+      const nextIndex =
+        currentIndex === -1
+          ? direction === 1
+            ? 0
+            : tracks.length - 1
+          : clamp(currentIndex + direction, 0, tracks.length - 1);
+      const nextTrack = tracks[nextIndex];
+      setSelectedTrackIds([nextTrack.id]);
+      setScrollToTrackId(nextTrack.id);
+    },
+    [activeTrackId, selectedTrackIds, tracks],
+  );
+
+  const playSelectedTrack = useCallback(() => {
+    const selectedTrack = selectedTrackIds[0] ? library.tracks[selectedTrackIds[0]] : null;
+    if (selectedTrack) void selectTrack(selectedTrack, true);
+  }, [library.tracks, selectTrack, selectedTrackIds]);
+
+  const toggleSelectedTrackFavorite = useCallback(() => {
+    const selectedTrackId = selectedTrackIds[0];
+    if (selectedTrackId) void toggleFavoriteTrack(selectedTrackId);
+  }, [selectedTrackIds, toggleFavoriteTrack]);
 
   const rememberTrackPosition = useCallback(
     (trackId: string, time: number) => {
@@ -1016,23 +1087,60 @@ export function App() {
         return;
       }
 
-      if (event.code === "ArrowUp" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      if (event.code === "ArrowUp" && primaryModifier && !event.altKey) {
         event.preventDefault();
         const step = library.settings.playback.volumeStepPercent / 100;
         changeVolumeBy(event.shiftKey ? step * 2 : step);
         return;
       }
 
-      if (event.code === "ArrowDown" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      if (event.code === "ArrowDown" && primaryModifier && !event.altKey) {
         event.preventDefault();
         const step = library.settings.playback.volumeStepPercent / 100;
         changeVolumeBy(event.shiftKey ? -(step * 2) : -step);
+        return;
+      }
+
+      if (event.code === "ArrowUp" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        selectAdjacentTrackInList(-1);
+        return;
+      }
+
+      if (event.code === "ArrowDown" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        selectAdjacentTrackInList(1);
+        return;
+      }
+
+      if (event.code === "Enter" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        playSelectedTrack();
+        return;
+      }
+
+      if (
+        event.key.toLowerCase() === "l" &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        toggleSelectedTrackFavorite();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [changeVolumeBy, library.settings.playback, seekBy, togglePlayback]);
+  }, [
+    changeVolumeBy,
+    library.settings.playback,
+    playSelectedTrack,
+    seekBy,
+    selectAdjacentTrackInList,
+    togglePlayback,
+    toggleSelectedTrackFavorite,
+  ]);
 
   useEffect(() => {
     return window.playhead.onMediaCommand((command) => {
@@ -1263,6 +1371,7 @@ export function App() {
             key="search"
             tracks={allTracks}
             folders={library.folders}
+            libraryMode={library.settings.library.mode}
             onSelectTrack={playSearchResult}
             onClose={() => setIsSearchOpen(false)}
           />

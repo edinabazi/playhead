@@ -261,4 +261,31 @@ input,
       opacity: 0.55;
     }
   }
+
+  @keyframes waveform-skeleton-pulse {
+    0%,
+    100% {
+      transform: scaleY(0.58);
+      opacity: 0.23;
+    }
+    24% {
+      transform: scaleY(0.88);
+      opacity: 0.36;
+    }
+    48% {
+      transform: scaleY(1.18);
+      opacity: 0.52;
+    }
+    72% {
+      transform: scaleY(0.76);
+      opacity: 0.31;
+    }
+  }
+}
+
+.waveform-skeleton-loading .waveform-skeleton-bar {
+  animation: waveform-skeleton-pulse 1.72s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  animation-direction: reverse;
+  transform-origin: center;
+  will-change: transform, opacity;
 }

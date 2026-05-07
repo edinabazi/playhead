@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
 import { formatTime } from "@/lib/format";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
 import type { LibraryPlaylist, LibraryTrack } from "../../../../shared/library";
+import { FavoriteHeartButton } from "./FavoriteHeartButton";
 import { TrackArtwork } from "./TrackArtwork";
 import { TrackCell } from "./TrackCell";
 import { TrackRowMenu } from "./TrackRowMenu";
@@ -50,7 +50,6 @@ export function TrackList({
 }) {
   const icons = useIcons();
   const MusicIcon = icons.music;
-  const HeartIcon = icons.heart;
   const MenuIcon = icons.ellipsis;
   const [menuTrackId, setMenuTrackId] = useState<string | null>(null);
   const [contextMenuPoint, setContextMenuPoint] = useState<MenuAnchorPoint | null>(null);
@@ -130,7 +129,7 @@ export function TrackList({
                         setMenuTrackId(track.id);
                       }}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter") onSelectTrack(track);
+                        if (event.key === "Enter") onPlayTrack(track);
                       }}
                       onDragStart={(event) => {
                         setDraggedTrackId(track.id);
@@ -217,24 +216,14 @@ export function TrackList({
                       </div>
                       <div className="flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
                         <span>{formatTime(track.duration)}</span>
-                        <Tooltip content={isFavorite ? "Remove from Loved" : "Add to Loved"} side="top">
-                          <button
-                            className={`no-drag transition hover:text-foreground ${
-                              isFavorite ? "text-primary" : "text-muted-foreground"
-                            }`}
-                            title={isFavorite ? "Remove from Loved" : "Add to Loved"}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void onToggleFavorite(track);
-                            }}
-                          >
-                            <HeartIcon
-                              size={18}
-                              strokeWidth={1.7}
-                              fill={isFavorite ? "currentColor" : "none"}
-                            />
-                          </button>
-                        </Tooltip>
+                        <FavoriteHeartButton
+                          active={isFavorite}
+                          tooltipSide="top"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void onToggleFavorite(track);
+                          }}
+                        />
                         <TrackRowMenu
                           track={track}
                           playlists={playlists}

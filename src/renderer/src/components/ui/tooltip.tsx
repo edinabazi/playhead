@@ -159,7 +159,7 @@ export function Tooltip({
               style={{
                 left: position.left,
                 top: position.top,
-                transform: `translate(${position.x}, ${position.y})`,
+                translate: `${position.x} ${position.y}`,
               }}
               initial={{
                 opacity: 0,

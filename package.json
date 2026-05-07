@@ -58,6 +58,7 @@
     "node-taglib-sharp": "^6.0.3",
     "react": "latest",
     "react-dom": "latest",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "wavesurfer.js": "^7.12.6"
   },

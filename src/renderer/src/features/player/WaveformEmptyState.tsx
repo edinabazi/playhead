@@ -12,6 +12,7 @@ export function WaveformEmptyState({
     48, 27, 43, 60, 33, 51, 24, 37, 55, 31, 45, 64, 38, 52, 29, 41, 57, 34, 49, 25, 40, 53, 30, 46,
     59, 35, 50, 28, 42, 56, 32, 47, 23, 39, 54, 36, 48, 26, 44, 58,
   ];
+  const barCount = bars.length;
 
   return (
     <motion.div
@@ -23,25 +24,19 @@ export function WaveformEmptyState({
         opacity: { duration: reduceMotion ? 0 : 0.16 },
       }}
     >
-      <div className="absolute inset-x-5 top-1/2 flex -translate-y-1/2 items-center justify-between gap-[2px]">
+      <div
+        className={`absolute inset-x-5 top-1/2 flex -translate-y-1/2 items-center justify-between gap-[2px] ${
+          isLoading && !reduceMotion ? "waveform-skeleton-loading" : ""
+        }`}
+      >
         {bars.map((height, index) => (
-          <motion.span
+          <span
             key={index}
-            className="w-[2px] rounded-full bg-white/25"
-            initial={{ height: Math.max(8, height * 0.52), opacity: 0.24 }}
-            animate={{
-              height: reduceMotion
-                ? height * 0.52
-                : isLoading
-                  ? [height * 0.48, height * 0.86, height * 0.58]
-                  : height * 0.52,
-              opacity: reduceMotion ? 0.24 : isLoading ? [0.22, 0.48, 0.28] : 0.24,
-            }}
-            transition={{
-              duration: reduceMotion ? 0 : 0.92,
-              delay: (index % 16) * 0.025,
-              repeat: reduceMotion ? 0 : isLoading ? Infinity : 0,
-              ease: [0.22, 1, 0.36, 1],
+            className="waveform-skeleton-bar w-[2px] rounded-full bg-white/25"
+            style={{
+              height: Math.max(8, height * 0.58),
+              opacity: reduceMotion || !isLoading ? 0.24 : undefined,
+              animationDelay: `${(index / barCount) * -1.72}s`,
             }}
           />
         ))}
