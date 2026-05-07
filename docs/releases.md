@@ -5,20 +5,18 @@ already have a matching Git tag.
 
 ## Version Flow
 
-1. Update `package.json` and `package-lock.json` to the next version.
+1. Update `package.json` and `pnpm-lock.yaml` to the next version.
 2. Merge or push that change to `main`.
-3. GitHub Actions runs lint, tests, typecheck, and OS builds.
+3. GitHub Actions runs lint, tests, typecheck, and macOS builds.
 4. The workflow creates a draft GitHub Release tagged `v<version>`.
 5. Review the draft release notes and assets, then publish it.
 
 ## Assets
 
 - macOS: `.dmg` and `.zip`
-- Windows: NSIS installer and portable `.exe`
-- Linux: `.AppImage` and `.deb`
 
-macOS signing/notarization and Windows code signing are not configured yet. Unsigned builds are fine
-for early open-source releases, but users will see OS security warnings.
+macOS signing/notarization is not configured yet. Unsigned builds are fine for early open-source
+releases, but users will see OS security warnings.
 
 ## GitHub Configuration
 
@@ -30,9 +28,8 @@ for early open-source releases, but users will see OS security warnings.
 ## Local Builds
 
 ```bash
-npm run dist:mac
-npm run dist:win
-npm run dist:linux
+pnpm dist
+pnpm dist:mac
 ```
 
-Run the matching command on the target OS for the most reliable local package.
+Run the command on macOS for the most reliable local package.

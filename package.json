@@ -6,21 +6,27 @@
   "author": "Edin",
   "license": "MIT",
   "private": false,
+  "packageManager": "pnpm@10.32.0",
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "typecheck": "tsc --noEmit",
-    "build": "npm run typecheck && electron-vite build",
+    "build": "pnpm typecheck && electron-vite build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "dist": "npm run build && electron-builder --publish never",
-    "dist:mac": "npm run build && electron-builder --mac --publish never",
-    "dist:win": "npm run build && electron-builder --win --publish never",
-    "dist:linux": "npm run build && electron-builder --linux --publish never",
+    "dist": "pnpm dist:mac",
+    "dist:mac": "pnpm build && electron-builder --mac --publish never",
     "preview": "electron-vite preview"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron-winstaller",
+      "esbuild",
+      "protobufjs"
+    ]
   },
   "build": {
     "appId": "com.playhead.app",
@@ -45,22 +51,6 @@
       "target": [
         "dmg",
         "zip"
-      ]
-    },
-    "win": {
-      "icon": "resources/playhead-icon.png",
-      "target": [
-        "nsis",
-        "portable"
-      ]
-    },
-    "linux": {
-      "icon": "resources/playhead-icon.png",
-      "category": "Audio",
-      "maintainer": "Edin Abazi <edinabazi@users.noreply.github.com>",
-      "target": [
-        "AppImage",
-        "deb"
       ]
     }
   },
