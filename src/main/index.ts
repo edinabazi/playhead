@@ -1,10 +1,12 @@
-import { app, BrowserWindow, globalShortcut, nativeImage, protocol } from "electron";
+import electron from "electron";
 import { join } from "node:path";
 import { closeFolderWatcher } from "./library/folder-watcher";
 import { registerLibraryIpc } from "./library/library-ipc";
 import { registerMediaShortcuts } from "./media/media-shortcuts";
 import { registerTelemetryIpc, trackAppLaunch } from "./telemetry";
 import { createWindow } from "./window/create-window";
+
+const { app, BrowserWindow, globalShortcut, nativeImage, protocol } = electron;
 
 protocol.registerSchemesAsPrivileged([
   {

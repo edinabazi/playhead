@@ -1,5 +1,7 @@
-import { BrowserWindow, globalShortcut } from "electron";
+import electron from "electron";
 import type { MediaCommand } from "../../shared/library";
+
+const { BrowserWindow, globalShortcut } = electron;
 
 function sendMediaCommand(command: MediaCommand): void {
   for (const window of BrowserWindow.getAllWindows()) {

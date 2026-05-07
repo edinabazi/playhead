@@ -1,8 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { join } from "node:path";
-import { app, nativeImage } from "electron";
+import electron from "electron";
 import type { LibraryArtwork, LibraryState } from "../shared/library";
+
+const { app, nativeImage } = electron;
 
 export async function writeArtwork(trackId: string, bytes: Uint8Array): Promise<LibraryArtwork> {
   const image = nativeImage.createFromBuffer(Buffer.from(bytes));

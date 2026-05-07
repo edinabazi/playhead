@@ -1,4 +1,5 @@
-import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
+import electron from "electron";
+import type { IpcRendererEvent } from "electron";
 import type {
   EditableTrackMetadata,
   LibraryFolder,
@@ -6,6 +7,8 @@ import type {
   MediaCommand,
   PlayheadApi,
 } from "../shared/library";
+
+const { contextBridge, ipcRenderer, webUtils } = electron;
 
 const api: PlayheadApi = {
   getLibraryState: () => ipcRenderer.invoke("library:get-state"),

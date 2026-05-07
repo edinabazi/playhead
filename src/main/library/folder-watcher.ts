@@ -1,9 +1,11 @@
 import type { FSWatcher } from "chokidar";
 import chokidar from "chokidar";
-import { BrowserWindow } from "electron";
+import electron from "electron";
 import { extname } from "node:path";
 import type { LibraryFolder } from "../../shared/library";
 import { audioExtensions } from "./constants";
+
+const { BrowserWindow } = electron;
 
 const notifyDelayMs = 650;
 const ignoredDirectoryNames = new Set([

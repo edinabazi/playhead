@@ -1,8 +1,10 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { app, ipcMain } from "electron";
+import electron from "electron";
 import { readLibraryState } from "./library/store";
+
+const { app, ipcMain } = electron;
 
 type TelemetryPayload = {
   api_key: string;

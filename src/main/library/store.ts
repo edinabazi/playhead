@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { app } from "electron";
+import electron from "electron";
 import {
   defaultAppSettings,
   defaultLibrarySettings,
@@ -10,6 +10,8 @@ import {
   type LibraryState,
 } from "../../shared/library";
 import { materializeStoredArtwork } from "../artwork";
+
+const { app } = electron;
 
 function libraryPath(): string {
   return join(app.getPath("userData"), "library.json");

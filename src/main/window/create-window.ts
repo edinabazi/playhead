@@ -1,5 +1,7 @@
 import { join } from "node:path";
-import { BrowserWindow } from "electron";
+import electron from "electron";
+
+const { BrowserWindow } = electron;
 
 export function createWindow(): void {
   const iconPath = join(__dirname, "../../resources/playhead-icon.png");

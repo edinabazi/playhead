@@ -2,12 +2,14 @@ import { createReadStream } from "node:fs";
 import { readFile, rm, stat, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { Readable } from "node:stream";
-import { app, dialog, ipcMain, protocol, shell } from "electron";
+import electron from "electron";
 import type { EditableTrackMetadata, LibraryFolder, LibraryState } from "../../shared/library";
 import { readTrackMetadata, saveTrackMetadata } from "../metadata/metadata";
 import { watchLibraryFolders } from "./folder-watcher";
 import { scanFolderPath } from "./scanner";
 import { normalizeLibraryState, readLibraryState, writeLibraryState } from "./store";
+
+const { app, dialog, ipcMain, protocol, shell } = electron;
 
 function encodeMediaPath(filePath: string): string {
   return Buffer.from(filePath, "utf8").toString("base64url");
