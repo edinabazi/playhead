@@ -23,12 +23,16 @@ npm run test
 npm run build
 ```
 
-Build a local macOS app bundle:
+Build local installers/packages:
 
 ```bash
 npm run dist:mac
-open release/Playhead.app
+npm run dist:win
+npm run dist:linux
 ```
+
+Release automation is documented in [`docs/releases.md`](docs/releases.md). Tracking is documented
+in [`docs/tracking.md`](docs/tracking.md).
 
 ## Architecture
 
@@ -58,10 +62,9 @@ Known limitations:
 
 - Metadata writing is limited to the file formats supported by the current native metadata bridge.
 - The renderer composition in `App.tsx` still owns the top-level playback/library orchestration.
-- Packaging is configured for local macOS directory builds; signed/notarized distribution is not set up yet.
+- Signed/notarized distribution is not set up yet.
 
 ## Contributing
 
 Keep changes small, explicit, and easy to review. Prefer existing feature folders and shared types over
 new layers. Run `npm run typecheck`, `npm run lint`, and `npm run test` before opening a PR.
-

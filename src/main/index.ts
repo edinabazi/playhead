@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { closeFolderWatcher } from "./library/folder-watcher";
 import { registerLibraryIpc } from "./library/library-ipc";
 import { registerMediaShortcuts } from "./media/media-shortcuts";
+import { registerTelemetryIpc, trackAppLaunch } from "./telemetry";
 import { createWindow } from "./window/create-window";
 
 protocol.registerSchemesAsPrivileged([
@@ -27,8 +28,10 @@ app.whenReady().then(() => {
   }
 
   registerLibraryIpc();
+  registerTelemetryIpc();
   registerMediaShortcuts();
   createWindow();
+  void trackAppLaunch();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

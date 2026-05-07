@@ -97,6 +97,7 @@ export type AppSettings = {
   library: LibrarySettings;
   playback: PlaybackSettings;
   appearance: AppearanceSettings;
+  telemetry: TelemetrySettings;
   session: SessionSettings;
 };
 
@@ -118,6 +119,10 @@ export type PlaybackSettings = {
 export type AppearanceSettings = {
   appTransparency: number;
   reduceMotion: boolean;
+};
+
+export type TelemetrySettings = {
+  enabled: boolean;
 };
 
 export type SessionSettings = {
@@ -154,6 +159,7 @@ export type PlayheadApi = {
   clearWaveformCache: () => Promise<void>;
   exportLibraryBackup: (state: LibraryState) => Promise<boolean>;
   importLibraryBackup: () => Promise<LibraryState | null>;
+  trackEvent: (eventName: string, properties?: Record<string, string | number | boolean>) => void;
   onMediaCommand: (callback: (command: MediaCommand) => void) => () => void;
   onFolderChanged: (callback: (folderId: string) => void) => () => void;
 };
@@ -188,6 +194,10 @@ export const defaultAppearanceSettings = (): AppearanceSettings => ({
   reduceMotion: false,
 });
 
+export const defaultTelemetrySettings = (): TelemetrySettings => ({
+  enabled: true,
+});
+
 export const defaultSessionSettings = (): SessionSettings => ({
   activeTrackId: null,
   selectedTrackIds: [],
@@ -198,6 +208,7 @@ export const defaultAppSettings = (): AppSettings => ({
   library: defaultLibrarySettings(),
   playback: defaultPlaybackSettings(),
   appearance: defaultAppearanceSettings(),
+  telemetry: defaultTelemetrySettings(),
   session: defaultSessionSettings(),
 });
 

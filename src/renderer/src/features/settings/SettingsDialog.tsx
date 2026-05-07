@@ -5,10 +5,12 @@ import {
   defaultAppearanceSettings,
   defaultLibrarySettings,
   defaultPlaybackSettings,
+  defaultTelemetrySettings,
   type AppearanceSettings,
   type LibraryFolder,
   type LibrarySettings,
   type PlaybackSettings,
+  type TelemetrySettings,
 } from "../../../../shared/library";
 import {
   DialogOverlay,
@@ -53,6 +55,8 @@ export function SettingsDialog({
   appearanceSettings,
   onAppearanceSettingsChange,
   onAppearancePreviewChange,
+  telemetrySettings,
+  onTelemetrySettingsChange,
   onAdvancedAction,
   onClose,
 }: {
@@ -68,6 +72,8 @@ export function SettingsDialog({
   appearanceSettings: AppearanceSettings;
   onAppearanceSettingsChange: (settings: AppearanceSettings) => void;
   onAppearancePreviewChange: (appTransparency: number | null) => void;
+  telemetrySettings: TelemetrySettings;
+  onTelemetrySettingsChange: (settings: TelemetrySettings) => void;
   onAdvancedAction: (action: AdvancedSettingsAction) => Promise<string>;
   onClose: () => void;
 }) {
@@ -91,6 +97,10 @@ export function SettingsDialog({
       ...appearanceSettings,
     }),
   );
+  const [draftTelemetrySettings, setDraftTelemetrySettings] = useState<TelemetrySettings>(() => ({
+    ...defaultTelemetrySettings(),
+    ...telemetrySettings,
+  }));
   const [isTransparencyPreviewing, setIsTransparencyPreviewing] = useState(false);
   const [pendingAdvancedAction, setPendingAdvancedAction] = useState<AdvancedSettingsAction | null>(
     null,
@@ -101,6 +111,7 @@ export function SettingsDialog({
   const savedSettings = { ...defaultLibrarySettings(), ...librarySettings };
   const savedPlaybackSettings = { ...defaultPlaybackSettings(), ...playbackSettings };
   const savedAppearanceSettings = { ...defaultAppearanceSettings(), ...appearanceSettings };
+  const savedTelemetrySettings = { ...defaultTelemetrySettings(), ...telemetrySettings };
   const settingsChanged =
     savedSettings.mode !== draftLibrarySettings.mode ||
     savedSettings.watchFolders !== draftLibrarySettings.watchFolders ||
@@ -116,7 +127,13 @@ export function SettingsDialog({
   const appearanceSettingsChanged =
     savedAppearanceSettings.appTransparency !== draftAppearanceSettings.appTransparency ||
     savedAppearanceSettings.reduceMotion !== draftAppearanceSettings.reduceMotion;
-  const hasUnsavedChanges = settingsChanged || playbackSettingsChanged || appearanceSettingsChanged;
+  const telemetrySettingsChanged =
+    savedTelemetrySettings.enabled !== draftTelemetrySettings.enabled;
+  const hasUnsavedChanges =
+    settingsChanged ||
+    playbackSettingsChanged ||
+    appearanceSettingsChanged ||
+    telemetrySettingsChanged;
   const categories = [
     { id: "library", label: "Library", icon: FolderOpenIcon },
     { id: "playback", label: "Playback", icon: icons.play },
@@ -259,6 +276,16 @@ export function SettingsDialog({
   const saveAppearanceSettings = () => {
     if (!appearanceSettingsChanged) return;
     onAppearanceSettingsChange(draftAppearanceSettings);
+    onClose();
+  };
+
+  const resetTelemetrySettings = () => {
+    setDraftTelemetrySettings(savedTelemetrySettings);
+  };
+
+  const saveTelemetrySettings = () => {
+    if (!telemetrySettingsChanged) return;
+    onTelemetrySettingsChange(draftTelemetrySettings);
     onClose();
   };
 
@@ -434,9 +461,14 @@ export function SettingsDialog({
             ) : (
               <AdvancedSettingsPane
                 actions={advancedActions}
+                telemetrySettings={draftTelemetrySettings}
+                telemetryChanged={telemetrySettingsChanged}
                 pendingAction={pendingAdvancedAction}
                 loaderIcon={icons.loader}
                 chevronRightIcon={ChevronRightIcon}
+                onTelemetryChange={setDraftTelemetrySettings}
+                onResetTelemetry={resetTelemetrySettings}
+                onSaveTelemetry={saveTelemetrySettings}
                 onRunAction={(action) => void runAdvancedAction(action)}
               />
             )}

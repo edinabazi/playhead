@@ -62,5 +62,5 @@ export const settingsHeaderDescriptions: Record<SettingsCategoryId, string> = {
   playback: "Keyboard playback behavior.",
   appearance: "Window transparency and motion.",
   shortcuts: "Current keyboard controls.",
-  advanced: "Maintenance and backup tools.",
+  advanced: "Maintenance, backup, and diagnostics.",
 };

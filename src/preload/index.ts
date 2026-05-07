@@ -27,9 +27,11 @@ const api: PlayheadApi = {
   showItemInFolder: (path: string) => ipcRenderer.invoke("library:show-item", path),
   openDataFolder: () => ipcRenderer.invoke("library:open-data-folder"),
   clearWaveformCache: () => ipcRenderer.invoke("library:clear-waveform-cache"),
-  exportLibraryBackup: (state: LibraryState) =>
-    ipcRenderer.invoke("library:export-backup", state),
+  exportLibraryBackup: (state: LibraryState) => ipcRenderer.invoke("library:export-backup", state),
   importLibraryBackup: () => ipcRenderer.invoke("library:import-backup"),
+  trackEvent: (eventName: string, properties?: Record<string, string | number | boolean>) => {
+    void ipcRenderer.invoke("telemetry:track", eventName, properties);
+  },
   onMediaCommand: (callback: (command: MediaCommand) => void) => {
     const listener = (_event: IpcRendererEvent, command: MediaCommand) => callback(command);
     ipcRenderer.on("media-command", listener);

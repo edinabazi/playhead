@@ -60,9 +60,7 @@ export function AppearanceSettingsPane({
         >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h4 className="text-[14px] font-semibold leading-5 text-foreground">
-                Reduce motion
-              </h4>
+              <h4 className="text-[14px] font-semibold leading-5 text-foreground">Reduce motion</h4>
               <p className="mt-1 max-w-[420px] text-[12px] font-medium leading-4 text-muted-foreground">
                 Simplify animation and transition effects.
               </p>
@@ -75,12 +73,20 @@ export function AppearanceSettingsPane({
         </div>
       </div>
 
-      <SettingsFooter
-        status={changed ? "Changes will apply after saving." : "Appearance settings are up to date."}
-        changed={changed}
-        onReset={onReset}
-        onSave={onSave}
-      />
+      <div
+        className={`transition-opacity ${
+          isTransparencyPreviewing ? "pointer-events-none opacity-0" : ""
+        }`}
+      >
+        <SettingsFooter
+          status={
+            changed ? "Changes will apply after saving." : "Appearance settings are up to date."
+          }
+          changed={changed}
+          onReset={onReset}
+          onSave={onSave}
+        />
+      </div>
     </>
   );
 }

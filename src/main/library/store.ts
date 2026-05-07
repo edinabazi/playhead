@@ -52,6 +52,7 @@ export function normalizeSettings(
       library: { ...defaults.library, ...(grouped.library || {}) },
       playback: { ...defaults.playback, ...(grouped.playback || {}) },
       appearance: { ...defaults.appearance, ...(grouped.appearance || {}) },
+      telemetry: { ...defaults.telemetry, ...(grouped.telemetry || {}) },
       session: { ...defaults.session, ...(grouped.session || {}) },
     };
   }

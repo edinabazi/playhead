@@ -11,6 +11,7 @@ import {
   type LibraryState,
   type LibraryTrack,
   type PlaybackSettings,
+  type TelemetrySettings,
   defaultSessionSettings,
 } from "../../shared/library";
 import { getMediaArtworkSrc } from "@/lib/artwork";
@@ -21,10 +22,7 @@ import { CreatePlaylistDialog } from "@/features/playlists/CreatePlaylistDialog"
 import { setMediaActionHandler, updateMediaPosition } from "@/features/player/media-session";
 import type { RepeatMode } from "@/features/player/types";
 import { TrackSearchDialog } from "@/features/search/TrackSearchDialog";
-import {
-  SettingsDialog,
-  type AdvancedSettingsAction,
-} from "@/features/settings/SettingsDialog";
+import { SettingsDialog, type AdvancedSettingsAction } from "@/features/settings/SettingsDialog";
 import { DeletePlaylistDialog } from "@/features/sidebar/DeletePlaylistDialog";
 import { RemoveFolderDialog } from "@/features/sidebar/RemoveFolderDialog";
 import { Sidebar } from "@/features/sidebar/Sidebar";
@@ -97,8 +95,9 @@ export function App() {
   const [trackPendingPlaylistCreation, setTrackPendingPlaylistCreation] =
     useState<LibraryTrack | null>(null);
   const [folderPendingRemoval, setFolderPendingRemoval] = useState<LibraryFolder | null>(null);
-  const [playlistPendingDeletion, setPlaylistPendingDeletion] =
-    useState<LibraryPlaylist | null>(null);
+  const [playlistPendingDeletion, setPlaylistPendingDeletion] = useState<LibraryPlaylist | null>(
+    null,
+  );
   const [renamingPlaylistId, setRenamingPlaylistId] = useState<string | null>(null);
   const [scrollToTrackId, setScrollToTrackId] = useState<string | null>(null);
   const [previewAppTransparency, setPreviewAppTransparency] = useState<number | null>(null);
@@ -163,85 +162,88 @@ export function App() {
     [library],
   );
 
-  const selectTrack = useCallback(async (
-    track: LibraryTrack,
-    autoplay = true,
-    startTime = 0,
-    allowSkipUnavailable = true,
-  ) => {
-    const wavesurfer = wavesurferRef.current;
-    if (!wavesurfer) return;
-    const requestId = trackLoadRequestIdRef.current + 1;
-    trackLoadRequestIdRef.current = requestId;
-    loadedTrackIdRef.current = null;
-
-    wavesurfer.pause();
-    setIsLoadingTrack(true);
-    setError("");
-    setActiveTrackId(track.id);
-    setHasWaveform(false);
-    setCurrentTime(0);
-    setDuration(track.duration || 0);
-    setIsPlaying(false);
-    if (
-      library.settings.playback.restoreLastSession ||
-      library.settings.playback.rememberTrackPositions
-    ) {
-      persistSessionSettings({
-        ...library.settings.session,
-        activeTrackId: track.id,
-        selectedTrackIds: [track.id],
-      });
-    }
-
-    try {
-      const audioUrl = await window.playhead.getAudioFileUrl(track.path);
-      if (requestId !== trackLoadRequestIdRef.current) return;
-
-      await (trackLoadQueueRef.current = trackLoadQueueRef.current
-        .catch(() => undefined)
-        .then(async () => {
-          if (requestId !== trackLoadRequestIdRef.current) return;
-          await wavesurfer.load(audioUrl);
-        }));
-      if (requestId !== trackLoadRequestIdRef.current) return;
-
-      loadedTrackIdRef.current = track.id;
-      setHasWaveform(true);
-      setDuration(wavesurfer.getDuration() || track.duration || 0);
-      if (startTime > 0) {
-        wavesurfer.setTime(clamp(startTime, 0, wavesurfer.getDuration() || startTime));
-        setCurrentTime(wavesurfer.getCurrentTime());
-      }
-
-      if (autoplay) {
-        try {
-          await wavesurfer.play();
-        } catch {
-          setIsPlaying(false);
-          setError("Playback could not start.");
-        }
-      }
-    } catch (loadError) {
-      if (requestId !== trackLoadRequestIdRef.current) return;
-      console.error("Failed to load track", { path: track.path, error: loadError });
+  const selectTrack = useCallback(
+    async (track: LibraryTrack, autoplay = true, startTime = 0, allowSkipUnavailable = true) => {
+      const wavesurfer = wavesurferRef.current;
+      if (!wavesurfer) return;
+      const requestId = trackLoadRequestIdRef.current + 1;
+      trackLoadRequestIdRef.current = requestId;
       loadedTrackIdRef.current = null;
-      setError("This track could not be loaded.");
+
+      wavesurfer.pause();
+      setIsLoadingTrack(true);
+      setError("");
+      setActiveTrackId(track.id);
       setHasWaveform(false);
-      if (autoplay && allowSkipUnavailable && library.settings.playback.skipUnavailableTracks) {
-        showTrackActionToast({ action: "Skipped unavailable track", track });
-        playAdjacentTrackRef.current();
+      setCurrentTime(0);
+      setDuration(track.duration || 0);
+      setIsPlaying(false);
+      if (
+        library.settings.playback.restoreLastSession ||
+        library.settings.playback.rememberTrackPositions
+      ) {
+        persistSessionSettings({
+          ...library.settings.session,
+          activeTrackId: track.id,
+          selectedTrackIds: [track.id],
+        });
       }
-    } finally {
-      if (requestId === trackLoadRequestIdRef.current) setIsLoadingTrack(false);
-    }
-  }, [
-    library.settings.playback.rememberTrackPositions,
-    library.settings.playback.restoreLastSession,
-    library.settings.playback.skipUnavailableTracks,
-    library.settings.session,
-    persistSessionSettings,
-  ]);
+
+      try {
+        const audioUrl = await window.playhead.getAudioFileUrl(track.path);
+        if (requestId !== trackLoadRequestIdRef.current) return;
+
+        await (trackLoadQueueRef.current = trackLoadQueueRef.current
+          .catch(() => undefined)
+          .then(async () => {
+            if (requestId !== trackLoadRequestIdRef.current) return;
+            await wavesurfer.load(audioUrl);
+          }));
+        if (requestId !== trackLoadRequestIdRef.current) return;
+
+        loadedTrackIdRef.current = track.id;
+        setHasWaveform(true);
+        setDuration(wavesurfer.getDuration() || track.duration || 0);
+        window.playhead.trackEvent("track_loaded", {
+          autoplay,
+          has_duration: Boolean(track.duration),
+          audio_format: track.audioFormat || "unknown",
+        });
+        if (startTime > 0) {
+          wavesurfer.setTime(clamp(startTime, 0, wavesurfer.getDuration() || startTime));
+          setCurrentTime(wavesurfer.getCurrentTime());
+        }
+
+        if (autoplay) {
+          try {
+            await wavesurfer.play();
+          } catch {
+            setIsPlaying(false);
+            setError("Playback could not start.");
+          }
+        }
+      } catch (loadError) {
+        if (requestId !== trackLoadRequestIdRef.current) return;
+        console.error("Failed to load track", { path: track.path, error: loadError });
+        loadedTrackIdRef.current = null;
+        setError("This track could not be loaded.");
+        setHasWaveform(false);
+        if (autoplay && allowSkipUnavailable && library.settings.playback.skipUnavailableTracks) {
+          showTrackActionToast({ action: "Skipped unavailable track", track });
+          playAdjacentTrackRef.current();
+        }
+      } finally {
+        if (requestId === trackLoadRequestIdRef.current) setIsLoadingTrack(false);
+      }
+    },
+    [
+      library.settings.playback.rememberTrackPositions,
+      library.settings.playback.restoreLastSession,
+      library.settings.playback.skipUnavailableTracks,
+      library.settings.session,
+      persistSessionSettings,
+    ],
+  );
 
   const playSearchResult = useCallback(
     async (track: LibraryTrack) => {
@@ -277,6 +279,10 @@ export function App() {
             : { type: "folder" as const, id: scanned.folder.id },
       };
       await persistLibrary(nextState);
+      window.playhead.trackEvent("folder_added", {
+        source: "picker",
+        track_count: scanned.tracks.length,
+      });
       showFolderActionToast({ folder: scanned.folder, trackCount: scanned.tracks.length });
     } catch (error) {
       const message = getErrorMessage(error, "Could not scan that folder.");
@@ -306,6 +312,10 @@ export function App() {
           );
           nextState = mergeScannedFolder(nextState, scanned);
           lastScannedFolderId = scanned.folder.id;
+          window.playhead.trackEvent("folder_added", {
+            source: "drop",
+            track_count: scanned.tracks.length,
+          });
           showFolderActionToast({ folder: scanned.folder, trackCount: scanned.tracks.length });
         }
 
@@ -437,6 +447,19 @@ export function App() {
     [library, persistLibrary],
   );
 
+  const updateTelemetrySettings = useCallback(
+    async (settings: TelemetrySettings) => {
+      await persistLibrary({
+        ...library,
+        settings: { ...library.settings, telemetry: settings },
+      });
+      if (settings.enabled && !library.settings.telemetry.enabled) {
+        window.playhead.trackEvent("telemetry_enabled");
+      }
+    },
+    [library, persistLibrary],
+  );
+
   const clearPlaybackState = useCallback(() => {
     wavesurferRef.current?.stop();
     wavesurferRef.current?.empty();
@@ -515,6 +538,9 @@ export function App() {
         ],
         selectedSource: { type: "playlist", id: playlist.id },
       });
+      window.playhead.trackEvent("playlist_created", {
+        from_track: Boolean(track),
+      });
       if (track) {
         showTrackActionToast({
           action: "Playlist created",
@@ -546,10 +572,10 @@ export function App() {
           ? library.settings.library.mode === "library"
             ? { type: "library-tracks" as const }
             : nextFolders[0]
-            ? { type: "folder" as const, id: nextFolders[0].id }
-            : library.playlists[0]
-              ? { type: "playlist" as const, id: library.playlists[0].id }
-              : null
+              ? { type: "folder" as const, id: nextFolders[0].id }
+              : library.playlists[0]
+                ? { type: "playlist" as const, id: library.playlists[0].id }
+                : null
           : library.selectedSource;
 
       if (activeTrackId && removedTrackIds.has(activeTrackId)) {
@@ -662,6 +688,7 @@ export function App() {
               : null
             : library.selectedSource,
       });
+      window.playhead.trackEvent(wasFavorite ? "track_unfavorited" : "track_favorited");
 
       if (track) {
         showTrackActionToast({
@@ -762,13 +789,17 @@ export function App() {
 
       const source = library.selectedSource;
       if (!source) return;
-      const uniqueTrackIds = trackIds.filter((trackId, index) => trackIds.indexOf(trackId) === index);
+      const uniqueTrackIds = trackIds.filter(
+        (trackId, index) => trackIds.indexOf(trackId) === index,
+      );
       if (uniqueTrackIds.length === 0) return;
 
       if (source.type === "folder") {
         const folder = library.folders.find((item) => item.id === source.id);
         if (!folder) return;
-        const trackIdsToMove = folder.trackIds.filter((trackId) => uniqueTrackIds.includes(trackId));
+        const trackIdsToMove = folder.trackIds.filter((trackId) =>
+          uniqueTrackIds.includes(trackId),
+        );
         if (trackIdsToMove.length === 0) return;
         const targetIndex = folder.trackIds.indexOf(targetTrackId);
         if (targetIndex === -1) return;
@@ -792,7 +823,9 @@ export function App() {
 
       const playlist = library.playlists.find((item) => item.id === source.id);
       if (!playlist) return;
-      const trackIdsToMove = playlist.trackIds.filter((trackId) => uniqueTrackIds.includes(trackId));
+      const trackIdsToMove = playlist.trackIds.filter((trackId) =>
+        uniqueTrackIds.includes(trackId),
+      );
       if (trackIdsToMove.length === 0) return;
       const targetIndex = playlist.trackIds.indexOf(targetTrackId);
       if (targetIndex === -1) return;
@@ -809,9 +842,7 @@ export function App() {
       await persistLibrary({
         ...library,
         playlists: library.playlists.map((item) =>
-          item.id === playlist.id
-            ? { ...item, trackIds: nextTrackIds, updatedAt: now }
-            : item,
+          item.id === playlist.id ? { ...item, trackIds: nextTrackIds, updatedAt: now } : item,
         ),
       });
     },
@@ -952,7 +983,12 @@ export function App() {
         trackPositions: nextPositions,
       });
     },
-    [library.settings.playback.rememberTrackPositions, library.settings.session, persistSessionSettings, selectedTrackIds],
+    [
+      library.settings.playback.rememberTrackPositions,
+      library.settings.session,
+      persistSessionSettings,
+      selectedTrackIds,
+    ],
   );
 
   const clearTrackPosition = useCallback(
@@ -965,7 +1001,11 @@ export function App() {
         trackPositions: nextPositions,
       });
     },
-    [library.settings.playback.rememberTrackPositions, library.settings.session, persistSessionSettings],
+    [
+      library.settings.playback.rememberTrackPositions,
+      library.settings.session,
+      persistSessionSettings,
+    ],
   );
 
   const playAdjacentTrack = useCallback(
@@ -1240,271 +1280,277 @@ export function App() {
 
   return (
     <MotionConfig reducedMotion={reduceMotion ? "always" : "never"}>
-    <main
-      className={`app-window app-drag h-dvh overflow-hidden bg-transparent text-foreground ${
-        reduceMotion ? "reduce-motion" : ""
-      }`}
-    >
-      <section
-        className="app-shell app-drag flex size-full gap-4 overflow-hidden p-4"
-        style={{ "--app-transparency": appTransparency } as React.CSSProperties}
+      <main
+        className={`app-window app-drag h-dvh overflow-hidden bg-transparent text-foreground ${
+          reduceMotion ? "reduce-motion" : ""
+        }`}
       >
-        <Sidebar
-          folders={library.folders}
-          libraryMode={library.settings.library.mode}
-          artistCount={libraryArtists.length}
-          albumCount={libraryAlbums.length}
-          trackCount={libraryTrackCount}
-          playlists={library.playlists}
-          lovedCount={hasLovedTracks ? library.favoriteTrackIds.length : 0}
-          selectedSource={library.selectedSource}
-          isScanning={isScanning}
-          onAddFolder={addFolder}
-          onOpenSearch={() => setIsSearchOpen(true)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
-          onSelectSource={(source) => void persistLibrary({ ...library, selectedSource: source })}
-          onDropTrackToPlaylist={(trackIds, playlist) => void addTracksToPlaylist(trackIds, playlist)}
-          onRemoveFolder={(folder) => setFolderPendingRemoval(folder)}
-          onRenamePlaylist={(playlist) => setRenamingPlaylistId(playlist.id)}
-          onDeletePlaylist={(playlist) => {
-            if (playlist.trackIds.length === 0) {
-              void deletePlaylist(playlist.id);
-              return;
-            }
-            setPlaylistPendingDeletion(playlist);
-          }}
-        />
-
-        <main className="no-drag flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
-          {isLibraryEmpty ? (
-            <EmptyLibraryState
-              isScanning={isScanning}
-              libraryMode={library.settings.library.mode}
-              onLibraryModeChange={(mode) => void updateLibraryMode(mode)}
-              onAddFolder={addFolder}
-              onDropFolderPaths={(folderPaths) => void addFolderPaths(folderPaths)}
-            />
-          ) : (
-            <>
-              <Player
-                activeTrack={activeTrack}
-                isPlaying={isPlaying}
-                isLoading={isLoadingTrack}
-                hasWaveform={hasWaveform}
-                reduceMotion={reduceMotion}
-                isFavorite={
-                  activeTrack ? (library.favoriteTrackIds || []).includes(activeTrack.id) : false
-                }
-                currentTime={currentTime}
-                duration={duration}
-                waveformRef={setWaveformElement}
-                onTogglePlayback={togglePlayback}
-                onPreviousTrack={() => playAdjacentTrack(-1)}
-                onNextTrack={() => playAdjacentTrack(1)}
-                shuffleEnabled={shuffleEnabled}
-                repeatMode={repeatMode}
-                volume={volume}
-                onToggleShuffle={() => setShuffleEnabled((enabled) => !enabled)}
-                onCycleRepeat={() =>
-                  setRepeatMode((mode) => (mode === "off" ? "all" : mode === "all" ? "one" : "off"))
-                }
-                onToggleFavorite={() => {
-                  if (activeTrack) void toggleFavoriteTrack(activeTrack.id);
-                }}
-                onVolumeChange={setPlayerVolume}
-              />
-
-              {selectedSource?.type === "library-artists" ? (
-                <LibraryBrowser
-                  emptyLabel="No artists to show."
-                  artists={libraryArtists}
-                  onSelectArtist={(artist) =>
-                    void persistLibrary({
-                      ...library,
-                      selectedSource: { type: "library-artist", id: artist.id },
-                    })
-                  }
-                />
-              ) : selectedSource?.type === "library-albums" ? (
-                <LibraryBrowser
-                  emptyLabel="No albums to show."
-                  albums={libraryAlbums}
-                  onSelectAlbum={(album) =>
-                    void persistLibrary({
-                      ...library,
-                      selectedSource: { type: "library-album", id: album.id },
-                    })
-                  }
-                />
-              ) : (
-                <>
-                  {(selectedLibraryArtist || selectedLibraryAlbum) && (
-                    <LibraryDetailHeader
-                      artist={selectedLibraryArtist}
-                      album={selectedLibraryAlbum}
-                      onBack={() =>
-                        void persistLibrary({
-                          ...library,
-                          selectedSource: {
-                            type: selectedLibraryArtist ? "library-artists" : "library-albums",
-                          },
-                        })
-                      }
-                    />
-                  )}
-                  <TrackList
-                    tracks={tracks}
-                    activeTrackId={activeTrackId}
-                    isPlaying={isPlaying}
-                    selectedTrackIds={selectedTrackIds}
-                    scrollToTrackId={scrollToTrackId}
-                    selectedPlaylist={selectedPlaylist}
-                    canReorderTracks={selectedSource?.type !== "library-tracks"}
-                    playlists={library.playlists}
-                    favoriteTrackIds={library.favoriteTrackIds || []}
-                    onSelectTrack={selectTrackInList}
-                    onPlayTrack={(track) => selectTrack(track, true)}
-                    onAddToPlaylist={(track, playlist) => addTrackToPlaylist(track.id, playlist)}
-                    onAddTracksToPlaylist={(tracks, playlist) =>
-                      addTracksToPlaylist(
-                        tracks.map((track) => track.id),
-                        playlist,
-                      )
-                    }
-                    onCreatePlaylist={(track) => {
-                      setTrackPendingPlaylistCreation(track);
-                      setIsCreatePlaylistOpen(true);
-                    }}
-                    onToggleFavorite={(track) => toggleFavoriteTrack(track.id)}
-                    onRemoveFromPlaylist={removeTrackFromSelectedPlaylist}
-                    onShowInFolder={(track) => window.playhead.showItemInFolder(track.path)}
-                    onShowMetadata={(track) => setMetadataDialog({ track })}
-                    onReorderTrack={(trackId, targetTrackId, edge) =>
-                      reorderTrack(trackId, targetTrackId, edge)
-                    }
-                    onScrolledToTrack={() => setScrollToTrackId(null)}
-                  />
-                </>
-              )}
-            </>
-          )}
-        </main>
-      </section>
-      <AnimatePresence>
-        {metadataDialog && (
-          <MetadataDialog
-            key="metadata"
-            track={metadataDialog.track}
-            onSave={saveTrackMetadata}
-            onClose={() => setMetadataDialog(null)}
-          />
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {isSearchOpen && (
-          <TrackSearchDialog
-            key="search"
-            tracks={allTracks}
+        <section
+          className="app-shell app-drag flex size-full gap-4 overflow-hidden p-4"
+          style={{ "--app-transparency": appTransparency } as React.CSSProperties}
+        >
+          <Sidebar
             folders={library.folders}
-            artists={libraryArtists}
-            albums={libraryAlbums}
             libraryMode={library.settings.library.mode}
-            onSelectTrack={playSearchResult}
-            onSelectArtist={(artist) => {
-              setIsSearchOpen(false);
-              void persistLibrary({
-                ...library,
-                selectedSource: { type: "library-artist", id: artist.id },
-              });
-            }}
-            onSelectAlbum={(album) => {
-              setIsSearchOpen(false);
-              void persistLibrary({
-                ...library,
-                selectedSource: { type: "library-album", id: album.id },
-              });
-            }}
-            onClose={() => setIsSearchOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {isSettingsOpen && (
-          <SettingsDialog
-            key="settings"
-            librarySettings={library.settings.library}
-            libraryFolders={library.folders}
+            artistCount={libraryArtists.length}
+            albumCount={libraryAlbums.length}
+            trackCount={libraryTrackCount}
+            playlists={library.playlists}
+            lovedCount={hasLovedTracks ? library.favoriteTrackIds.length : 0}
+            selectedSource={library.selectedSource}
             isScanning={isScanning}
-            onAddLibraryFolder={() => void addFolder()}
-            onDropLibraryFolderPaths={(folderPaths) => void addFolderPaths(folderPaths)}
-            onLibrarySettingsChange={(settings) => void updateLibrarySettings(settings)}
-            onRemoveLibraryFolder={setFolderPendingRemoval}
-            playbackSettings={library.settings.playback}
-            onPlaybackSettingsChange={(settings) => void updatePlaybackSettings(settings)}
-            appearanceSettings={library.settings.appearance}
-            onAppearanceSettingsChange={(settings) => void updateAppearanceSettings(settings)}
-            onAppearancePreviewChange={setPreviewAppTransparency}
-            onAdvancedAction={runAdvancedSettingsAction}
-            onClose={() => setIsSettingsOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {folderPendingRemoval && (
-          <RemoveFolderDialog
-            key={`remove-folder-${folderPendingRemoval.id}`}
-            folder={folderPendingRemoval}
-            onConfirm={() => {
-              const folderId = folderPendingRemoval.id;
-              setFolderPendingRemoval(null);
-              void removeFolderFromPlayhead(folderId);
-            }}
-            onClose={() => setFolderPendingRemoval(null)}
-          />
-        )}
-        {playlistPendingDeletion && (
-          <DeletePlaylistDialog
-            key={`delete-playlist-${playlistPendingDeletion.id}`}
-            playlist={playlistPendingDeletion}
-            onConfirm={() => {
-              const playlistId = playlistPendingDeletion.id;
-              setPlaylistPendingDeletion(null);
-              void deletePlaylist(playlistId);
-            }}
-            onClose={() => setPlaylistPendingDeletion(null)}
-          />
-        )}
-        {isCreatePlaylistOpen && (
-          <CreatePlaylistDialog
-            key="create-playlist"
-            description={
-              trackPendingPlaylistCreation
-                ? `Name the playlist. ${trackPendingPlaylistCreation.title} will be added to it.`
-                : undefined
+            onAddFolder={addFolder}
+            onOpenSearch={() => setIsSearchOpen(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+            onSelectSource={(source) => void persistLibrary({ ...library, selectedSource: source })}
+            onDropTrackToPlaylist={(trackIds, playlist) =>
+              void addTracksToPlaylist(trackIds, playlist)
             }
-            onCreate={(name) => void createNewPlaylist(name, trackPendingPlaylistCreation)}
-            onClose={() => {
-              setIsCreatePlaylistOpen(false);
-              setTrackPendingPlaylistCreation(null);
+            onRemoveFolder={(folder) => setFolderPendingRemoval(folder)}
+            onRenamePlaylist={(playlist) => setRenamingPlaylistId(playlist.id)}
+            onDeletePlaylist={(playlist) => {
+              if (playlist.trackIds.length === 0) {
+                void deletePlaylist(playlist.id);
+                return;
+              }
+              setPlaylistPendingDeletion(playlist);
             }}
           />
-        )}
-        {renamingPlaylistId && (
-          <CreatePlaylistDialog
-            key={`rename-playlist-${renamingPlaylistId}`}
-            title="Rename Playlist"
-            description="Update the playlist name."
-            initialName={
-              library.playlists.find((playlist) => playlist.id === renamingPlaylistId)?.name || ""
-            }
-            submitLabel="Rename"
-            onCreate={(name) => void renamePlaylist(renamingPlaylistId, name)}
-            onClose={() => setRenamingPlaylistId(null)}
-          />
-        )}
-      </AnimatePresence>
-    </main>
+
+          <main className="no-drag flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
+            {isLibraryEmpty ? (
+              <EmptyLibraryState
+                isScanning={isScanning}
+                libraryMode={library.settings.library.mode}
+                onLibraryModeChange={(mode) => void updateLibraryMode(mode)}
+                onAddFolder={addFolder}
+                onDropFolderPaths={(folderPaths) => void addFolderPaths(folderPaths)}
+              />
+            ) : (
+              <>
+                <Player
+                  activeTrack={activeTrack}
+                  isPlaying={isPlaying}
+                  isLoading={isLoadingTrack}
+                  hasWaveform={hasWaveform}
+                  reduceMotion={reduceMotion}
+                  isFavorite={
+                    activeTrack ? (library.favoriteTrackIds || []).includes(activeTrack.id) : false
+                  }
+                  currentTime={currentTime}
+                  duration={duration}
+                  waveformRef={setWaveformElement}
+                  onTogglePlayback={togglePlayback}
+                  onPreviousTrack={() => playAdjacentTrack(-1)}
+                  onNextTrack={() => playAdjacentTrack(1)}
+                  shuffleEnabled={shuffleEnabled}
+                  repeatMode={repeatMode}
+                  volume={volume}
+                  onToggleShuffle={() => setShuffleEnabled((enabled) => !enabled)}
+                  onCycleRepeat={() =>
+                    setRepeatMode((mode) =>
+                      mode === "off" ? "all" : mode === "all" ? "one" : "off",
+                    )
+                  }
+                  onToggleFavorite={() => {
+                    if (activeTrack) void toggleFavoriteTrack(activeTrack.id);
+                  }}
+                  onVolumeChange={setPlayerVolume}
+                />
+
+                {selectedSource?.type === "library-artists" ? (
+                  <LibraryBrowser
+                    emptyLabel="No artists to show."
+                    artists={libraryArtists}
+                    onSelectArtist={(artist) =>
+                      void persistLibrary({
+                        ...library,
+                        selectedSource: { type: "library-artist", id: artist.id },
+                      })
+                    }
+                  />
+                ) : selectedSource?.type === "library-albums" ? (
+                  <LibraryBrowser
+                    emptyLabel="No albums to show."
+                    albums={libraryAlbums}
+                    onSelectAlbum={(album) =>
+                      void persistLibrary({
+                        ...library,
+                        selectedSource: { type: "library-album", id: album.id },
+                      })
+                    }
+                  />
+                ) : (
+                  <>
+                    {(selectedLibraryArtist || selectedLibraryAlbum) && (
+                      <LibraryDetailHeader
+                        artist={selectedLibraryArtist}
+                        album={selectedLibraryAlbum}
+                        onBack={() =>
+                          void persistLibrary({
+                            ...library,
+                            selectedSource: {
+                              type: selectedLibraryArtist ? "library-artists" : "library-albums",
+                            },
+                          })
+                        }
+                      />
+                    )}
+                    <TrackList
+                      tracks={tracks}
+                      activeTrackId={activeTrackId}
+                      isPlaying={isPlaying}
+                      selectedTrackIds={selectedTrackIds}
+                      scrollToTrackId={scrollToTrackId}
+                      selectedPlaylist={selectedPlaylist}
+                      canReorderTracks={selectedSource?.type !== "library-tracks"}
+                      playlists={library.playlists}
+                      favoriteTrackIds={library.favoriteTrackIds || []}
+                      onSelectTrack={selectTrackInList}
+                      onPlayTrack={(track) => selectTrack(track, true)}
+                      onAddToPlaylist={(track, playlist) => addTrackToPlaylist(track.id, playlist)}
+                      onAddTracksToPlaylist={(tracks, playlist) =>
+                        addTracksToPlaylist(
+                          tracks.map((track) => track.id),
+                          playlist,
+                        )
+                      }
+                      onCreatePlaylist={(track) => {
+                        setTrackPendingPlaylistCreation(track);
+                        setIsCreatePlaylistOpen(true);
+                      }}
+                      onToggleFavorite={(track) => toggleFavoriteTrack(track.id)}
+                      onRemoveFromPlaylist={removeTrackFromSelectedPlaylist}
+                      onShowInFolder={(track) => window.playhead.showItemInFolder(track.path)}
+                      onShowMetadata={(track) => setMetadataDialog({ track })}
+                      onReorderTrack={(trackId, targetTrackId, edge) =>
+                        reorderTrack(trackId, targetTrackId, edge)
+                      }
+                      onScrolledToTrack={() => setScrollToTrackId(null)}
+                    />
+                  </>
+                )}
+              </>
+            )}
+          </main>
+        </section>
+        <AnimatePresence>
+          {metadataDialog && (
+            <MetadataDialog
+              key="metadata"
+              track={metadataDialog.track}
+              onSave={saveTrackMetadata}
+              onClose={() => setMetadataDialog(null)}
+            />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {isSearchOpen && (
+            <TrackSearchDialog
+              key="search"
+              tracks={allTracks}
+              folders={library.folders}
+              artists={libraryArtists}
+              albums={libraryAlbums}
+              libraryMode={library.settings.library.mode}
+              onSelectTrack={playSearchResult}
+              onSelectArtist={(artist) => {
+                setIsSearchOpen(false);
+                void persistLibrary({
+                  ...library,
+                  selectedSource: { type: "library-artist", id: artist.id },
+                });
+              }}
+              onSelectAlbum={(album) => {
+                setIsSearchOpen(false);
+                void persistLibrary({
+                  ...library,
+                  selectedSource: { type: "library-album", id: album.id },
+                });
+              }}
+              onClose={() => setIsSearchOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {isSettingsOpen && (
+            <SettingsDialog
+              key="settings"
+              librarySettings={library.settings.library}
+              libraryFolders={library.folders}
+              isScanning={isScanning}
+              onAddLibraryFolder={() => void addFolder()}
+              onDropLibraryFolderPaths={(folderPaths) => void addFolderPaths(folderPaths)}
+              onLibrarySettingsChange={(settings) => void updateLibrarySettings(settings)}
+              onRemoveLibraryFolder={setFolderPendingRemoval}
+              playbackSettings={library.settings.playback}
+              onPlaybackSettingsChange={(settings) => void updatePlaybackSettings(settings)}
+              appearanceSettings={library.settings.appearance}
+              onAppearanceSettingsChange={(settings) => void updateAppearanceSettings(settings)}
+              onAppearancePreviewChange={setPreviewAppTransparency}
+              telemetrySettings={library.settings.telemetry}
+              onTelemetrySettingsChange={(settings) => void updateTelemetrySettings(settings)}
+              onAdvancedAction={runAdvancedSettingsAction}
+              onClose={() => setIsSettingsOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {folderPendingRemoval && (
+            <RemoveFolderDialog
+              key={`remove-folder-${folderPendingRemoval.id}`}
+              folder={folderPendingRemoval}
+              onConfirm={() => {
+                const folderId = folderPendingRemoval.id;
+                setFolderPendingRemoval(null);
+                void removeFolderFromPlayhead(folderId);
+              }}
+              onClose={() => setFolderPendingRemoval(null)}
+            />
+          )}
+          {playlistPendingDeletion && (
+            <DeletePlaylistDialog
+              key={`delete-playlist-${playlistPendingDeletion.id}`}
+              playlist={playlistPendingDeletion}
+              onConfirm={() => {
+                const playlistId = playlistPendingDeletion.id;
+                setPlaylistPendingDeletion(null);
+                void deletePlaylist(playlistId);
+              }}
+              onClose={() => setPlaylistPendingDeletion(null)}
+            />
+          )}
+          {isCreatePlaylistOpen && (
+            <CreatePlaylistDialog
+              key="create-playlist"
+              description={
+                trackPendingPlaylistCreation
+                  ? `Name the playlist. ${trackPendingPlaylistCreation.title} will be added to it.`
+                  : undefined
+              }
+              onCreate={(name) => void createNewPlaylist(name, trackPendingPlaylistCreation)}
+              onClose={() => {
+                setIsCreatePlaylistOpen(false);
+                setTrackPendingPlaylistCreation(null);
+              }}
+            />
+          )}
+          {renamingPlaylistId && (
+            <CreatePlaylistDialog
+              key={`rename-playlist-${renamingPlaylistId}`}
+              title="Rename Playlist"
+              description="Update the playlist name."
+              initialName={
+                library.playlists.find((playlist) => playlist.id === renamingPlaylistId)?.name || ""
+              }
+              submitLabel="Rename"
+              onCreate={(name) => void renamePlaylist(renamingPlaylistId, name)}
+              onClose={() => setRenamingPlaylistId(null)}
+            />
+          )}
+        </AnimatePresence>
+      </main>
     </MotionConfig>
   );
 }
