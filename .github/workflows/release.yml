@@ -12,7 +12,6 @@ on:
       - main
     paths:
       - package.json
-      - pnpm-lock.yaml
       - package-lock.json
       - src/**
       - resources/**
@@ -67,17 +66,14 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.tag || github.ref }}
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10.32.0
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm test
-      - run: pnpm typecheck
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run typecheck
 
   build:
     needs:

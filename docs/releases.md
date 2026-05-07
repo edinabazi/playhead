@@ -5,7 +5,7 @@ already have a matching Git tag.
 
 ## Version Flow
 
-1. Update `package.json` and `pnpm-lock.yaml` to the next version.
+1. Update `package.json` and `package-lock.json` to the next version.
 2. Merge or push that change to `main`.
 3. GitHub Actions runs lint, tests, typecheck, and macOS builds.
 4. The workflow creates a draft GitHub Release tagged `v<version>`.
@@ -28,8 +28,8 @@ releases, but users will see OS security warnings.
 ## Local Builds
 
 ```bash
-pnpm dist
-pnpm dist:mac
+npm run dist
+npm run dist:mac
 ```
 
 Run the command on macOS for the most reliable local package.

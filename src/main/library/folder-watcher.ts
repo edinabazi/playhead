@@ -13,7 +13,6 @@ const ignoredDirectoryNames = new Set([
   ".nuxt",
   ".output",
   ".parcel-cache",
-  ".pnpm-store",
   ".svelte-kit",
   ".turbo",
   ".venv",

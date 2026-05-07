@@ -151,34 +151,34 @@ Use it, test it, break it, report issues, and help shape it.
 Install dependencies:
 
 ```bash
-pnpm install
+npm ci
 ```
 
 Start the app in development:
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
 Run checks:
 
 ```bash
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm build
+npm run typecheck
+npm run lint
+npm test
+npm run build
 ```
 
 Build a distributable app:
 
 ```bash
-pnpm dist
+npm run dist
 ```
 
 Build for macOS:
 
 ```bash
-pnpm dist:mac
+npm run dist:mac
 ```
 
 ## Tech stack
@@ -246,10 +246,10 @@ Good contributions are usually:
 Before opening a pull request, please run:
 
 ```bash
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm build
+npm run typecheck
+npm run lint
+npm test
+npm run build
 ```
 
 ## Roadmap ideas
