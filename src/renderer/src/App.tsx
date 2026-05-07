@@ -14,9 +14,8 @@ import {
   defaultSessionSettings,
 } from "../../shared/library";
 import { getMediaArtworkSrc } from "@/lib/artwork";
-import { isEditableTarget } from "@/lib/dom";
 import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
-import { isMacPlatform } from "@/lib/platform";
+import { getAudioMimeType, toArrayBuffer } from "@/features/player/audio-utils";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
 import { CreatePlaylistDialog } from "@/features/playlists/CreatePlaylistDialog";
@@ -47,58 +46,11 @@ import {
 } from "@/features/library/library-model";
 import { EmptyLibraryState } from "@/features/library/EmptyLibraryState";
 import { LibraryBrowser } from "@/features/library/LibraryBrowser";
-
-const audioMimeTypes: Record<string, string> = {
-  ".aac": "audio/aac",
-  ".aiff": "audio/aiff",
-  ".flac": "audio/flac",
-  ".m4a": "audio/mp4",
-  ".mp3": "audio/mpeg",
-  ".ogg": "audio/ogg",
-  ".opus": "audio/ogg; codecs=opus",
-  ".wav": "audio/wav",
-};
-
-function getAudioMimeType(path: string): string {
-  const extensionStart = path.lastIndexOf(".");
-  const extension = extensionStart >= 0 ? path.slice(extensionStart).toLowerCase() : "";
-  return audioMimeTypes[extension] || "application/octet-stream";
-}
-
-function toArrayBuffer(value: ArrayBuffer | Uint8Array): ArrayBuffer {
-  if (value instanceof ArrayBuffer) return value;
-  const copy = new Uint8Array(value.byteLength);
-  copy.set(value);
-  return copy.buffer;
-}
+import { normalizeSourceForMode } from "@/features/library/source";
+import { usePlayerKeyboardShortcuts } from "@/hooks/use-player-keyboard-shortcuts";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-function normalizeSourceForMode(state: LibraryState): LibraryState {
-  const source = state.selectedSource;
-  if (state.settings.library.mode === "library") {
-    if (!source || source.type === "folder") {
-      return { ...state, selectedSource: { type: "library-tracks" } };
-    }
-    return state;
-  }
-
-  if (
-    source?.type === "library-artists" ||
-    source?.type === "library-artist" ||
-    source?.type === "library-albums" ||
-    source?.type === "library-album" ||
-    source?.type === "library-tracks"
-  ) {
-    return {
-      ...state,
-      selectedSource: state.folders[0] ? { type: "folder", id: state.folders[0].id } : null,
-    };
-  }
-
-  return state;
 }
 
 export function App() {
@@ -1161,100 +1113,17 @@ export function App() {
     };
   }, [waveformElement]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isEditableTarget(event.target)) return;
-
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        (event.key.toLowerCase() === "k" || event.key.toLowerCase() === "f")
-      ) {
-        event.preventDefault();
-        setIsSearchOpen(true);
-        return;
-      }
-
-      const primaryModifier = isMacPlatform() ? event.metaKey : event.ctrlKey;
-      if (primaryModifier && event.key === ",") {
-        event.preventDefault();
-        setIsSettingsOpen(true);
-        return;
-      }
-
-      if (event.code === "Space" && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        void togglePlayback();
-        return;
-      }
-
-      if (event.code === "ArrowLeft" && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        const step = library.settings.playback.seekStepSeconds;
-        seekBy(event.shiftKey ? -(step * 2) : -step);
-        return;
-      }
-
-      if (event.code === "ArrowRight" && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        const step = library.settings.playback.seekStepSeconds;
-        seekBy(event.shiftKey ? step * 2 : step);
-        return;
-      }
-
-      if (event.code === "ArrowUp" && primaryModifier && !event.altKey) {
-        event.preventDefault();
-        const step = library.settings.playback.volumeStepPercent / 100;
-        changeVolumeBy(event.shiftKey ? step * 2 : step);
-        return;
-      }
-
-      if (event.code === "ArrowDown" && primaryModifier && !event.altKey) {
-        event.preventDefault();
-        const step = library.settings.playback.volumeStepPercent / 100;
-        changeVolumeBy(event.shiftKey ? -(step * 2) : -step);
-        return;
-      }
-
-      if (event.code === "ArrowUp" && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        selectAdjacentTrackInList(-1);
-        return;
-      }
-
-      if (event.code === "ArrowDown" && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        selectAdjacentTrackInList(1);
-        return;
-      }
-
-      if (event.code === "Enter" && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        playSelectedTrack();
-        return;
-      }
-
-      if (
-        event.key.toLowerCase() === "l" &&
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !event.altKey
-      ) {
-        event.preventDefault();
-        toggleSelectedTrackFavorite();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    changeVolumeBy,
-    library.settings.playback,
-    playSelectedTrack,
-    seekBy,
-    selectAdjacentTrackInList,
-    togglePlayback,
-    toggleSelectedTrackFavorite,
-  ]);
+  usePlayerKeyboardShortcuts({
+    playbackSettings: library.settings.playback,
+    onOpenSearch: () => setIsSearchOpen(true),
+    onOpenSettings: () => setIsSettingsOpen(true),
+    onTogglePlayback: () => void togglePlayback(),
+    onSeekBy: seekBy,
+    onChangeVolumeBy: changeVolumeBy,
+    onSelectAdjacentTrack: selectAdjacentTrackInList,
+    onPlaySelectedTrack: playSelectedTrack,
+    onToggleSelectedTrackFavorite: toggleSelectedTrackFavorite,
+  });
 
   useEffect(() => {
     return window.playhead.onMediaCommand((command) => {
