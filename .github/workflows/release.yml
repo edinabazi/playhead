@@ -108,7 +108,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
           POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://eu.i.posthog.com' }}
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: playhead-${{ matrix.artifact }}
           path: |
@@ -128,7 +128,7 @@ jobs:
     if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v7
         with:
           path: artifacts
           merge-multiple: true
