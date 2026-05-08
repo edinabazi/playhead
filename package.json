@@ -6,6 +6,10 @@
   "author": "Edin",
   "license": "MIT",
   "private": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edinabazi/playhead.git"
+  },
   "packageManager": "npm@10.9.2",
   "type": "module",
   "main": "out/main/index.js",
@@ -41,11 +45,20 @@
     "mac": {
       "icon": "resources/playhead.icns",
       "category": "public.app-category.music",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
       "target": [
         "dmg",
         "zip"
       ]
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "edinabazi",
+        "repo": "playhead"
+      }
+    ]
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.2.7",
@@ -59,6 +72,7 @@
     "chokidar": "^5.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.3",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
     "music-metadata": "^11.12.3",

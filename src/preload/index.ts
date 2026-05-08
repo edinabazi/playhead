@@ -1,5 +1,6 @@
 import type { IpcRendererEvent } from "electron";
 import type {
+  AppUpdateState,
   EditableTrackMetadata,
   LibraryFolder,
   LibraryState,
@@ -32,6 +33,9 @@ const api: PlayheadApi = {
   clearWaveformCache: () => ipcRenderer.invoke("library:clear-waveform-cache"),
   exportLibraryBackup: (state: LibraryState) => ipcRenderer.invoke("library:export-backup", state),
   importLibraryBackup: () => ipcRenderer.invoke("library:import-backup"),
+  getUpdateState: () => ipcRenderer.invoke("app-updates:get-state"),
+  checkForUpdates: () => ipcRenderer.invoke("app-updates:check"),
+  installUpdate: () => ipcRenderer.invoke("app-updates:install"),
   trackEvent: (eventName: string, properties?: Record<string, string | number | boolean>) => {
     void ipcRenderer.invoke("telemetry:track", eventName, properties);
   },
@@ -44,6 +48,11 @@ const api: PlayheadApi = {
     const listener = (_event: IpcRendererEvent, folderId: string) => callback(folderId);
     ipcRenderer.on("library:folder-changed", listener);
     return () => ipcRenderer.removeListener("library:folder-changed", listener);
+  },
+  onUpdateStateChanged: (callback: (state: AppUpdateState) => void) => {
+    const listener = (_event: IpcRendererEvent, state: AppUpdateState) => callback(state);
+    ipcRenderer.on("app-updates:state-changed", listener);
+    return () => ipcRenderer.removeListener("app-updates:state-changed", listener);
   },
 };
 

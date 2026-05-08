@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import WaveSurfer from "wavesurfer.js";
 import {
-  type EditableTrackMetadata,
   type AppearanceSettings,
+  type AppUpdateState,
+  type EditableTrackMetadata,
   type LibraryFolder,
   type LibrarySettings,
   type LibraryMode,
@@ -101,6 +102,7 @@ export function App() {
   const [renamingPlaylistId, setRenamingPlaylistId] = useState<string | null>(null);
   const [scrollToTrackId, setScrollToTrackId] = useState<string | null>(null);
   const [previewAppTransparency, setPreviewAppTransparency] = useState<number | null>(null);
+  const [updateState, setUpdateState] = useState<AppUpdateState>({ status: "idle" });
 
   const tracks = useMemo(() => getSourceTracks(library), [library]);
   const allTracks = useMemo(() => Object.values(library.tracks), [library.tracks]);
@@ -1131,6 +1133,11 @@ export function App() {
   }, [library, persistLibrary]);
 
   useEffect(() => {
+    void window.playhead.getUpdateState().then(setUpdateState);
+    return window.playhead.onUpdateStateChanged(setUpdateState);
+  }, []);
+
+  useEffect(() => {
     playNextTrackOnEndRef.current = playNextTrackOnEnd;
   }, [playNextTrackOnEnd]);
 
@@ -1308,9 +1315,16 @@ export function App() {
             lovedCount={hasLovedTracks ? library.favoriteTrackIds.length : 0}
             selectedSource={library.selectedSource}
             isScanning={isScanning}
+            updateState={updateState}
             onAddFolder={addFolder}
             onOpenSearch={() => setIsSearchOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            onInstallUpdate={() => {
+              window.playhead.trackEvent("app_update_install_clicked", {
+                version: updateState.version || "unknown",
+              });
+              void window.playhead.installUpdate();
+            }}
             onCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
             onSelectSource={(source) => void persistLibrary({ ...library, selectedSource: source })}
             onDropTrackToPlaylist={(trackIds, playlist) =>

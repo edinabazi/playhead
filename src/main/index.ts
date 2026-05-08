@@ -4,6 +4,7 @@ import { closeFolderWatcher } from "./library/folder-watcher";
 import { registerLibraryIpc } from "./library/library-ipc";
 import { registerMediaShortcuts } from "./media/media-shortcuts";
 import { registerTelemetryIpc, trackAppLaunch } from "./telemetry";
+import { registerUpdaterIpc, startUpdater } from "./updater";
 import { createWindow } from "./window/create-window";
 
 const { app, BrowserWindow, globalShortcut, nativeImage, protocol } = electron;
@@ -36,7 +37,9 @@ app.whenReady().then(() => {
   registerLibraryIpc();
   registerTelemetryIpc();
   registerMediaShortcuts();
+  registerUpdaterIpc();
   createWindow();
+  startUpdater();
   void trackAppLaunch();
 
   app.on("activate", () => {

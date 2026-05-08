@@ -11,12 +11,20 @@ already have a matching Git tag.
 4. The workflow creates a draft GitHub Release tagged `v<version>`.
 5. Review the draft release notes and assets, then publish it.
 
+Published releases are required for in-app updates. Installed apps check the GitHub release feed,
+download newer versions in the background, and show an **Update** button when the update is ready to
+install.
+
 ## Assets
 
 - macOS: `.dmg` and `.zip`
 
 macOS signing/notarization is not configured yet. Unsigned builds are fine for early open-source
 releases, but users will see OS security warnings.
+
+The updater is disabled in development and only runs from packaged apps. To test the full flow, build
+and install an older packaged version, publish a newer GitHub Release, then launch the older app and
+wait for the **Update** button.
 
 ## GitHub Configuration
 

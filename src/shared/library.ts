@@ -140,6 +140,13 @@ export type ScannedFolder = {
 
 export type MediaCommand = "play-pause" | "next" | "previous";
 
+export type AppUpdateState =
+  | { status: "idle"; version?: string }
+  | { status: "checking"; version?: string }
+  | { status: "downloading"; version?: string; progress?: number }
+  | { status: "ready"; version?: string }
+  | { status: "error"; version?: string; message: string };
+
 export type PlayheadApi = {
   getLibraryState: () => Promise<LibraryState>;
   saveLibraryState: (state: LibraryState) => Promise<LibraryState>;
@@ -161,9 +168,13 @@ export type PlayheadApi = {
   clearWaveformCache: () => Promise<void>;
   exportLibraryBackup: (state: LibraryState) => Promise<boolean>;
   importLibraryBackup: () => Promise<LibraryState | null>;
+  getUpdateState: () => Promise<AppUpdateState>;
+  checkForUpdates: () => Promise<AppUpdateState>;
+  installUpdate: () => Promise<boolean>;
   trackEvent: (eventName: string, properties?: Record<string, string | number | boolean>) => void;
   onMediaCommand: (callback: (command: MediaCommand) => void) => () => void;
   onFolderChanged: (callback: (folderId: string) => void) => () => void;
+  onUpdateStateChanged: (callback: (state: AppUpdateState) => void) => () => void;
 };
 
 export const defaultLibrarySettings = (): LibrarySettings => ({

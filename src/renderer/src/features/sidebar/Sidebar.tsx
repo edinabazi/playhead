@@ -5,6 +5,7 @@ import { getPrimaryModifierLabel } from "@/lib/platform";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import type {
+  AppUpdateState,
   LibraryFolder,
   LibraryMode,
   LibraryPlaylist,
@@ -24,9 +25,11 @@ export function Sidebar({
   lovedCount,
   selectedSource,
   isScanning,
+  updateState,
   onAddFolder,
   onOpenSearch,
   onOpenSettings,
+  onInstallUpdate,
   onCreatePlaylist,
   onSelectSource,
   onDropTrackToPlaylist,
@@ -43,9 +46,11 @@ export function Sidebar({
   lovedCount: number;
   selectedSource: SelectedSource | null;
   isScanning: boolean;
+  updateState: AppUpdateState;
   onAddFolder: () => void;
   onOpenSearch: () => void;
   onOpenSettings: () => void;
+  onInstallUpdate: () => void;
   onCreatePlaylist: () => void;
   onSelectSource: (source: SelectedSource) => void;
   onDropTrackToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
@@ -62,9 +67,26 @@ export function Sidebar({
   const SettingsIcon = icons.settings;
   const modifierLabel = getPrimaryModifierLabel();
   const isLibraryMode = libraryMode === "library";
+  const hasReadyUpdate = updateState.status === "ready";
 
   return (
-    <aside className="app-drag flex w-[260px] shrink-0 flex-col overflow-hidden rounded-[41px] bg-[rgba(0,0,0,0.2)] px-[18px] pb-[18px] pt-[54px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <aside className="app-drag relative flex w-[260px] shrink-0 flex-col overflow-hidden rounded-[41px] bg-[rgba(0,0,0,0.2)] px-[18px] pb-[18px] pt-[54px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      {hasReadyUpdate && (
+        <Tooltip
+          content={updateState.version ? `Install ${updateState.version}` : "Install update"}
+          side="top"
+          sideOffset={7}
+        >
+          <button
+            type="button"
+            className="absolute top-4.5 right-6 no-drag h-5 rounded-full bg-primary px-2 text-[11px] font-semibold leading-none text-primary-foreground transition hover:bg-primary/90 font-mono uppercase"
+            aria-label="Install update and restart"
+            onClick={onInstallUpdate}
+          >
+            Update
+          </button>
+        </Tooltip>
+      )}
       <div className="relative flex min-h-[30px] shrink-0 items-center justify-between">
         <img className="h-[26px]" src={playheadLogo} alt="Playhead" draggable={false} />
         <div className="flex items-center gap-1 translate-y-0.5">
