@@ -137,7 +137,7 @@ export function Player({
                   {activeTrack?.title || "No track selected"}
                 </motion.h1>
                 <motion.p
-                  className="mt-1 truncate text-[14px] font-medium leading-[1.25] text-muted-foreground"
+                  className="mt-0.5 truncate text-[14px] font-medium leading-[1.25] text-muted-foreground"
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.07, duration: 0.16 }}

@@ -17,6 +17,24 @@ describe("library store settings", () => {
     expect(normalizeSettings(undefined)).toEqual(defaultAppSettings());
   });
 
+  it("normalizes missing session playback controls", () => {
+    const legacySettings = {
+      session: {
+        activeTrackId: "track-1",
+        selectedTrackIds: ["track-1"],
+        trackPositions: {},
+      },
+    } as unknown as Parameters<typeof normalizeSettings>[0];
+
+    expect(normalizeSettings(legacySettings).session).toEqual({
+      activeTrackId: "track-1",
+      selectedTrackIds: ["track-1"],
+      trackPositions: {},
+      shuffleEnabled: false,
+      repeatMode: "off",
+    });
+  });
+
   it("normalizes legacy flat library settings", () => {
     const settings = normalizeSettings({
       enabledAudioExtensions: [".mp3"],

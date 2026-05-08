@@ -21,7 +21,11 @@ type TrackListRowProps = {
   menuOpen: boolean;
   menuAnchorPoint: MenuAnchorPoint | null;
   menuIcon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
-  artworkFallbackIcon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+  artworkFallbackIcon: React.ComponentType<{
+    size?: number;
+    strokeWidth?: number;
+    className?: string;
+  }>;
   onSelect: (track: LibraryTrack, event?: React.MouseEvent<HTMLDivElement>) => void;
   onPlay: (track: LibraryTrack) => void;
   onContextMenu: (track: LibraryTrack, point: MenuAnchorPoint) => void;
@@ -104,7 +108,7 @@ export function TrackListRow({
         <TrackArtwork track={track} fallbackIcon={artworkFallbackIcon} />
         <div className="min-w-0">
           <p className="truncate text-[14px] font-semibold leading-[1.18]">{track.title}</p>
-          <p className="mt-1 truncate text-[13px] font-medium leading-[1.25] text-muted-foreground">
+          <p className="mt-0.5 truncate text-[13px] font-medium leading-[1.25] text-muted-foreground">
             {track.artist}
           </p>
         </div>

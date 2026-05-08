@@ -1,24 +1,15 @@
 {
-  "fill" : {
-    "automatic-gradient" : "display-p3:0.12806,0.12806,0.12806,1.00000"
-  },
+  "fill" : "system-dark",
   "groups" : [
     {
       "layers" : [
         {
-          "blend-mode" : "normal",
-          "fill" : "automatic",
-          "glass" : true,
-          "hidden" : false,
-          "image-name" : "Group 1.png",
-          "name" : "Group 1",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          }
+          "image-name" : "marker 2.svg",
+          "name" : "marker 2"
+        },
+        {
+          "image-name" : "waveform 2.svg",
+          "name" : "waveform 2"
         }
       ],
       "shadow" : {

@@ -7,8 +7,13 @@ import "@fontsource/inter/latin-600.css";
 import { Toaster } from "@/components/ui/sonner";
 import { App } from "./App";
 import { IconProvider } from "./lib/icon-context";
+import { isMacPlatform } from "./lib/platform";
 import { ShapeProvider } from "./lib/shape-context";
 import "./index.css";
+
+if (isMacPlatform()) {
+  document.documentElement.classList.add("platform-mac");
+}
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

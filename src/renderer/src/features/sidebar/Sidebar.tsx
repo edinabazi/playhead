@@ -209,7 +209,7 @@ export function Sidebar({
       </div>
 
       <motion.button
-        className="no-drag mt-[18px] flex h-[49px] w-full shrink-0 items-center justify-center gap-2 rounded-[33px] bg-primary px-4 text-[14px] font-medium leading-none text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.48),0_14px_34px_rgba(255,255,0,0.08)] transition-colors disabled:opacity-55"
+        className="no-drag mt-[18px] hidden h-[49px] w-full shrink-0 items-center justify-center gap-2 rounded-[33px] bg-primary px-4 text-[14px] font-medium leading-none text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.48),0_14px_34px_rgba(255,255,0,0.08)] transition-colors disabled:opacity-55"
         title={isLibraryMode ? "Manage library" : "Add folder"}
         disabled={!isLibraryMode && isScanning}
         whileHover={{ y: -1 }}

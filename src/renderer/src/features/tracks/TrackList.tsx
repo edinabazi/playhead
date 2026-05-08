@@ -212,13 +212,6 @@ function scrollRowIntoNearestView(row: HTMLElement, container: HTMLElement) {
   const rowRect = row.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
 
-  if (rowRect.top < containerRect.top) {
-    container.scrollTop += rowRect.top - containerRect.top;
-    return;
-  }
-
-  const bottomOffset = rowRect.height;
-  if (rowRect.bottom > containerRect.bottom - bottomOffset) {
-    container.scrollTop += rowRect.bottom - (containerRect.bottom - bottomOffset);
-  }
+  container.scrollTop +=
+    rowRect.top - containerRect.top - containerRect.height / 2 + rowRect.height / 2;
 }

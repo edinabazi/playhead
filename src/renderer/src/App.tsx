@@ -1025,7 +1025,9 @@ export function App() {
         const candidates =
           currentIndex === -1 ? tracks : tracks.filter((_, index) => index !== currentIndex);
         const randomIndex = Math.floor(Math.random() * candidates.length);
-        void selectTrack(candidates[randomIndex], true, 0, false);
+        const nextTrack = candidates[randomIndex];
+        setScrollToTrackId(nextTrack.id);
+        void selectTrack(nextTrack, true, 0, false);
         return;
       }
 
@@ -1036,7 +1038,9 @@ export function App() {
             : 0
           : (currentIndex + direction + tracks.length) % tracks.length;
 
-      void selectTrack(tracks[nextIndex], true, 0, false);
+      const nextTrack = tracks[nextIndex];
+      setScrollToTrackId(nextTrack.id);
+      void selectTrack(nextTrack, true, 0, false);
     },
     [activeTrackId, selectTrack, selectedTrackIds, shuffleEnabled, tracks],
   );
@@ -1057,7 +1061,9 @@ export function App() {
       const candidates =
         currentIndex === -1 ? tracks : tracks.filter((_, index) => index !== currentIndex);
       const randomIndex = Math.floor(Math.random() * candidates.length);
-      void selectTrack(candidates[randomIndex], true);
+      const nextTrack = candidates[randomIndex];
+      setScrollToTrackId(nextTrack.id);
+      void selectTrack(nextTrack, true);
       return true;
     }
 
@@ -1065,6 +1071,7 @@ export function App() {
     if (!nextTrack && repeatMode === "all") nextTrack = tracks[0] || null;
     if (!nextTrack) return false;
 
+    setScrollToTrackId(nextTrack.id);
     void selectTrack(nextTrack, true);
     return true;
   }, [activeTrackId, repeatMode, selectTrack, shuffleEnabled, tracks]);
@@ -1086,6 +1093,8 @@ export function App() {
     void window.playhead.getLibraryState().then((state) => {
       const nextState = normalizeSourceForMode(state);
       setLibrary(nextState);
+      setShuffleEnabled(nextState.settings.session.shuffleEnabled);
+      setRepeatMode(nextState.settings.session.repeatMode);
       void window.playhead.watchLibraryFolders(
         nextState.settings.library.watchFolders ? nextState.folders : [],
         nextState.settings.library.enabledAudioExtensions,
@@ -1347,12 +1356,25 @@ export function App() {
                   shuffleEnabled={shuffleEnabled}
                   repeatMode={repeatMode}
                   volume={volume}
-                  onToggleShuffle={() => setShuffleEnabled((enabled) => !enabled)}
-                  onCycleRepeat={() =>
-                    setRepeatMode((mode) =>
-                      mode === "off" ? "all" : mode === "all" ? "one" : "off",
-                    )
-                  }
+                  onToggleShuffle={() => {
+                    const nextShuffleEnabled = !shuffleEnabled;
+                    setShuffleEnabled(nextShuffleEnabled);
+                    persistSessionSettings({
+                      ...library.settings.session,
+                      shuffleEnabled: nextShuffleEnabled,
+                      repeatMode,
+                    });
+                  }}
+                  onCycleRepeat={() => {
+                    const nextRepeatMode =
+                      repeatMode === "off" ? "all" : repeatMode === "all" ? "one" : "off";
+                    setRepeatMode(nextRepeatMode);
+                    persistSessionSettings({
+                      ...library.settings.session,
+                      shuffleEnabled,
+                      repeatMode: nextRepeatMode,
+                    });
+                  }}
                   onToggleFavorite={() => {
                     if (activeTrack) void toggleFavoriteTrack(activeTrack.id);
                   }}

@@ -129,6 +129,8 @@ export type SessionSettings = {
   activeTrackId: string | null;
   selectedTrackIds: string[];
   trackPositions: Record<string, number>;
+  shuffleEnabled: boolean;
+  repeatMode: "off" | "all" | "one";
 };
 
 export type ScannedFolder = {
@@ -202,6 +204,8 @@ export const defaultSessionSettings = (): SessionSettings => ({
   activeTrackId: null,
   selectedTrackIds: [],
   trackPositions: {},
+  shuffleEnabled: false,
+  repeatMode: "off",
 });
 
 export const defaultAppSettings = (): AppSettings => ({
