@@ -10,10 +10,7 @@ import type {
   LibraryPlaylist,
   SelectedSource,
 } from "../../../../shared/library";
-import {
-  SidebarContextMenu,
-  type SidebarContextMenuState,
-} from "./SidebarContextMenu";
+import { SidebarContextMenu, type SidebarContextMenuState } from "./SidebarContextMenu";
 import { SidebarGroup } from "./SidebarGroup";
 import { SidebarEmpty, SidebarItem } from "./SidebarItem";
 
@@ -69,8 +66,8 @@ export function Sidebar({
   return (
     <aside className="app-drag flex w-[260px] shrink-0 flex-col overflow-hidden rounded-[41px] bg-[rgba(0,0,0,0.2)] px-[18px] pb-[18px] pt-[54px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <div className="relative flex min-h-[30px] shrink-0 items-center justify-between">
-        <img className="h-[29px] w-[84px]" src={playheadLogo} alt="Playhead" draggable={false} />
-        <div className="flex items-center gap-1">
+        <img className="h-[26px]" src={playheadLogo} alt="Playhead" draggable={false} />
+        <div className="flex items-center gap-1 translate-y-0.5">
           <Tooltip content={`${modifierLabel} K`} side="top" sideOffset={7}>
             <button
               type="button"
@@ -191,7 +188,9 @@ export function Sidebar({
                 {playlists.map((playlist) => (
                   <SidebarItem
                     key={playlist.id}
-                    active={selectedSource?.type === "playlist" && selectedSource.id === playlist.id}
+                    active={
+                      selectedSource?.type === "playlist" && selectedSource.id === playlist.id
+                    }
                     icon={icons["list-music"]}
                     label={playlist.name}
                     detail={`${playlist.trackIds.length}`}
