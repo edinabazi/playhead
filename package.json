@@ -63,11 +63,18 @@
     },
     "linux": {
       "category": "Audio",
+      "maintainer": "Edin <hello@edinabazi.com>",
       "target": [
         "AppImage",
         "deb",
         "tar.gz"
       ]
+    },
+    "appImage": {
+      "artifactName": "${productName}-linux-${arch}.AppImage"
+    },
+    "deb": {
+      "artifactName": "${productName}-linux-${arch}.deb"
     },
     "publish": [
       {
