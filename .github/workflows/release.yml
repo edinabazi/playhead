@@ -87,6 +87,12 @@ jobs:
           - os: macos-latest
             script: dist:mac
             artifact: macos
+          - os: windows-latest
+            script: dist:win
+            artifact: windows
+          - os: ubuntu-latest
+            script: dist:linux
+            artifact: linux
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -123,8 +129,6 @@ jobs:
       - run: npm run ${{ matrix.script }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -161,8 +165,12 @@ jobs:
           path: |
             release/*.dmg
             release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+            release/*.tar.gz
             release/*.blockmap
-            release/latest*.yml
+            release/*.yml
           if-no-files-found: error
 
   publish:

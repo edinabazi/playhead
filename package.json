@@ -1,7 +1,7 @@
 {
   "name": "playhead",
   "productName": "Playhead",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Local-first desktop music player prototype with waveform playback.",
   "author": "Edin",
   "license": "MIT",
@@ -21,8 +21,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "dist": "npm run dist:mac",
+    "dist": "npm run dist:mac && npm run dist:win && npm run dist:linux",
     "dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never",
+    "dist:win": "npm run build && electron-builder --win --x64 --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --x64 --publish never",
     "preview": "electron-vite preview"
   },
   "build": {
@@ -32,7 +34,7 @@
       "output": "release",
       "buildResources": "resources"
     },
-    "artifactName": "${productName}-mac-${arch}.${ext}",
+    "artifactName": "${productName}-${os}-${arch}.${ext}",
     "files": [
       "out/**/*",
       "package.json"
@@ -51,6 +53,20 @@
       "target": [
         "dmg",
         "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "linux": {
+      "category": "Audio",
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
       ]
     },
     "publish": [

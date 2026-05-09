@@ -19,9 +19,13 @@ install.
 
 - macOS Apple Silicon: `Playhead-mac-arm64.dmg` and `Playhead-mac-arm64.zip`
 - macOS Intel: `Playhead-mac-x64.dmg` and `Playhead-mac-x64.zip`
+- Windows Intel/AMD: `Playhead-win-x64.exe` and `Playhead-win-x64.zip`
+- Linux Intel/AMD: `Playhead-linux-x64.AppImage`, `Playhead-linux-x64.deb`, and
+  `Playhead-linux-x64.tar.gz`
 
 macOS release builds are signed and notarized when the required Apple Developer secrets are present
 in GitHub Actions.
+Windows and Linux builds are currently unsigned.
 
 The updater is disabled in development and only runs from packaged apps. To test the full flow, build
 and install an older packaged version, publish a newer GitHub Release, then launch the older app and
@@ -67,6 +71,9 @@ Stable download URLs:
 ```text
 https://github.com/edinabazi/playhead/releases/latest/download/Playhead-mac-arm64.dmg
 https://github.com/edinabazi/playhead/releases/latest/download/Playhead-mac-x64.dmg
+https://github.com/edinabazi/playhead/releases/latest/download/Playhead-win-x64.exe
+https://github.com/edinabazi/playhead/releases/latest/download/Playhead-linux-x64.AppImage
+https://github.com/edinabazi/playhead/releases/latest/download/Playhead-linux-x64.deb
 ```
 
 ## Local Builds
@@ -74,6 +81,8 @@ https://github.com/edinabazi/playhead/releases/latest/download/Playhead-mac-x64.
 ```bash
 npm run dist
 npm run dist:mac
+npm run dist:win
+npm run dist:linux
 ```
 
 Run the command on macOS for the most reliable local package.
