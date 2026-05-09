@@ -32,6 +32,7 @@
       "output": "release",
       "buildResources": "resources"
     },
+    "artifactName": "${productName}-mac-${arch}.${ext}",
     "files": [
       "out/**/*",
       "package.json"
