@@ -22,7 +22,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "dist": "npm run dist:mac",
-    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never",
     "preview": "electron-vite preview"
   },
   "build": {

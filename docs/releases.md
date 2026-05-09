@@ -17,7 +17,8 @@ install.
 
 ## Assets
 
-- macOS: `.dmg` and `.zip`
+- macOS Apple Silicon: `Playhead-mac-arm64.dmg` and `Playhead-mac-arm64.zip`
+- macOS Intel: `Playhead-mac-x64.dmg` and `Playhead-mac-x64.zip`
 
 macOS release builds are signed and notarized when the required Apple Developer secrets are present
 in GitHub Actions.
@@ -60,6 +61,13 @@ Add the copied value as the `MACOS_CERTIFICATE` repository secret.
 
 The workflow also signs, notarizes, and staples generated `.dmg` files after packaging. This lets
 Gatekeeper verify both the app bundle and the downloadable disk image.
+
+Stable download URLs:
+
+```text
+https://github.com/edinabazi/playhead/releases/latest/download/Playhead-mac-arm64.dmg
+https://github.com/edinabazi/playhead/releases/latest/download/Playhead-mac-x64.dmg
+```
 
 ## Local Builds
 
