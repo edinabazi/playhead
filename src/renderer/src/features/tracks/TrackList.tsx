@@ -48,7 +48,7 @@ export function TrackList({
   onAddTracksToPlaylist: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (track: LibraryTrack) => void;
   onToggleFavorite: (track: LibraryTrack) => void;
-  onRemoveFromPlaylist: (trackId: string) => void;
+  onRemoveFromPlaylist: (trackIds: string[]) => void;
   onShowInFolder: (track: LibraryTrack) => void;
   onShowMetadata: (track: LibraryTrack) => void;
   onViewArtist?: (track: LibraryTrack) => void;

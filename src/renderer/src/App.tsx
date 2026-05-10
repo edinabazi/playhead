@@ -16,6 +16,7 @@ import {
   defaultSessionSettings,
 } from "../../shared/library";
 import { getMediaArtworkSrc } from "@/lib/artwork";
+import { isEditableTarget } from "@/lib/dom";
 import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
@@ -28,6 +29,7 @@ import { DeletePlaylistDialog } from "@/features/sidebar/DeletePlaylistDialog";
 import { RemoveFolderDialog } from "@/features/sidebar/RemoveFolderDialog";
 import { Sidebar } from "@/features/sidebar/Sidebar";
 import { TrackList } from "@/features/tracks/TrackList";
+import { RemoveTracksFromPlaylistDialog } from "@/features/tracks/RemoveTracksFromPlaylistDialog";
 import {
   showFolderActionToast,
   showSimpleActionToast,
@@ -105,6 +107,9 @@ export function App() {
   const [folderPendingRemoval, setFolderPendingRemoval] = useState<LibraryFolder | null>(null);
   const [playlistPendingDeletion, setPlaylistPendingDeletion] = useState<LibraryPlaylist | null>(
     null,
+  );
+  const [playlistTrackIdsPendingRemoval, setPlaylistTrackIdsPendingRemoval] = useState<string[]>(
+    [],
   );
   const [selectedLibraryBrowserItemIds, setSelectedLibraryBrowserItemIds] = useState<string[]>([]);
   const [renamingPlaylistId, setRenamingPlaylistId] = useState<string | null>(null);
@@ -658,10 +663,12 @@ export function App() {
     [library, persistLibrary],
   );
 
-  const removeTrackFromSelectedPlaylist = useCallback(
-    async (trackId: string) => {
+  const removeTracksFromSelectedPlaylist = useCallback(
+    async (trackIds: string[]) => {
       const source = library.selectedSource;
       if (!source || source.type !== "playlist") return;
+      const trackIdsToRemove = new Set(trackIds);
+      if (trackIdsToRemove.size === 0) return;
       const now = new Date().toISOString();
 
       await persistLibrary({
@@ -670,7 +677,7 @@ export function App() {
           playlist.id === source.id
             ? {
                 ...playlist,
-                trackIds: playlist.trackIds.filter((item) => item !== trackId),
+                trackIds: playlist.trackIds.filter((item) => !trackIdsToRemove.has(item)),
                 updatedAt: now,
               }
             : playlist,
@@ -678,6 +685,18 @@ export function App() {
       });
     },
     [library, persistLibrary],
+  );
+
+  const requestRemoveTracksFromSelectedPlaylist = useCallback(
+    (trackIds: string[]) => {
+      if (trackIds.length > 1) {
+        setPlaylistTrackIdsPendingRemoval(trackIds);
+        return;
+      }
+
+      void removeTracksFromSelectedPlaylist(trackIds);
+    },
+    [removeTracksFromSelectedPlaylist],
   );
 
   const toggleFavoriteTrack = useCallback(
@@ -1019,6 +1038,30 @@ export function App() {
     [selectedLibraryBrowserItemIds],
   );
 
+  const selectAllVisibleItems = useCallback(() => {
+    const source = library.selectedSource;
+    if (!source) return;
+
+    if (source.type === "library-artists") {
+      const artistIds = libraryArtists.map((artist) => artist.id);
+      setSelectedLibraryBrowserItemIds(artistIds);
+      libraryBrowserSelectionAnchorIdRef.current = artistIds[0] || null;
+      return;
+    }
+
+    if (source.type === "library-albums") {
+      const albumIds = libraryAlbums.map((album) => album.id);
+      setSelectedLibraryBrowserItemIds(albumIds);
+      libraryBrowserSelectionAnchorIdRef.current = albumIds[0] || null;
+      return;
+    }
+
+    if (tracks.length === 0) return;
+    const trackIds = tracks.map((track) => track.id);
+    setSelectedTrackIds(trackIds);
+    selectionAnchorTrackIdRef.current = trackIds[0] || null;
+  }, [library.selectedSource, libraryAlbums, libraryArtists, tracks]);
+
   const backFromLibraryDetail = useCallback(() => {
     if (library.settings.library.mode !== "library") return;
     if (library.selectedSource?.type === "library-artist") {
@@ -1199,6 +1242,20 @@ export function App() {
     setScrollToTrackId(track.id);
     void selectTrack(track, false, library.settings.session.trackPositions[track.id] || 0);
   }, [isWaveformEngineReady, library, selectTrack]);
+
+  useEffect(() => {
+    const onSelectAll = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() !== "a") return;
+
+      event.preventDefault();
+      selectAllVisibleItems();
+    };
+
+    window.addEventListener("keydown", onSelectAll);
+    return () => window.removeEventListener("keydown", onSelectAll);
+  }, [selectAllVisibleItems]);
 
   useEffect(() => {
     const canGoBackFromLibraryDetail = () =>
@@ -1587,7 +1644,7 @@ export function App() {
                         setIsCreatePlaylistOpen(true);
                       }}
                       onToggleFavorite={(track) => toggleFavoriteTrack(track.id)}
-                      onRemoveFromPlaylist={removeTrackFromSelectedPlaylist}
+                      onRemoveFromPlaylist={requestRemoveTracksFromSelectedPlaylist}
                       onShowInFolder={(track) => window.playhead.showItemInFolder(track.path)}
                       onShowMetadata={(track) => setMetadataDialog({ track })}
                       onViewArtist={
@@ -1685,6 +1742,19 @@ export function App() {
                 void deletePlaylist(playlistId);
               }}
               onClose={() => setPlaylistPendingDeletion(null)}
+            />
+          )}
+          {playlistTrackIdsPendingRemoval.length > 1 && selectedPlaylist && (
+            <RemoveTracksFromPlaylistDialog
+              key="remove-tracks-from-playlist"
+              trackCount={playlistTrackIdsPendingRemoval.length}
+              playlistName={selectedPlaylist.name}
+              onConfirm={() => {
+                const trackIds = playlistTrackIdsPendingRemoval;
+                setPlaylistTrackIdsPendingRemoval([]);
+                void removeTracksFromSelectedPlaylist(trackIds);
+              }}
+              onClose={() => setPlaylistTrackIdsPendingRemoval([])}
             />
           )}
           {isCreatePlaylistOpen && (

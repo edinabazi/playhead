@@ -40,7 +40,7 @@ export function TrackRowMenu({
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
   onAddTracksToPlaylist?: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (track: LibraryTrack) => void;
-  onRemoveFromPlaylist: (trackId: string) => void;
+  onRemoveFromPlaylist: (trackIds: string[]) => void;
   onShowInFolder: (track: LibraryTrack) => void;
   onShowMetadata: (track: LibraryTrack) => void;
   onViewArtist?: (track: LibraryTrack) => void;
@@ -171,13 +171,13 @@ export function TrackRowMenu({
                 </div>
               )}
             </div>
-            {!isMultiTrackMenu && selectedPlaylist && (
+            {selectedPlaylist && (
               <MenuItem
                 icon={icons.x}
                 label="Remove from Playlist"
                 index={1}
                 onSelect={() => {
-                  onRemoveFromPlaylist(track.id);
+                  onRemoveFromPlaylist(tracksForAction.map((item) => item.id));
                   onOpenChange(false, null);
                 }}
               />

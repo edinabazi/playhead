@@ -36,26 +36,30 @@ export function PlayPauseMorphIcon({
   size = 24,
   ...props
 }: MediaIconProps & { playing: boolean }) {
+  const transition = { duration: 0.18, ease: [0.22, 1, 0.36, 1] } as const;
+
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <motion.g
-        animate={{ opacity: playing ? 0 : 1, scale: playing ? 0.82 : 1 }}
+      <motion.path
+        d="M5 5 L12 8.7 L12 15.3 L5 19 Z"
+        fill="currentColor"
+        animate={{
+          d: playing ? "M5 4 L10 4 L10 20 L5 20 Z" : "M5 5 L12 8.7 L12 15.3 L5 19 Z",
+        }}
         initial={false}
-        transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
-        style={{ originX: "50%", originY: "50%" }}
-      >
-        <path d="M5 5 L12 8.7 L12 15.3 L5 19 Z" fill="currentColor" />
-        <path d="M12 8.7 L20 12 L12 15.3 L12 8.7 Z" fill="currentColor" />
-      </motion.g>
-      <motion.g
-        animate={{ opacity: playing ? 1 : 0, scale: playing ? 1 : 0.82 }}
+        transition={transition}
+      />
+      <motion.path
+        d="M12 8.7 L20 12 L12 15.3 L12 8.7 Z"
+        fill="currentColor"
+        animate={{
+          d: playing
+            ? "M14 4 L19 4 L19 20 L14 20 Z"
+            : "M12 8.7 L20 12 L12 15.3 L12 8.7 Z",
+        }}
         initial={false}
-        transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
-        style={{ originX: "50%", originY: "50%" }}
-      >
-        <path d="M5 4 L10 4 L10 20 L5 20 Z" fill="currentColor" />
-        <path d="M14 4 L19 4 L19 20 L14 20 Z" fill="currentColor" />
-      </motion.g>
+        transition={transition}
+      />
     </svg>
   );
 }
