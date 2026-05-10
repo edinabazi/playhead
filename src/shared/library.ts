@@ -171,6 +171,9 @@ export type PlayheadApi = {
   getUpdateState: () => Promise<AppUpdateState>;
   checkForUpdates: () => Promise<AppUpdateState>;
   installUpdate: () => Promise<boolean>;
+  minimizeWindow: () => Promise<void>;
+  toggleMaximizeWindow: () => Promise<void>;
+  closeWindow: () => Promise<void>;
   trackEvent: (eventName: string, properties?: Record<string, string | number | boolean>) => void;
   onMediaCommand: (callback: (command: MediaCommand) => void) => () => void;
   onFolderChanged: (callback: (folderId: string) => void) => () => void;

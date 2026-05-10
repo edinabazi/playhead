@@ -47,6 +47,7 @@ import { LibraryDetailHeader } from "@/features/library/LibraryDetailHeader";
 import { LibraryBrowser } from "@/features/library/LibraryBrowser";
 import { normalizeSourceForMode } from "@/features/library/source";
 import { usePlayerKeyboardShortcuts } from "@/hooks/use-player-keyboard-shortcuts";
+import { WindowControls } from "@/components/WindowControls";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -1305,6 +1306,7 @@ export function App() {
           className="app-shell app-drag flex size-full gap-4 overflow-hidden p-4"
           style={{ "--app-transparency": appTransparency } as React.CSSProperties}
         >
+          <WindowControls />
           <Sidebar
             folders={library.folders}
             libraryMode={library.settings.library.mode}
@@ -1341,7 +1343,7 @@ export function App() {
             }}
           />
 
-          <main className="no-drag flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
+          <main className="app-drag flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
             {isLibraryEmpty ? (
               <EmptyLibraryState
                 isScanning={isScanning}

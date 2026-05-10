@@ -36,6 +36,9 @@ const api: PlayheadApi = {
   getUpdateState: () => ipcRenderer.invoke("app-updates:get-state"),
   checkForUpdates: () => ipcRenderer.invoke("app-updates:check"),
   installUpdate: () => ipcRenderer.invoke("app-updates:install"),
+  minimizeWindow: () => ipcRenderer.invoke("window:minimize"),
+  toggleMaximizeWindow: () => ipcRenderer.invoke("window:toggle-maximize"),
+  closeWindow: () => ipcRenderer.invoke("window:close"),
   trackEvent: (eventName: string, properties?: Record<string, string | number | boolean>) => {
     void ipcRenderer.invoke("telemetry:track", eventName, properties);
   },

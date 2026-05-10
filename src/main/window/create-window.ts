@@ -5,6 +5,7 @@ const { BrowserWindow } = electron;
 
 export function createWindow(): void {
   const iconPath = join(__dirname, "../../resources/playhead-icon.png");
+  const isMac = process.platform === "darwin";
 
   const win = new BrowserWindow({
     width: 980,
@@ -13,8 +14,10 @@ export function createWindow(): void {
     minHeight: 560,
     title: "Playhead",
     icon: iconPath,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 35, y: 38 },
+    frame: isMac,
+    titleBarStyle: isMac ? "hiddenInset" : undefined,
+    trafficLightPosition: isMac ? { x: 35, y: 38 } : undefined,
+    autoHideMenuBar: true,
     hasShadow: false,
     backgroundColor: "#00000000",
     transparent: true,

@@ -81,8 +81,8 @@ export function Player({
     : [];
 
   return (
-    <section className="flex shrink-0 flex-col gap-[10px] px-4 pt-4 overflow-hidden">
-      <div className="app-drag flex h-[60px] items-center gap-3">
+    <section className="relative flex shrink-0 flex-col gap-[10px] px-4 pt-4">
+      <div className="app-drag flex h-16 items-center gap-3">
         <div className="relative size-16 shrink-0 overflow-hidden rounded-[12px]">
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
@@ -148,7 +148,7 @@ export function Player({
             </AnimatePresence>
           </div>
 
-          <div className="flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
+          <div className="no-drag flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
             <FavoriteHeartButton
               active={isFavorite}
               disabled={!activeTrack}
