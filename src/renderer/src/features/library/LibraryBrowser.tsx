@@ -1,33 +1,50 @@
+import { useEffect, useRef, useState } from "react";
+import { Dropdown } from "@/components/ui/dropdown";
+import { MenuItem } from "@/components/ui/menu-item";
 import { useIcons } from "@/lib/icon-context";
+import {
+  clampMenuPoint,
+  shouldOpenSubmenuLeft,
+  type MenuAnchorPoint,
+} from "@/lib/menu-position";
 import { TrackCell } from "@/features/tracks/TrackCell";
 import type { LibraryAlbum, LibraryArtist } from "./library-model";
 import { ArtistArtwork } from "./ArtistArtwork";
 import { setDraggedTrackIds } from "@/features/tracks/track-drag";
+import type { LibraryPlaylist } from "../../../../shared/library";
 
 export function LibraryBrowser({
   emptyLabel,
   artists,
   albums,
   selectedItemIds = [],
+  playlists,
   onActivateArtist,
   onActivateAlbum,
   onSelectArtist,
   onSelectAlbum,
+  onAddTrackIdsToPlaylist,
 }: {
   emptyLabel: string;
   artists?: LibraryArtist[];
   albums?: LibraryAlbum[];
   selectedItemIds?: string[];
+  playlists: LibraryPlaylist[];
   onActivateArtist?: (artist: LibraryArtist) => void;
   onActivateAlbum?: (album: LibraryAlbum) => void;
   onSelectArtist?: (artist: LibraryArtist, event?: React.MouseEvent<HTMLDivElement>) => void;
   onSelectAlbum?: (album: LibraryAlbum, event?: React.MouseEvent<HTMLDivElement>) => void;
+  onAddTrackIdsToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
 }) {
   const icons = useIcons();
   const MusicIcon = icons.music;
   const ChevronRightIcon = icons["chevron-right"];
   const rows = artists || albums || [];
   const selectedItemIdSet = new Set(selectedItemIds);
+  const [contextMenu, setContextMenu] = useState<{
+    point: MenuAnchorPoint;
+    trackIds: string[];
+  } | null>(null);
 
   const startCollectionDrag = (
     item: LibraryArtist | LibraryAlbum,
@@ -46,6 +63,24 @@ export function LibraryBrowser({
     document.body.appendChild(dragImage);
     event.dataTransfer.setDragImage(dragImage, 26, 24);
     window.setTimeout(() => dragImage.remove(), 0);
+  };
+
+  const openContextMenu = (
+    item: LibraryArtist | LibraryAlbum,
+    items: Array<LibraryArtist | LibraryAlbum>,
+    event: React.MouseEvent<HTMLDivElement>,
+  ) => {
+    event.preventDefault();
+    const actionItems = selectedItemIdSet.has(item.id)
+      ? items.filter((row) => selectedItemIdSet.has(row.id))
+      : [item];
+    const trackIds = Array.from(new Set(actionItems.flatMap((row) => row.trackIds)));
+    if (trackIds.length === 0) return;
+
+    setContextMenu({
+      point: { x: event.clientX, y: event.clientY, align: "left" },
+      trackIds,
+    });
   };
 
   return (
@@ -67,6 +102,10 @@ export function LibraryBrowser({
                   onDoubleClick={() => onActivateArtist?.(artist)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") onActivateArtist?.(artist);
+                  }}
+                  onContextMenu={(event) => {
+                    if (!selectedItemIdSet.has(artist.id)) onSelectArtist?.(artist);
+                    openContextMenu(artist, artists, event);
                   }}
                   onDragStart={(event) => startCollectionDrag(artist, artists, event)}
                 >
@@ -104,6 +143,10 @@ export function LibraryBrowser({
                     onDoubleClick={() => onActivateAlbum?.(album)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") onActivateAlbum?.(album);
+                    }}
+                    onContextMenu={(event) => {
+                      if (!selectedItemIdSet.has(album.id)) onSelectAlbum?.(album);
+                      openContextMenu(album, albums, event);
                     }}
                     onDragStart={(event) => startCollectionDrag(album, albums, event)}
                   >
@@ -144,7 +187,121 @@ export function LibraryBrowser({
           )}
         </div>
       </div>
+      {contextMenu && (
+        <LibraryCollectionContextMenu
+          point={contextMenu.point}
+          trackIds={contextMenu.trackIds}
+          playlists={playlists}
+          onAddTrackIdsToPlaylist={onAddTrackIdsToPlaylist}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </section>
+  );
+}
+
+function LibraryCollectionContextMenu({
+  point,
+  trackIds,
+  playlists,
+  onAddTrackIdsToPlaylist,
+  onClose,
+}: {
+  point: MenuAnchorPoint;
+  trackIds: string[];
+  playlists: LibraryPlaylist[];
+  onAddTrackIdsToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
+  onClose: () => void;
+}) {
+  const icons = useIcons();
+  const [playlistOpen, setPlaylistOpen] = useState(false);
+  const [playlistSide, setPlaylistSide] = useState<"left" | "right">("right");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const playlistTriggerRef = useRef<HTMLDivElement | null>(null);
+  const ChevronRightIcon = icons["chevron-right"];
+  const clampedPoint = clampMenuPoint(point);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) onClose();
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="fixed z-50"
+      style={{
+        left: clampedPoint.x,
+        top: clampedPoint.y,
+      }}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <Dropdown className="w-56 bg-[rgba(10,10,10,0.96)]">
+        <div
+          className="relative"
+          ref={playlistTriggerRef}
+          onMouseEnter={() => {
+            setPlaylistSide(shouldOpenSubmenuLeft(playlistTriggerRef.current) ? "left" : "right");
+            setPlaylistOpen(true);
+          }}
+          onMouseLeave={() => setPlaylistOpen(false)}
+        >
+          <MenuItem
+            icon={icons["list-plus"]}
+            label="Add to Playlist"
+            index={0}
+            className="pr-8"
+            onSelect={() => setPlaylistOpen((value) => !value)}
+          />
+          <ChevronRightIcon
+            size={14}
+            strokeWidth={1.8}
+            className="pointer-events-none absolute right-2 top-1/2 z-20 -translate-y-1/2 text-muted-foreground"
+          />
+          {playlistOpen && (
+            <div
+              className={`absolute top-0 z-10 ${
+                playlistSide === "left"
+                  ? "right-[calc(100%-2px)] pr-2"
+                  : "left-[calc(100%-2px)] pl-2"
+              }`}
+              onMouseMove={(event) => event.stopPropagation()}
+              onMouseEnter={() => setPlaylistOpen(true)}
+            >
+              <Dropdown className="w-52 bg-[rgba(10,10,10,0.96)]">
+                {playlists.length > 0 ? (
+                  playlists.map((playlist, index) => (
+                    <MenuItem
+                      key={playlist.id}
+                      icon={icons["list-music"]}
+                      label={playlist.name}
+                      index={index}
+                      checked={trackIds.every((trackId) => playlist.trackIds.includes(trackId))}
+                      onSelect={() => {
+                        onAddTrackIdsToPlaylist(trackIds, playlist);
+                        setPlaylistOpen(false);
+                        onClose();
+                      }}
+                    />
+                  ))
+                ) : (
+                  <MenuItem
+                    icon={icons["list-music"]}
+                    label="No Playlists"
+                    index={0}
+                    onSelect={() => undefined}
+                  />
+                )}
+              </Dropdown>
+            </div>
+          )}
+        </div>
+      </Dropdown>
+    </div>
   );
 }
 

@@ -1523,6 +1523,7 @@ export function App() {
                     emptyLabel="No artists to show."
                     artists={libraryArtists}
                     selectedItemIds={selectedLibraryBrowserItemIds}
+                    playlists={library.playlists}
                     onSelectArtist={(artist, event) =>
                       selectLibraryBrowserItem(
                         artist.id,
@@ -1533,12 +1534,14 @@ export function App() {
                     onActivateArtist={(artist) =>
                       selectLibrarySource({ type: "library-artist", id: artist.id })
                     }
+                    onAddTrackIdsToPlaylist={addTracksToPlaylist}
                   />
                 ) : selectedSource?.type === "library-albums" ? (
                   <LibraryBrowser
                     emptyLabel="No albums to show."
                     albums={libraryAlbums}
                     selectedItemIds={selectedLibraryBrowserItemIds}
+                    playlists={library.playlists}
                     onSelectAlbum={(album, event) =>
                       selectLibraryBrowserItem(
                         album.id,
@@ -1549,6 +1552,7 @@ export function App() {
                     onActivateAlbum={(album) =>
                       selectLibrarySource({ type: "library-album", id: album.id })
                     }
+                    onAddTrackIdsToPlaylist={addTracksToPlaylist}
                   />
                 ) : (
                   <>
