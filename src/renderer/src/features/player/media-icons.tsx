@@ -36,24 +36,29 @@ export function PlayPauseMorphIcon({
   size = 24,
   ...props
 }: MediaIconProps & { playing: boolean }) {
-  const leftPlay = "M5 5 L12 8.7 L12 15.3 L5 19 Z";
-  const rightPlay = "M12 8.7 L20 12 L12 15.3 L12 8.7 Z";
-  const leftPause = "M5 4 L10 4 L10 20 L5 20 Z";
-  const rightPause = "M14 4 L19 4 L19 20 L14 20 Z";
+  const transition = { duration: 0.18, ease: [0.22, 1, 0.36, 1] } as const;
 
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
       <motion.path
-        d={leftPlay}
-        animate={{ d: playing ? leftPause : leftPlay }}
+        d="M5 5 L12 8.7 L12 15.3 L5 19 Z"
         fill="currentColor"
-        transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.62 }}
+        animate={{
+          d: playing ? "M5 4 L10 4 L10 20 L5 20 Z" : "M5 5 L12 8.7 L12 15.3 L5 19 Z",
+        }}
+        initial={false}
+        transition={transition}
       />
       <motion.path
-        d={rightPlay}
-        animate={{ d: playing ? rightPause : rightPlay }}
+        d="M12 8.7 L20 12 L12 15.3 L12 8.7 Z"
         fill="currentColor"
-        transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.62 }}
+        animate={{
+          d: playing
+            ? "M14 4 L19 4 L19 20 L14 20 Z"
+            : "M12 8.7 L20 12 L12 15.3 L12 8.7 Z",
+        }}
+        initial={false}
+        transition={transition}
       />
     </svg>
   );

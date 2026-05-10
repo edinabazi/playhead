@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { SliderComfortable } from "@/components/ui/slider";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
+import { useWindowDrag } from "@/hooks/use-window-drag";
 import { FavoriteHeartButton } from "@/features/tracks/FavoriteHeartButton";
 import { TrackArtwork } from "@/features/tracks/TrackArtwork";
 import { IconButton } from "./IconButton";
@@ -67,6 +68,7 @@ export function Player({
   onToggleFavorite: () => void;
   onVolumeChange: (volume: number) => void;
 }) {
+  const windowDragHandlers = useWindowDrag<HTMLDivElement>();
   const icons = useIcons();
   const MusicIcon = icons.music;
   const ShuffleIcon = icons.shuffle;
@@ -81,8 +83,8 @@ export function Player({
     : [];
 
   return (
-    <section className="flex shrink-0 flex-col gap-[10px] px-4 pt-4 overflow-hidden">
-      <div className="app-drag flex h-[60px] items-center gap-3">
+    <section className="relative flex shrink-0 flex-col gap-[10px] px-4 pt-4">
+      <div className="app-drag flex h-16 items-center gap-3" {...windowDragHandlers}>
         <div className="relative size-16 shrink-0 overflow-hidden rounded-[12px]">
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
@@ -148,7 +150,7 @@ export function Player({
             </AnimatePresence>
           </div>
 
-          <div className="flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
+          <div className="no-drag flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
             <FavoriteHeartButton
               active={isFavorite}
               disabled={!activeTrack}
@@ -208,6 +210,7 @@ export function Player({
           <IconButton
             title={shuffleEnabled ? "Shuffle on" : "Shuffle"}
             active={shuffleEnabled}
+            motionType="shuffle"
             onClick={onToggleShuffle}
           >
             <ShuffleIcon size={20} strokeWidth={1.8} />
@@ -217,24 +220,58 @@ export function Player({
               title="Previous"
               onClick={onPreviousTrack}
               disabled={!activeTrack || isLoading}
+              motionType="previous"
             >
               <SkipBackFilledIcon size={16} />
             </IconButton>
-            <button
-              className="no-drag grid size-12 place-items-center rounded-full bg-white text-black transition duration-150 hover:bg-white/90 active:scale-[0.98] disabled:opacity-40"
+            <motion.button
+              className="no-drag relative grid size-12 place-items-center overflow-hidden rounded-full bg-white text-black shadow-[0_0_0_0_rgba(255,255,255,0)]"
               title={isPlaying ? "Pause" : "Play"}
               onClick={onTogglePlayback}
               disabled={!activeTrack || isLoading}
+              whileHover={
+                !activeTrack || isLoading
+                  ? undefined
+                  : {
+                      scale: 1.07,
+                      y: -2,
+                      boxShadow:
+                        "0 14px 34px rgba(255,255,255,0.14), 0 0 0 1px rgba(255,255,255,0.46)",
+                    }
+              }
+              whileTap={!activeTrack || isLoading ? undefined : { scale: 0.9, y: 0 }}
+              transition={{ type: "spring", stiffness: 620, damping: 28, mass: 0.58 }}
             >
-              <span className="relative grid size-6 place-items-center overflow-hidden">
+              <motion.span
+                className="pointer-events-none absolute inset-0 rounded-full"
+                initial={false}
+                animate={{
+                  opacity: isPlaying ? 0.32 : 0.14,
+                  background:
+                    "radial-gradient(circle at 50% 38%, rgba(255,255,255,1), rgba(255,255,255,0.14) 54%, rgba(0,0,0,0) 72%)",
+                }}
+                transition={{ duration: 0.16 }}
+              />
+              <motion.span
+                className="relative grid size-6 place-items-center overflow-hidden"
+                initial={false}
+                animate={{ rotate: isPlaying ? 0 : 0, scale: isPlaying ? 0.96 : 1 }}
+                whileHover={!activeTrack || isLoading ? undefined : { scale: 1.09 }}
+                transition={{ type: "spring", stiffness: 680, damping: 24, mass: 0.5 }}
+              >
                 <PlayPauseMorphIcon
                   playing={isPlaying}
                   size={24}
                   className={isPlaying ? "" : "translate-x-px"}
                 />
-              </span>
-            </button>
-            <IconButton title="Next" onClick={onNextTrack} disabled={!activeTrack || isLoading}>
+              </motion.span>
+            </motion.button>
+            <IconButton
+              title="Next"
+              onClick={onNextTrack}
+              disabled={!activeTrack || isLoading}
+              motionType="next"
+            >
               <SkipForwardFilledIcon size={16} />
             </IconButton>
           </div>
@@ -243,6 +280,7 @@ export function Player({
               repeatMode === "one" ? "Repeat one" : repeatMode === "all" ? "Repeat all" : "Repeat"
             }
             active={repeatMode !== "off"}
+            motionType="repeat"
             onClick={onCycleRepeat}
           >
             <span className="relative grid place-items-center">

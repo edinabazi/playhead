@@ -2,6 +2,10 @@ export function isMacPlatform() {
   return navigator.platform.toLowerCase().includes("mac");
 }
 
+export function usesCustomWindowControls() {
+  return !isMacPlatform();
+}
+
 export function getPrimaryModifierLabel() {
   return isMacPlatform() ? "⌘" : "Ctrl";
 }

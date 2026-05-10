@@ -16,6 +16,7 @@ import {
   defaultSessionSettings,
 } from "../../shared/library";
 import { getMediaArtworkSrc } from "@/lib/artwork";
+import { isEditableTarget } from "@/lib/dom";
 import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
@@ -28,6 +29,7 @@ import { DeletePlaylistDialog } from "@/features/sidebar/DeletePlaylistDialog";
 import { RemoveFolderDialog } from "@/features/sidebar/RemoveFolderDialog";
 import { Sidebar } from "@/features/sidebar/Sidebar";
 import { TrackList } from "@/features/tracks/TrackList";
+import { RemoveTracksFromPlaylistDialog } from "@/features/tracks/RemoveTracksFromPlaylistDialog";
 import {
   showFolderActionToast,
   showSimpleActionToast,
@@ -40,6 +42,8 @@ import {
   getLibraryArtists,
   getAllLibraryTracks,
   getSourceTracks,
+  getTrackAlbumId,
+  getTrackArtistId,
   mergeScannedFolder,
 } from "@/features/library/library-model";
 import { EmptyLibraryState } from "@/features/library/EmptyLibraryState";
@@ -47,6 +51,8 @@ import { LibraryDetailHeader } from "@/features/library/LibraryDetailHeader";
 import { LibraryBrowser } from "@/features/library/LibraryBrowser";
 import { normalizeSourceForMode } from "@/features/library/source";
 import { usePlayerKeyboardShortcuts } from "@/hooks/use-player-keyboard-shortcuts";
+import { useWindowDrag } from "@/hooks/use-window-drag";
+import { WindowControls } from "@/components/WindowControls";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -59,6 +65,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function App() {
+  const topGapWindowDragHandlers = useWindowDrag<HTMLDivElement>();
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const playNextTrackOnEndRef = useRef<() => boolean>(() => false);
   const playAdjacentTrackRef = useRef<() => void>(() => {});
@@ -70,9 +77,11 @@ export function App() {
   const didRestoreSessionRef = useRef(false);
   const lastPositionSaveRef = useRef(0);
   const selectionAnchorTrackIdRef = useRef<string | null>(null);
+  const libraryBrowserSelectionAnchorIdRef = useRef<string | null>(null);
   const trackLoadRequestIdRef = useRef(0);
   const trackLoadQueueRef = useRef(Promise.resolve());
   const loadedTrackIdRef = useRef<string | null>(null);
+  const lastLibraryBackGestureAtRef = useRef(0);
 
   const [library, setLibrary] = useState<LibraryState>(emptyLibraryState);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
@@ -99,6 +108,10 @@ export function App() {
   const [playlistPendingDeletion, setPlaylistPendingDeletion] = useState<LibraryPlaylist | null>(
     null,
   );
+  const [playlistTrackIdsPendingRemoval, setPlaylistTrackIdsPendingRemoval] = useState<string[]>(
+    [],
+  );
+  const [selectedLibraryBrowserItemIds, setSelectedLibraryBrowserItemIds] = useState<string[]>([]);
   const [renamingPlaylistId, setRenamingPlaylistId] = useState<string | null>(null);
   const [scrollToTrackId, setScrollToTrackId] = useState<string | null>(null);
   const [previewAppTransparency, setPreviewAppTransparency] = useState<number | null>(null);
@@ -650,10 +663,12 @@ export function App() {
     [library, persistLibrary],
   );
 
-  const removeTrackFromSelectedPlaylist = useCallback(
-    async (trackId: string) => {
+  const removeTracksFromSelectedPlaylist = useCallback(
+    async (trackIds: string[]) => {
       const source = library.selectedSource;
       if (!source || source.type !== "playlist") return;
+      const trackIdsToRemove = new Set(trackIds);
+      if (trackIdsToRemove.size === 0) return;
       const now = new Date().toISOString();
 
       await persistLibrary({
@@ -662,7 +677,7 @@ export function App() {
           playlist.id === source.id
             ? {
                 ...playlist,
-                trackIds: playlist.trackIds.filter((item) => item !== trackId),
+                trackIds: playlist.trackIds.filter((item) => !trackIdsToRemove.has(item)),
                 updatedAt: now,
               }
             : playlist,
@@ -670,6 +685,18 @@ export function App() {
       });
     },
     [library, persistLibrary],
+  );
+
+  const requestRemoveTracksFromSelectedPlaylist = useCallback(
+    (trackIds: string[]) => {
+      if (trackIds.length > 1) {
+        setPlaylistTrackIdsPendingRemoval(trackIds);
+        return;
+      }
+
+      void removeTracksFromSelectedPlaylist(trackIds);
+    },
+    [removeTracksFromSelectedPlaylist],
   );
 
   const toggleFavoriteTrack = useCallback(
@@ -965,6 +992,102 @@ export function App() {
     if (selectedTrack) void selectTrack(selectedTrack, true);
   }, [library.tracks, selectTrack, selectedTrackIds]);
 
+  const selectLibrarySource = useCallback(
+    (source: LibraryState["selectedSource"]) => {
+      setSelectedLibraryBrowserItemIds([]);
+      libraryBrowserSelectionAnchorIdRef.current = null;
+      void persistLibrary({ ...library, selectedSource: source });
+    },
+    [library, persistLibrary],
+  );
+
+  const selectLibraryBrowserItem = useCallback(
+    (itemId: string, orderedItemIds: string[], event?: React.MouseEvent<HTMLDivElement>) => {
+      const isRangeSelection = Boolean(event?.shiftKey);
+      const isToggleSelection = Boolean(event?.metaKey || event?.ctrlKey);
+
+      if (isRangeSelection) {
+        const anchorItemId =
+          libraryBrowserSelectionAnchorIdRef.current ||
+          selectedLibraryBrowserItemIds[0] ||
+          itemId;
+        const anchorIndex = orderedItemIds.indexOf(anchorItemId);
+        const targetIndex = orderedItemIds.indexOf(itemId);
+
+        if (anchorIndex !== -1 && targetIndex !== -1) {
+          const start = Math.min(anchorIndex, targetIndex);
+          const end = Math.max(anchorIndex, targetIndex);
+          setSelectedLibraryBrowserItemIds(orderedItemIds.slice(start, end + 1));
+          return;
+        }
+      }
+
+      if (isToggleSelection) {
+        libraryBrowserSelectionAnchorIdRef.current = itemId;
+        setSelectedLibraryBrowserItemIds((current) =>
+          current.includes(itemId)
+            ? current.filter((currentItemId) => currentItemId !== itemId)
+            : [...current, itemId],
+        );
+        return;
+      }
+
+      libraryBrowserSelectionAnchorIdRef.current = itemId;
+      setSelectedLibraryBrowserItemIds([itemId]);
+    },
+    [selectedLibraryBrowserItemIds],
+  );
+
+  const selectAllVisibleItems = useCallback(() => {
+    const source = library.selectedSource;
+    if (!source) return;
+
+    if (source.type === "library-artists") {
+      const artistIds = libraryArtists.map((artist) => artist.id);
+      setSelectedLibraryBrowserItemIds(artistIds);
+      libraryBrowserSelectionAnchorIdRef.current = artistIds[0] || null;
+      return;
+    }
+
+    if (source.type === "library-albums") {
+      const albumIds = libraryAlbums.map((album) => album.id);
+      setSelectedLibraryBrowserItemIds(albumIds);
+      libraryBrowserSelectionAnchorIdRef.current = albumIds[0] || null;
+      return;
+    }
+
+    if (tracks.length === 0) return;
+    const trackIds = tracks.map((track) => track.id);
+    setSelectedTrackIds(trackIds);
+    selectionAnchorTrackIdRef.current = trackIds[0] || null;
+  }, [library.selectedSource, libraryAlbums, libraryArtists, tracks]);
+
+  const backFromLibraryDetail = useCallback(() => {
+    if (library.settings.library.mode !== "library") return;
+    if (library.selectedSource?.type === "library-artist") {
+      selectLibrarySource({ type: "library-artists" });
+    }
+    if (library.selectedSource?.type === "library-album") {
+      selectLibrarySource({ type: "library-albums" });
+    }
+  }, [library.selectedSource, library.settings.library.mode, selectLibrarySource]);
+
+  const viewTrackArtist = useCallback(
+    (track: LibraryTrack) => {
+      if (library.settings.library.mode !== "library") return;
+      selectLibrarySource({ type: "library-artist", id: getTrackArtistId(track) });
+    },
+    [library.settings.library.mode, selectLibrarySource],
+  );
+
+  const viewTrackAlbum = useCallback(
+    (track: LibraryTrack) => {
+      if (library.settings.library.mode !== "library") return;
+      selectLibrarySource({ type: "library-album", id: getTrackAlbumId(track) });
+    },
+    [library.settings.library.mode, selectLibrarySource],
+  );
+
   const toggleSelectedTrackFavorite = useCallback(() => {
     const selectedTrackId = selectedTrackIds[0];
     if (selectedTrackId) void toggleFavoriteTrack(selectedTrackId);
@@ -1119,6 +1242,57 @@ export function App() {
     setScrollToTrackId(track.id);
     void selectTrack(track, false, library.settings.session.trackPositions[track.id] || 0);
   }, [isWaveformEngineReady, library, selectTrack]);
+
+  useEffect(() => {
+    const onSelectAll = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() !== "a") return;
+
+      event.preventDefault();
+      selectAllVisibleItems();
+    };
+
+    window.addEventListener("keydown", onSelectAll);
+    return () => window.removeEventListener("keydown", onSelectAll);
+  }, [selectAllVisibleItems]);
+
+  useEffect(() => {
+    const canGoBackFromLibraryDetail = () =>
+      library.settings.library.mode === "library" &&
+      (library.selectedSource?.type === "library-artist" ||
+        library.selectedSource?.type === "library-album");
+
+    const onMouseBack = (event: MouseEvent) => {
+      if (event.button !== 3) return;
+      if (!canGoBackFromLibraryDetail()) return;
+
+      event.preventDefault();
+      backFromLibraryDetail();
+    };
+
+    const onTrackpadBack = (event: WheelEvent) => {
+      if (!canGoBackFromLibraryDetail()) return;
+      if (event.deltaX >= -45) return;
+      if (Math.abs(event.deltaX) < Math.abs(event.deltaY) * 1.5) return;
+
+      const now = Date.now();
+      if (now - lastLibraryBackGestureAtRef.current < 700) return;
+      lastLibraryBackGestureAtRef.current = now;
+
+      event.preventDefault();
+      backFromLibraryDetail();
+    };
+
+    window.addEventListener("mousedown", onMouseBack);
+    window.addEventListener("auxclick", onMouseBack);
+    window.addEventListener("wheel", onTrackpadBack, { passive: false });
+    return () => {
+      window.removeEventListener("mousedown", onMouseBack);
+      window.removeEventListener("auxclick", onMouseBack);
+      window.removeEventListener("wheel", onTrackpadBack);
+    };
+  }, [backFromLibraryDetail, library.selectedSource, library.settings.library.mode]);
 
   useEffect(() => {
     return window.playhead.onFolderChanged((folderId) => {
@@ -1305,6 +1479,7 @@ export function App() {
           className="app-shell app-drag flex size-full gap-4 overflow-hidden p-4"
           style={{ "--app-transparency": appTransparency } as React.CSSProperties}
         >
+          <WindowControls />
           <Sidebar
             folders={library.folders}
             libraryMode={library.settings.library.mode}
@@ -1326,7 +1501,7 @@ export function App() {
               void window.playhead.installUpdate();
             }}
             onCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
-            onSelectSource={(source) => void persistLibrary({ ...library, selectedSource: source })}
+            onSelectSource={selectLibrarySource}
             onDropTrackToPlaylist={(trackIds, playlist) =>
               void addTracksToPlaylist(trackIds, playlist)
             }
@@ -1341,7 +1516,12 @@ export function App() {
             }}
           />
 
-          <main className="no-drag flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
+          <main className="app-drag relative flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
+            <div
+              className="app-drag absolute inset-x-0 top-0 z-40 h-8"
+              aria-hidden="true"
+              {...topGapWindowDragHandlers}
+            />
             {isLibraryEmpty ? (
               <EmptyLibraryState
                 isScanning={isScanning}
@@ -1399,23 +1579,37 @@ export function App() {
                   <LibraryBrowser
                     emptyLabel="No artists to show."
                     artists={libraryArtists}
-                    onSelectArtist={(artist) =>
-                      void persistLibrary({
-                        ...library,
-                        selectedSource: { type: "library-artist", id: artist.id },
-                      })
+                    selectedItemIds={selectedLibraryBrowserItemIds}
+                    playlists={library.playlists}
+                    onSelectArtist={(artist, event) =>
+                      selectLibraryBrowserItem(
+                        artist.id,
+                        libraryArtists.map((item) => item.id),
+                        event,
+                      )
                     }
+                    onActivateArtist={(artist) =>
+                      selectLibrarySource({ type: "library-artist", id: artist.id })
+                    }
+                    onAddTrackIdsToPlaylist={addTracksToPlaylist}
                   />
                 ) : selectedSource?.type === "library-albums" ? (
                   <LibraryBrowser
                     emptyLabel="No albums to show."
                     albums={libraryAlbums}
-                    onSelectAlbum={(album) =>
-                      void persistLibrary({
-                        ...library,
-                        selectedSource: { type: "library-album", id: album.id },
-                      })
+                    selectedItemIds={selectedLibraryBrowserItemIds}
+                    playlists={library.playlists}
+                    onSelectAlbum={(album, event) =>
+                      selectLibraryBrowserItem(
+                        album.id,
+                        libraryAlbums.map((item) => item.id),
+                        event,
+                      )
                     }
+                    onActivateAlbum={(album) =>
+                      selectLibrarySource({ type: "library-album", id: album.id })
+                    }
+                    onAddTrackIdsToPlaylist={addTracksToPlaylist}
                   />
                 ) : (
                   <>
@@ -1423,14 +1617,7 @@ export function App() {
                       <LibraryDetailHeader
                         artist={selectedLibraryArtist}
                         album={selectedLibraryAlbum}
-                        onBack={() =>
-                          void persistLibrary({
-                            ...library,
-                            selectedSource: {
-                              type: selectedLibraryArtist ? "library-artists" : "library-albums",
-                            },
-                          })
-                        }
+                        onBack={backFromLibraryDetail}
                       />
                     )}
                     <TrackList
@@ -1457,9 +1644,15 @@ export function App() {
                         setIsCreatePlaylistOpen(true);
                       }}
                       onToggleFavorite={(track) => toggleFavoriteTrack(track.id)}
-                      onRemoveFromPlaylist={removeTrackFromSelectedPlaylist}
+                      onRemoveFromPlaylist={requestRemoveTracksFromSelectedPlaylist}
                       onShowInFolder={(track) => window.playhead.showItemInFolder(track.path)}
                       onShowMetadata={(track) => setMetadataDialog({ track })}
+                      onViewArtist={
+                        library.settings.library.mode === "library" ? viewTrackArtist : undefined
+                      }
+                      onViewAlbum={
+                        library.settings.library.mode === "library" ? viewTrackAlbum : undefined
+                      }
                       onReorderTrack={(trackId, targetTrackId, edge) =>
                         reorderTrack(trackId, targetTrackId, edge)
                       }
@@ -1493,17 +1686,11 @@ export function App() {
               onSelectTrack={playSearchResult}
               onSelectArtist={(artist) => {
                 setIsSearchOpen(false);
-                void persistLibrary({
-                  ...library,
-                  selectedSource: { type: "library-artist", id: artist.id },
-                });
+                selectLibrarySource({ type: "library-artist", id: artist.id });
               }}
               onSelectAlbum={(album) => {
                 setIsSearchOpen(false);
-                void persistLibrary({
-                  ...library,
-                  selectedSource: { type: "library-album", id: album.id },
-                });
+                selectLibrarySource({ type: "library-album", id: album.id });
               }}
               onClose={() => setIsSearchOpen(false)}
             />
@@ -1555,6 +1742,19 @@ export function App() {
                 void deletePlaylist(playlistId);
               }}
               onClose={() => setPlaylistPendingDeletion(null)}
+            />
+          )}
+          {playlistTrackIdsPendingRemoval.length > 1 && selectedPlaylist && (
+            <RemoveTracksFromPlaylistDialog
+              key="remove-tracks-from-playlist"
+              trackCount={playlistTrackIdsPendingRemoval.length}
+              playlistName={selectedPlaylist.name}
+              onConfirm={() => {
+                const trackIds = playlistTrackIdsPendingRemoval;
+                setPlaylistTrackIdsPendingRemoval([]);
+                void removeTracksFromSelectedPlaylist(trackIds);
+              }}
+              onClose={() => setPlaylistTrackIdsPendingRemoval([])}
             />
           )}
           {isCreatePlaylistOpen && (
