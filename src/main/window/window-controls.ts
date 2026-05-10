@@ -7,6 +7,13 @@ function getSenderWindow(event: Electron.IpcMainInvokeEvent): Electron.BrowserWi
 }
 
 export function registerWindowControlsIpc(): void {
+  ipcMain.handle("window:move-to", (event, x: number, y: number) => {
+    const win = getSenderWindow(event);
+    if (!win) return;
+
+    win.setPosition(Math.round(x), Math.round(y), false);
+  });
+
   ipcMain.handle("window:minimize", (event) => {
     getSenderWindow(event)?.minimize();
   });

@@ -47,6 +47,7 @@ import { LibraryDetailHeader } from "@/features/library/LibraryDetailHeader";
 import { LibraryBrowser } from "@/features/library/LibraryBrowser";
 import { normalizeSourceForMode } from "@/features/library/source";
 import { usePlayerKeyboardShortcuts } from "@/hooks/use-player-keyboard-shortcuts";
+import { useWindowDrag } from "@/hooks/use-window-drag";
 import { WindowControls } from "@/components/WindowControls";
 
 function clamp(value: number, min: number, max: number): number {
@@ -60,6 +61,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function App() {
+  const topGapWindowDragHandlers = useWindowDrag<HTMLDivElement>();
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const playNextTrackOnEndRef = useRef<() => boolean>(() => false);
   const playAdjacentTrackRef = useRef<() => void>(() => {});
@@ -1343,7 +1345,12 @@ export function App() {
             }}
           />
 
-          <main className="app-drag flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
+          <main className="app-drag relative flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
+            <div
+              className="app-drag absolute inset-x-0 top-0 z-40 h-8"
+              aria-hidden="true"
+              {...topGapWindowDragHandlers}
+            />
             {isLibraryEmpty ? (
               <EmptyLibraryState
                 isScanning={isScanning}

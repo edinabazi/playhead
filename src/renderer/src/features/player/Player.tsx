@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { SliderComfortable } from "@/components/ui/slider";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
+import { useWindowDrag } from "@/hooks/use-window-drag";
 import { FavoriteHeartButton } from "@/features/tracks/FavoriteHeartButton";
 import { TrackArtwork } from "@/features/tracks/TrackArtwork";
 import { IconButton } from "./IconButton";
@@ -67,6 +68,7 @@ export function Player({
   onToggleFavorite: () => void;
   onVolumeChange: (volume: number) => void;
 }) {
+  const windowDragHandlers = useWindowDrag<HTMLDivElement>();
   const icons = useIcons();
   const MusicIcon = icons.music;
   const ShuffleIcon = icons.shuffle;
@@ -82,7 +84,7 @@ export function Player({
 
   return (
     <section className="relative flex shrink-0 flex-col gap-[10px] px-4 pt-4">
-      <div className="app-drag flex h-16 items-center gap-3">
+      <div className="app-drag flex h-16 items-center gap-3" {...windowDragHandlers}>
         <div className="relative size-16 shrink-0 overflow-hidden rounded-[12px]">
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div

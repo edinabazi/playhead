@@ -174,6 +174,7 @@ export type PlayheadApi = {
   minimizeWindow: () => Promise<void>;
   toggleMaximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;
+  moveWindowTo: (x: number, y: number) => Promise<void>;
   trackEvent: (eventName: string, properties?: Record<string, string | number | boolean>) => void;
   onMediaCommand: (callback: (command: MediaCommand) => void) => () => void;
   onFolderChanged: (callback: (folderId: string) => void) => () => void;
