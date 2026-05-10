@@ -56,12 +56,14 @@
       ]
     },
     "win": {
+      "icon": "resources/playhead.ico",
       "target": [
         "nsis",
         "zip"
       ]
     },
     "linux": {
+      "icon": "resources/playhead-icon.png",
       "category": "Audio",
       "maintainer": "Edin <hello@edinabazi.com>",
       "target": [

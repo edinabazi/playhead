@@ -1,10 +1,12 @@
 import { join } from "node:path";
 import { electron } from "../electron";
 
-const { BrowserWindow, shell } = electron;
+const { app, BrowserWindow, shell } = electron;
 
 export function createWindow(): void {
-  const iconPath = join(__dirname, "../../resources/playhead-icon.png");
+  const iconPath = app.isPackaged
+    ? join(process.resourcesPath, "playhead-icon.png")
+    : join(__dirname, "../../resources/playhead-icon.png");
   const isMac = process.platform === "darwin";
 
   const win = new BrowserWindow({
