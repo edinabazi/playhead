@@ -28,7 +28,7 @@ export type LibraryAlbum = {
   year?: number;
 };
 
-function normalizeKey(value: string): string {
+export function getLibraryKey(value: string): string {
   return value.trim().toLowerCase() || "unknown";
 }
 
@@ -40,8 +40,12 @@ export function getTrackAlbum(track: LibraryTrack): string {
   return track.album || unknownAlbum;
 }
 
-function getAlbumId(track: LibraryTrack): string {
-  return `${normalizeKey(getTrackArtist(track))}::${normalizeKey(getTrackAlbum(track))}`;
+export function getTrackArtistId(track: LibraryTrack): string {
+  return getLibraryKey(getTrackArtist(track));
+}
+
+export function getTrackAlbumId(track: LibraryTrack): string {
+  return `${getTrackArtistId(track)}::${getLibraryKey(getTrackAlbum(track))}`;
 }
 
 function sortTracksByTitle(tracks: LibraryTrack[]): LibraryTrack[] {
@@ -94,7 +98,7 @@ export function getLibraryArtists(state: LibraryState): LibraryArtist[] {
 
   for (const track of Object.values(state.tracks)) {
     const name = getTrackArtist(track);
-    const id = normalizeKey(name);
+    const id = getLibraryKey(name);
     const artist = artists.get(id) || { id, name, artworkSet: [], trackIds: [] };
     artist.trackIds.push(track.id);
 
@@ -118,7 +122,7 @@ export function getLibraryAlbums(state: LibraryState): LibraryAlbum[] {
   const albums = new Map<string, LibraryAlbum>();
 
   for (const track of Object.values(state.tracks)) {
-    const id = getAlbumId(track);
+    const id = getTrackAlbumId(track);
     const album = albums.get(id) || {
       id,
       title: getTrackAlbum(track),
@@ -145,14 +149,14 @@ export function getSourceTracks(state: LibraryState): LibraryTrack[] {
   if (source.type === "library-artist") {
     return sortTracksByTitle(
       Object.values(state.tracks).filter(
-        (track) => normalizeKey(getTrackArtist(track)) === source.id,
+        (track) => getTrackArtistId(track) === source.id,
       ),
     );
   }
 
   if (source.type === "library-album") {
     return sortAlbumTracks(
-      Object.values(state.tracks).filter((track) => getAlbumId(track) === source.id),
+      Object.values(state.tracks).filter((track) => getTrackAlbumId(track) === source.id),
     );
   }
 

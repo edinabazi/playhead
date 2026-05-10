@@ -43,6 +43,8 @@ type TrackListRowProps = {
   onRemoveFromPlaylist: (trackId: string) => void;
   onShowInFolder: (track: LibraryTrack) => void;
   onShowMetadata: (track: LibraryTrack) => void;
+  onViewArtist?: (track: LibraryTrack) => void;
+  onViewAlbum?: (track: LibraryTrack) => void;
 };
 
 export function TrackListRow({
@@ -77,6 +79,8 @@ export function TrackListRow({
   onRemoveFromPlaylist,
   onShowInFolder,
   onShowMetadata,
+  onViewArtist,
+  onViewAlbum,
 }: TrackListRowProps) {
   return (
     <TrackCell
@@ -138,6 +142,8 @@ export function TrackListRow({
           onRemoveFromPlaylist={onRemoveFromPlaylist}
           onShowInFolder={onShowInFolder}
           onShowMetadata={onShowMetadata}
+          onViewArtist={onViewArtist}
+          onViewAlbum={onViewAlbum}
         />
       </div>
     </TrackCell>
