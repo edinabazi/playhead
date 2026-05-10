@@ -3,12 +3,13 @@ import { electron } from "./electron";
 import { closeFolderWatcher } from "./library/folder-watcher";
 import { registerLibraryIpc } from "./library/library-ipc";
 import { registerMediaShortcuts } from "./media/media-shortcuts";
+import { installApplicationMenu } from "./menu";
 import { registerTelemetryIpc, trackAppLaunch } from "./telemetry";
 import { registerUpdaterIpc, startUpdater } from "./updater";
 import { createWindow } from "./window/create-window";
 import { registerWindowControlsIpc } from "./window/window-controls";
 
-const { app, BrowserWindow, Menu, globalShortcut, nativeImage, protocol } = electron;
+const { app, BrowserWindow, globalShortcut, nativeImage, protocol } = electron;
 
 if (process.platform === "darwin") {
   app.commandLine.appendSwitch("use-mock-keychain");
@@ -29,9 +30,7 @@ protocol.registerSchemesAsPrivileged([
 
 app.whenReady().then(() => {
   app.setName("Playhead");
-  if (process.platform !== "darwin") {
-    Menu.setApplicationMenu(null);
-  }
+  installApplicationMenu();
 
   if (process.platform === "darwin") {
     app.dock?.setIcon(

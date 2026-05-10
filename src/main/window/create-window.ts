@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { electron } from "../electron";
 
-const { BrowserWindow } = electron;
+const { BrowserWindow, shell } = electron;
 
 export function createWindow(): void {
   const iconPath = join(__dirname, "../../resources/playhead-icon.png");
@@ -34,4 +34,25 @@ export function createWindow(): void {
   } else {
     win.loadFile(join(__dirname, "../renderer/index.html"));
   }
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      void shell.openExternal(url);
+    }
+
+    return { action: "deny" };
+  });
+
+  win.webContents.on("will-navigate", (event, url) => {
+    const currentUrl = win.webContents.getURL();
+    if (url === currentUrl || url.startsWith("file://") || url.startsWith("http://localhost:")) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      void shell.openExternal(url);
+    }
+  });
 }
