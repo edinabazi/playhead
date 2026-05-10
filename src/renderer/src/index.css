@@ -220,6 +220,16 @@ input,
   -webkit-app-region: no-drag;
 }
 
+.window-control {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  border: 0;
+  box-shadow:
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.28),
+    0 0 0 0.5px rgba(255, 255, 255, 0.12);
+}
+
 @theme inline {
   @keyframes spinner-move {
     to {

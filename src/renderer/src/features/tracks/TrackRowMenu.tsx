@@ -26,6 +26,8 @@ export function TrackRowMenu({
   onRemoveFromPlaylist,
   onShowInFolder,
   onShowMetadata,
+  onViewArtist,
+  onViewAlbum,
 }: {
   track: LibraryTrack;
   selectedTracks?: LibraryTrack[];
@@ -38,9 +40,11 @@ export function TrackRowMenu({
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
   onAddTracksToPlaylist?: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (track: LibraryTrack) => void;
-  onRemoveFromPlaylist: (trackId: string) => void;
+  onRemoveFromPlaylist: (trackIds: string[]) => void;
   onShowInFolder: (track: LibraryTrack) => void;
   onShowMetadata: (track: LibraryTrack) => void;
+  onViewArtist?: (track: LibraryTrack) => void;
+  onViewAlbum?: (track: LibraryTrack) => void;
 }) {
   const icons = useIcons();
   const [playlistOpen, setPlaylistOpen] = useState(false);
@@ -51,6 +55,8 @@ export function TrackRowMenu({
   const ListPlusIcon = icons["list-plus"];
   const FinderIcon = icons["folder-search"];
   const InfoIcon = icons.info;
+  const UserIcon = icons.user;
+  const AlbumIcon = icons["square-library"];
   const ChevronRightIcon = icons["chevron-right"];
   const fileManagerName = getNativeFileManagerName();
   const tracksForAction =
@@ -165,13 +171,13 @@ export function TrackRowMenu({
                 </div>
               )}
             </div>
-            {!isMultiTrackMenu && selectedPlaylist && (
+            {selectedPlaylist && (
               <MenuItem
                 icon={icons.x}
                 label="Remove from Playlist"
                 index={1}
                 onSelect={() => {
-                  onRemoveFromPlaylist(track.id);
+                  onRemoveFromPlaylist(tracksForAction.map((item) => item.id));
                   onOpenChange(false, null);
                 }}
               />
@@ -179,10 +185,33 @@ export function TrackRowMenu({
             {!isMultiTrackMenu && (
               <>
                 <DropdownSeparator />
+                {onViewArtist && (
+                  <MenuItem
+                    icon={UserIcon}
+                    label="View Artist"
+                    index={2}
+                    onSelect={() => {
+                      onViewArtist(track);
+                      onOpenChange(false, null);
+                    }}
+                  />
+                )}
+                {onViewAlbum && (
+                  <MenuItem
+                    icon={AlbumIcon}
+                    label="View Album"
+                    index={3}
+                    onSelect={() => {
+                      onViewAlbum(track);
+                      onOpenChange(false, null);
+                    }}
+                  />
+                )}
+                {(onViewArtist || onViewAlbum) && <DropdownSeparator />}
                 <MenuItem
                   icon={FinderIcon}
                   label={`Show in ${fileManagerName}`}
-                  index={2}
+                  index={4}
                   onSelect={() => {
                     onShowInFolder(track);
                     onOpenChange(false, null);
@@ -191,7 +220,7 @@ export function TrackRowMenu({
                 <MenuItem
                   icon={InfoIcon}
                   label="Metadata"
-                  index={3}
+                  index={5}
                   onSelect={() => {
                     onShowMetadata(track);
                     onOpenChange(false, null);

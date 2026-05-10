@@ -4,6 +4,8 @@ import {
   getLibraryAlbums,
   getLibraryArtists,
   getSourceTracks,
+  getTrackAlbumId,
+  getTrackArtistId,
   mergeScannedFolder,
 } from "../library-model";
 import {
@@ -106,6 +108,18 @@ describe("library model", () => {
         trackIds: ["track-1", "track-2"],
       },
     ]);
+  });
+
+  it("uses library grouping ids for track artist and album navigation", () => {
+    expect(getTrackArtistId(baseState.tracks["track-1"])).toBe("album artist");
+    expect(getTrackAlbumId(baseState.tracks["track-1"])).toBe("album artist::album");
+    expect(
+      getTrackAlbumId({
+        ...baseState.tracks["track-1"],
+        album: "",
+        albumArtist: "",
+      }),
+    ).toBe("artist::unknown album");
   });
 
   it("merges a scanned folder and removes stale playlist references", () => {

@@ -113,8 +113,8 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="thin-scrollbar no-drag -mx-2 mt-[30px] min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2">
-        <div className="flex flex-col gap-[30px] overflow-visible">
+      <div className="thin-scrollbar -mx-2 mt-[30px] min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2">
+        <div className="flex flex-col gap-[30px] overflow-visible no-drag">
           {libraryMode === "library" ? (
             <SidebarGroup
               title="Library"

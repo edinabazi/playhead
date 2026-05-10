@@ -28,6 +28,8 @@ export function TrackList({
   onRemoveFromPlaylist,
   onShowInFolder,
   onShowMetadata,
+  onViewArtist,
+  onViewAlbum,
   onReorderTrack,
   onScrolledToTrack,
 }: {
@@ -46,9 +48,11 @@ export function TrackList({
   onAddTracksToPlaylist: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (track: LibraryTrack) => void;
   onToggleFavorite: (track: LibraryTrack) => void;
-  onRemoveFromPlaylist: (trackId: string) => void;
+  onRemoveFromPlaylist: (trackIds: string[]) => void;
   onShowInFolder: (track: LibraryTrack) => void;
   onShowMetadata: (track: LibraryTrack) => void;
+  onViewArtist?: (track: LibraryTrack) => void;
+  onViewAlbum?: (track: LibraryTrack) => void;
   onReorderTrack: (trackIds: string[], targetTrackId: string, edge?: "before" | "after") => void;
   onScrolledToTrack: () => void;
 }) {
@@ -157,6 +161,8 @@ export function TrackList({
                       onRemoveFromPlaylist={onRemoveFromPlaylist}
                       onShowInFolder={onShowInFolder}
                       onShowMetadata={onShowMetadata}
+                      onViewArtist={onViewArtist}
+                      onViewAlbum={onViewAlbum}
                       onDragOver={(event) => {
                         if (!canReorderTracks) return;
                         event.preventDefault();
