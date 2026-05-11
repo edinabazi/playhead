@@ -177,6 +177,10 @@ canvas {
   z-index: 2;
 }
 
+.app-window-controls {
+  position: absolute;
+}
+
 .app-modal-overlay {
   border-radius: 49px;
   overflow: hidden;

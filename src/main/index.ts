@@ -15,6 +15,10 @@ if (process.platform === "darwin") {
   app.commandLine.appendSwitch("use-mock-keychain");
 }
 
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.playhead.app");
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "playhead-media",

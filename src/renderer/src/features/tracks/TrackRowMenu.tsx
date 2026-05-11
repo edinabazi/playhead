@@ -39,7 +39,7 @@ export function TrackRowMenu({
   onOpenChange: (open: boolean, point: MenuAnchorPoint | null) => void;
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
   onAddTracksToPlaylist?: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
-  onCreatePlaylist: (track: LibraryTrack) => void;
+  onCreatePlaylist: (tracks: LibraryTrack[]) => void;
   onRemoveFromPlaylist: (trackIds: string[]) => void;
   onShowInFolder: (track: LibraryTrack) => void;
   onShowMetadata: (track: LibraryTrack) => void;
@@ -162,7 +162,7 @@ export function TrackRowMenu({
                       label="Create Playlist"
                       index={playlists.length}
                       onSelect={() => {
-                        onCreatePlaylist(track);
+                        onCreatePlaylist(tracksForAction);
                         onOpenChange(false, null);
                         setPlaylistOpen(false);
                       }}

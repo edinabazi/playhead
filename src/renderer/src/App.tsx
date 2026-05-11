@@ -102,8 +102,9 @@ export function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
-  const [trackPendingPlaylistCreation, setTrackPendingPlaylistCreation] =
-    useState<LibraryTrack | null>(null);
+  const [tracksPendingPlaylistCreation, setTracksPendingPlaylistCreation] = useState<
+    LibraryTrack[]
+  >([]);
   const [folderPendingRemoval, setFolderPendingRemoval] = useState<LibraryFolder | null>(null);
   const [playlistPendingDeletion, setPlaylistPendingDeletion] = useState<LibraryPlaylist | null>(
     null,
@@ -541,32 +542,45 @@ export function App() {
   );
 
   const createNewPlaylist = useCallback(
-    async (name: string, track?: LibraryTrack | null) => {
+    async (name: string, tracksToAdd: LibraryTrack[] = []) => {
       const playlist = createPlaylist(library.playlists, name);
+      const trackIdsToAdd = tracksToAdd
+        .filter(
+          (track, index) =>
+            library.tracks[track.id] &&
+            tracksToAdd.findIndex((item) => item.id === track.id) === index,
+        )
+        .map((track) => track.id);
+      const now = new Date().toISOString();
       await persistLibrary({
         ...library,
         playlists: [
           ...library.playlists,
-          track
-            ? { ...playlist, trackIds: [track.id], updatedAt: new Date().toISOString() }
+          trackIdsToAdd.length > 0
+            ? { ...playlist, trackIds: trackIdsToAdd, updatedAt: now }
             : playlist,
         ],
         selectedSource: { type: "playlist", id: playlist.id },
       });
       window.playhead.trackEvent("playlist_created", {
-        from_track: Boolean(track),
+        from_track: trackIdsToAdd.length > 0,
       });
-      if (track) {
-        showTrackActionToast({
-          action: "Playlist created",
-          track,
-          detail: `Added to ${playlist.name}`,
-        });
+      if (trackIdsToAdd.length === 1) {
+        const track = tracksToAdd.find((item) => item.id === trackIdsToAdd[0]);
+        if (track) {
+          showTrackActionToast({
+            action: "Playlist created",
+            track,
+            detail: `Added to ${playlist.name}`,
+          });
+        }
+      } else if (trackIdsToAdd.length > 1) {
+        showSimpleActionToast(`${trackIdsToAdd.length} tracks added to ${playlist.name}.`);
       } else {
         showSimpleActionToast(`Playlist created: ${playlist.name}`);
       }
       setIsCreatePlaylistOpen(false);
-      setTrackPendingPlaylistCreation(null);
+      setTracksPendingPlaylistCreation([]);
     },
     [library, persistLibrary],
   );
@@ -1639,8 +1653,8 @@ export function App() {
                           playlist,
                         )
                       }
-                      onCreatePlaylist={(track) => {
-                        setTrackPendingPlaylistCreation(track);
+                      onCreatePlaylist={(tracks) => {
+                        setTracksPendingPlaylistCreation(tracks);
                         setIsCreatePlaylistOpen(true);
                       }}
                       onToggleFavorite={(track) => toggleFavoriteTrack(track.id)}
@@ -1761,14 +1775,16 @@ export function App() {
             <CreatePlaylistDialog
               key="create-playlist"
               description={
-                trackPendingPlaylistCreation
-                  ? `Name the playlist. ${trackPendingPlaylistCreation.title} will be added to it.`
+                tracksPendingPlaylistCreation.length === 1
+                  ? `Name the playlist. ${tracksPendingPlaylistCreation[0].title} will be added to it.`
+                  : tracksPendingPlaylistCreation.length > 1
+                    ? `Name the playlist. ${tracksPendingPlaylistCreation.length} tracks will be added to it.`
                   : undefined
               }
-              onCreate={(name) => void createNewPlaylist(name, trackPendingPlaylistCreation)}
+              onCreate={(name) => void createNewPlaylist(name, tracksPendingPlaylistCreation)}
               onClose={() => {
                 setIsCreatePlaylistOpen(false);
-                setTrackPendingPlaylistCreation(null);
+                setTracksPendingPlaylistCreation([]);
               }}
             />
           )}

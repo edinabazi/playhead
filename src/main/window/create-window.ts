@@ -1,13 +1,20 @@
 import { join } from "node:path";
 import { electron } from "../electron";
 
-const { app, BrowserWindow, shell } = electron;
+const { app, BrowserWindow, nativeImage, shell } = electron;
+
+function getWindowIconPath(): string {
+  const iconFile = process.platform === "win32" ? "playhead.ico" : "playhead-icon.png";
+
+  return app.isPackaged
+    ? join(process.resourcesPath, iconFile)
+    : join(__dirname, "../../resources", iconFile);
+}
 
 export function createWindow(): void {
-  const iconPath = app.isPackaged
-    ? join(process.resourcesPath, "playhead-icon.png")
-    : join(__dirname, "../../resources/playhead-icon.png");
+  const iconPath = getWindowIconPath();
   const isMac = process.platform === "darwin";
+  const windowIcon = nativeImage.createFromPath(iconPath);
 
   const win = new BrowserWindow({
     width: 980,
@@ -15,7 +22,7 @@ export function createWindow(): void {
     minWidth: 720,
     minHeight: 560,
     title: "Playhead",
-    icon: iconPath,
+    icon: windowIcon.isEmpty() ? iconPath : windowIcon,
     frame: isMac,
     titleBarStyle: isMac ? "hiddenInset" : undefined,
     trafficLightPosition: isMac ? { x: 35, y: 38 } : undefined,
