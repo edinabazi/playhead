@@ -1342,11 +1342,9 @@ export function App() {
       progressColor: styles.getPropertyValue("--foreground").trim() || "#ffffff",
       cursorColor: styles.getPropertyValue("--primary").trim() || "#ffff00",
       cursorWidth: 2,
-      barWidth: 2,
-      barGap: 3,
-      barRadius: 2,
       normalize: true,
       dragToSeek: true,
+      sampleRate: 16000,
     });
     wavesurfer.setVolume(volumeRef.current);
 
