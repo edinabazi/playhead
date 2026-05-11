@@ -1,4 +1,5 @@
 import playheadLogo from "@/assets/playhead-logo.svg";
+import { WindowControls } from "@/components/WindowControls";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
 import { getPrimaryModifierLabel } from "@/lib/platform";
@@ -71,6 +72,7 @@ export function Sidebar({
 
   return (
     <aside className="app-drag relative flex w-[260px] shrink-0 flex-col overflow-hidden rounded-[41px] bg-[rgba(0,0,0,0.2)] px-[18px] pb-[18px] pt-[54px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <WindowControls />
       {hasReadyUpdate && (
         <Tooltip
           content={updateState.version ? `Install ${updateState.version}` : "Install update"}
