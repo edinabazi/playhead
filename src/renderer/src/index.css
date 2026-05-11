@@ -179,6 +179,9 @@ canvas {
 
 .app-window-controls {
   position: absolute;
+  z-index: 60;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
 }
 
 .app-modal-overlay {
