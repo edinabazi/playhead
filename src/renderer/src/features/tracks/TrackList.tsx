@@ -46,7 +46,7 @@ export function TrackList({
   onPlayTrack: (track: LibraryTrack) => void;
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
   onAddTracksToPlaylist: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
-  onCreatePlaylist: (track: LibraryTrack) => void;
+  onCreatePlaylist: (tracks: LibraryTrack[]) => void;
   onToggleFavorite: (track: LibraryTrack) => void;
   onRemoveFromPlaylist: (trackIds: string[]) => void;
   onShowInFolder: (track: LibraryTrack) => void;

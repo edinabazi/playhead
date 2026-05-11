@@ -2,7 +2,7 @@ import electronUpdater from "electron-updater";
 import type { AppUpdateState } from "../shared/library";
 import { electron } from "./electron";
 
-const { app, BrowserWindow, ipcMain } = electron;
+const { app, BrowserWindow, dialog, ipcMain } = electron;
 const { autoUpdater } = electronUpdater;
 
 let updateState: AppUpdateState = { status: "idle" };
@@ -19,7 +19,7 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error && error.message ? error.message : "Update check failed.";
 }
 
-async function checkForAppUpdates(): Promise<AppUpdateState> {
+export async function checkForAppUpdates(): Promise<AppUpdateState> {
   if (!app.isPackaged) {
     setUpdateState({ status: "idle" });
     return updateState;
@@ -38,6 +38,37 @@ async function checkForAppUpdates(): Promise<AppUpdateState> {
   }
 
   return updateState;
+}
+
+export async function checkForAppUpdatesFromMenu(): Promise<void> {
+  const state = await checkForAppUpdates();
+  const focusedWindow = BrowserWindow.getFocusedWindow();
+  const showUpdateMessage = (options: Electron.MessageBoxOptions) =>
+    focusedWindow ? dialog.showMessageBox(focusedWindow, options) : dialog.showMessageBox(options);
+
+  if (!app.isPackaged) {
+    await showUpdateMessage({
+      type: "info",
+      message: "Updates are only available in packaged builds.",
+    });
+    return;
+  }
+
+  if (state.status === "idle") {
+    await showUpdateMessage({
+      type: "info",
+      message: "Playhead is up to date.",
+    });
+    return;
+  }
+
+  if (state.status === "error") {
+    await showUpdateMessage({
+      type: "error",
+      message: "Unable to check for updates.",
+      detail: state.message,
+    });
+  }
 }
 
 export function registerUpdaterIpc(): void {

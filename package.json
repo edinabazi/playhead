@@ -1,7 +1,7 @@
 {
   "name": "playhead",
   "productName": "Playhead",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Local-first desktop music player prototype with waveform playback.",
   "author": "Edin",
   "license": "MIT",
@@ -43,6 +43,10 @@
       {
         "from": "resources/playhead-icon.png",
         "to": "playhead-icon.png"
+      },
+      {
+        "from": "resources/playhead.ico",
+        "to": "playhead.ico"
       }
     ],
     "mac": {
@@ -55,13 +59,37 @@
         "zip"
       ]
     },
+    "dmg": {
+      "background": "resources/dmg-bg.tiff",
+      "icon": "resources/playhead.icns",
+      "iconSize": 120,
+      "window": {
+        "width": 976,
+        "height": 630
+      },
+      "contents": [
+        {
+          "x": 338,
+          "y": 140,
+          "type": "file"
+        },
+        {
+          "x": 638,
+          "y": 140,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
     "win": {
+      "icon": "resources/playhead.ico",
       "target": [
         "nsis",
         "zip"
       ]
     },
     "linux": {
+      "icon": "resources/playhead-icon.png",
       "category": "Audio",
       "maintainer": "Edin <hello@edinabazi.com>",
       "target": [

@@ -381,6 +381,19 @@ export function SettingsDialog({
               );
             })}
           </nav>
+          <div className="mt-auto px-3.5 pb-1 text-[10px] leading-4 text-muted-foreground/65">
+            <p>Playhead {__APP_VERSION__}</p>
+            <p>
+              Designed and built by{" "}
+              <a
+                href="https://edinabazi.com"
+                className="hover:text-muted-foreground cursor-pointer!"
+              >
+                Edin Abazi
+              </a>
+              .
+            </p>
+          </div>
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col">
