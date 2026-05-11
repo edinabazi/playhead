@@ -13,15 +13,18 @@
 </p>
 
 <p align="center">
-  <a href="#status">Status</a>
+  <strong>Downloads</strong>:
+  <a href="https://github.com/edinabazi/playhead/releases/latest/download/Playhead-mac-arm64.dmg">macOS Apple Silicon</a>
   ·
-  <a href="#features">Features</a>
+  <a href="https://github.com/edinabazi/playhead/releases/latest/download/Playhead-mac-x64.dmg">macOS Intel</a>
   ·
-  <a href="#development">Development</a>
+  <a href="https://github.com/edinabazi/playhead/releases/latest/download/Playhead-win-x64.exe">Windows</a>
   ·
-  <a href="#contributing">Contributing</a>
+  <a href="https://github.com/edinabazi/playhead/releases/latest/download/Playhead-linux-x86_64.AppImage">Linux AppImage</a>
   ·
-  <a href="#license">License</a>
+  <a href="https://github.com/edinabazi/playhead/releases/latest/download/Playhead-linux-amd64.deb">Linux .deb</a>
+  ·
+  <a href="https://github.com/edinabazi/playhead/releases/latest/download/Playhead-linux-x64.tar.gz">Linux tar.gz</a>
 </p>
 
 ---
