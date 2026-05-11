@@ -52,7 +52,6 @@ import { LibraryBrowser } from "@/features/library/LibraryBrowser";
 import { normalizeSourceForMode } from "@/features/library/source";
 import { usePlayerKeyboardShortcuts } from "@/hooks/use-player-keyboard-shortcuts";
 import { useWindowDrag } from "@/hooks/use-window-drag";
-import { WindowControls } from "@/components/WindowControls";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -1491,7 +1490,6 @@ export function App() {
           className="app-shell app-drag flex size-full gap-4 overflow-hidden p-4"
           style={{ "--app-transparency": appTransparency } as React.CSSProperties}
         >
-          <WindowControls />
           <Sidebar
             folders={library.folders}
             libraryMode={library.settings.library.mode}

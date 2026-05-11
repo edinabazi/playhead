@@ -184,6 +184,11 @@ canvas {
   -webkit-app-region: no-drag;
 }
 
+.app-window-controls,
+.app-window-controls * {
+  -webkit-app-region: no-drag;
+}
+
 .app-modal-overlay {
   border-radius: 49px;
   overflow: hidden;
