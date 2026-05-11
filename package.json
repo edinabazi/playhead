@@ -55,6 +55,28 @@
         "zip"
       ]
     },
+    "dmg": {
+      "background": "resources/dmg-bg.tiff",
+      "icon": "resources/playhead.icns",
+      "iconSize": 120,
+      "window": {
+        "width": 976,
+        "height": 630
+      },
+      "contents": [
+        {
+          "x": 338,
+          "y": 140,
+          "type": "file"
+        },
+        {
+          "x": 638,
+          "y": 140,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
     "win": {
       "icon": "resources/playhead.ico",
       "target": [
