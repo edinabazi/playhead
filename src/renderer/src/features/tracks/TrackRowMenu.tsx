@@ -129,7 +129,7 @@ export function TrackRowMenu({
               />
               {playlistOpen && (
                 <div
-                  className={`absolute top-0 z-10 ${
+                  className={`absolute top-[-5px] z-10 ${
                     playlistSide === "left"
                       ? "right-[calc(100%-2px)] pr-2"
                       : "left-[calc(100%-2px)] pl-2"

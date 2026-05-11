@@ -84,10 +84,10 @@ const MenuItem = forwardRef<HTMLDivElement, MenuItemProps>(
           <span
             className={cn(
               "col-start-1 row-start-1 transition-[color,font-variation-settings] duration-80",
-              isActive || checked ? "text-foreground" : "text-muted-foreground",
+              isActive || checked ? "text-foreground" : "text-[var(--menu-item-foreground)]",
             )}
             style={{
-              fontVariationSettings: checked ? fontWeights.semibold : fontWeights.normal,
+              fontVariationSettings: checked ? fontWeights.semibold : fontWeights.medium,
             }}
           >
             {label}

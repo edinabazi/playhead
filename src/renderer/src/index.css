@@ -45,8 +45,10 @@
   --panel-glass: rgba(0, 0, 0, 0.62);
   --panel-glass-soft: rgba(10, 10, 10, 0.18);
   --surface-track: rgba(255, 255, 255, 0.055);
-  --surface-track-active: rgba(255, 255, 255, 0.11);
-  --surface-track-hover: rgba(255, 255, 255, 0.075);
+  --surface-track-active: rgba(255, 255, 255, 0.15);
+  --surface-track-hover: rgba(255, 255, 255, 0.045);
+  --menu-item-foreground: #b6b6b2;
+  --menu-hover-background: rgba(255, 255, 255, 0.14);
 }
 
 :root.platform-mac {

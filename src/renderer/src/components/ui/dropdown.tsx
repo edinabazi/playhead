@@ -135,7 +135,7 @@ const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
             {activeRect && (
               <motion.div
                 key={sessionRef.current}
-                className={`absolute ${shape.bg} bg-accent/40 dark:bg-accent/25 pointer-events-none`}
+                className={`absolute ${shape.bg} bg-[var(--menu-hover-background)] pointer-events-none`}
                 initial={{
                   opacity: 0,
                   top: checkedRect?.top ?? activeRect.top,

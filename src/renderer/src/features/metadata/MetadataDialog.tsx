@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DialogOverlay,
@@ -27,24 +27,30 @@ export function MetadataDialog({
   onSave: (track: LibraryTrack, metadata: EditableTrackMetadata) => Promise<LibraryTrack>;
   onClose: () => void;
 }) {
+  const initialForm = useMemo<EditableTrackMetadata>(
+    () => ({
+      title: track.title,
+      artist: track.artist,
+      album: track.album || "",
+      albumArtist: "",
+      genre: "",
+      year: "",
+      trackNumber: "",
+      diskNumber: "",
+      composer: "",
+      bpm: "",
+      comment: "",
+    }),
+    [track],
+  );
   const [metadata, setMetadata] = useState<TrackMetadata | null>(null);
-  const [form, setForm] = useState<EditableTrackMetadata>({
-    title: track.title,
-    artist: track.artist,
-    album: track.album || "",
-    albumArtist: "",
-    genre: "",
-    year: "",
-    trackNumber: "",
-    diskNumber: "",
-    composer: "",
-    bpm: "",
-    comment: "",
-  });
+  const [form, setForm] = useState<EditableTrackMetadata>(initialForm);
+  const [baselineForm, setBaselineForm] = useState<EditableTrackMetadata>(initialForm);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [artworkPreview, setArtworkPreview] = useState<string | null>(getArtworkSrc(track));
+  const [showDiscardConfirmation, setShowDiscardConfirmation] = useState(false);
   const artworkInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -52,18 +58,23 @@ export function MetadataDialog({
     setIsLoading(true);
     setError("");
     setArtworkPreview(getArtworkSrc(track));
+    setForm(initialForm);
+    setBaselineForm(initialForm);
+    setShowDiscardConfirmation(false);
 
     void window.playhead
       .getTrackMetadata(track.path)
       .then((nextMetadata) => {
         if (cancelled) return;
-        setMetadata(nextMetadata);
-        setForm({
+        const nextForm = {
           ...nextMetadata.editable,
           title: nextMetadata.editable.title || track.title,
           artist: nextMetadata.editable.artist || track.artist,
           album: nextMetadata.editable.album || track.album || "",
-        });
+        };
+        setMetadata(nextMetadata);
+        setForm(nextForm);
+        setBaselineForm(nextForm);
       })
       .catch(() => {
         if (!cancelled) setError("Could not read metadata for this file.");
@@ -75,7 +86,51 @@ export function MetadataDialog({
     return () => {
       cancelled = true;
     };
-  }, [track]);
+  }, [initialForm, track]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    const fields: Array<Exclude<keyof EditableTrackMetadata, "artwork">> = [
+      "title",
+      "artist",
+      "album",
+      "albumArtist",
+      "genre",
+      "year",
+      "trackNumber",
+      "diskNumber",
+      "composer",
+      "bpm",
+      "comment",
+    ];
+
+    return (
+      fields.some((field) => form[field] !== baselineForm[field]) ||
+      form.artwork !== baselineForm.artwork
+    );
+  }, [baselineForm, form]);
+
+  const requestClose = useCallback(() => {
+    if (isSaving) return;
+    if (hasUnsavedChanges) {
+      setShowDiscardConfirmation(true);
+      return;
+    }
+    onClose();
+  }, [hasUnsavedChanges, isSaving, onClose]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (showDiscardConfirmation) {
+        setShowDiscardConfirmation(false);
+        return;
+      }
+      requestClose();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [requestClose, showDiscardConfirmation]);
 
   const updateField = (key: keyof EditableTrackMetadata, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -133,12 +188,12 @@ export function MetadataDialog({
     <DialogOverlay
       {...dialogOverlayMotion}
       className="app-modal-overlay fixed inset-0 z-50 grid place-items-center bg-black/45 p-6"
-      onClick={onClose}
+      onPointerDown={requestClose}
     >
       <DialogPanel
         {...dialogPanelMotion}
         className="no-drag selectable max-h-[84vh] w-full max-w-2xl overflow-hidden rounded-[32px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-4 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between gap-4">
           <div className="min-w-0">
@@ -146,7 +201,7 @@ export function MetadataDialog({
             <p className="truncate text-[13px] text-muted-foreground">{track.title}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Button className="no-drag" size="sm" variant="ghost" onClick={onClose}>
+            <Button className="no-drag" size="sm" variant="ghost" onClick={requestClose}>
               Cancel
             </Button>
             <Button
@@ -261,6 +316,48 @@ export function MetadataDialog({
           )}
         </div>
       </DialogPanel>
+      {showDiscardConfirmation && (
+        <DialogOverlay
+          {...dialogOverlayMotion}
+          className="app-modal-overlay no-drag fixed inset-0 z-[60] grid place-items-center bg-black/40 px-5"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            setShowDiscardConfirmation(false);
+          }}
+        >
+          <DialogPanel
+            {...dialogPanelMotion}
+            className="w-full max-w-[390px] rounded-[28px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-3 shadow-2xl"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <div className="px-2 pt-1">
+              <h2 className="text-[15px] font-semibold leading-6 text-foreground">
+                Discard metadata changes?
+              </h2>
+              <p className="mt-1 text-[13px] font-medium leading-5 text-muted-foreground">
+                You have unsaved metadata edits. Closing now will discard them.
+              </p>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2 px-2 pb-1">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowDiscardConfirmation(false)}
+              >
+                Keep Editing
+              </Button>
+              <Button
+                type="button"
+                className="bg-red-500 text-white hover:bg-red-400 active:bg-red-600"
+                onClick={onClose}
+              >
+                Discard Changes
+              </Button>
+            </div>
+          </DialogPanel>
+        </DialogOverlay>
+      )}
     </DialogOverlay>
   );
 }
