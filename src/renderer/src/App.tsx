@@ -103,7 +103,16 @@ function getUpdateMessageDismissedKey(version: string): string {
   return `playhead:update-message-dismissed:${version}`;
 }
 
-const updateMessagePreviewVersion = "0.1.10";
+const updateMessageLastSeenVersionKey = "playhead:update-message-last-seen-version";
+
+function markUpdateMessageVersionSeen(version: string): void {
+  localStorage.setItem(updateMessageLastSeenVersionKey, version);
+}
+
+function dismissUpdateMessage(version: string): void {
+  localStorage.setItem(getUpdateMessageDismissedKey(version), "true");
+  markUpdateMessageVersionSeen(version);
+}
 
 export function App() {
   const topGapWindowDragHandlers = useWindowDrag<HTMLDivElement>();
@@ -172,14 +181,7 @@ export function App() {
   const [updateMessage, setUpdateMessage] = useState<{
     version: string;
     message: UpdateMessage;
-  } | null>(
-    updateMessagesByVersion[updateMessagePreviewVersion]
-      ? {
-          version: updateMessagePreviewVersion,
-          message: updateMessagesByVersion[updateMessagePreviewVersion],
-        }
-      : null,
-  );
+  } | null>(null);
   const [lastfmState, setLastfmState] = useState<LastfmState>({
     configured: false,
     connected: false,
@@ -1620,14 +1622,20 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (updateMessagesByVersion[updateMessagePreviewVersion]) return;
-
     void window.playhead.getAppVersion().then((version) => {
+      const lastSeenVersion = localStorage.getItem(updateMessageLastSeenVersionKey);
+      const didJustUpdate = Boolean(lastSeenVersion && lastSeenVersion !== version);
       const message = updateMessagesByVersion[version];
-      if (!message) return;
+      if (!didJustUpdate || !message) {
+        markUpdateMessageVersionSeen(version);
+        return;
+      }
 
       const dismissedKey = getUpdateMessageDismissedKey(version);
-      if (localStorage.getItem(dismissedKey) === "true") return;
+      if (localStorage.getItem(dismissedKey) === "true") {
+        markUpdateMessageVersionSeen(version);
+        return;
+      }
 
       setUpdateMessage({ version, message });
     });
@@ -2158,7 +2166,7 @@ export function App() {
               key="update-message"
               message={updateMessage.message}
               onClose={() => {
-                localStorage.setItem(getUpdateMessageDismissedKey(updateMessage.version), "true");
+                dismissUpdateMessage(updateMessage.version);
                 setUpdateMessage(null);
               }}
             />
