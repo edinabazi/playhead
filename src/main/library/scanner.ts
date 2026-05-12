@@ -132,6 +132,7 @@ export async function buildTrack(filePath: string, folderId: string): Promise<Li
       duration: metadata.format.duration || 0,
       audioFormat: metadata.format.container || extname(filePath).slice(1).toUpperCase(),
       sampleRate: metadata.format.sampleRate,
+      bitRate: metadata.format.bitrate,
       bpm: metadata.common.bpm,
       folderId,
     };

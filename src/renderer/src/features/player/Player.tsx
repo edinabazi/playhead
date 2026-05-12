@@ -17,9 +17,9 @@ function formatAudioFormat(track: LibraryTrack): string {
   return format.toUpperCase();
 }
 
-function formatSampleRate(sampleRate?: number): string | null {
-  if (!sampleRate) return null;
-  return `${Number((sampleRate / 1000).toFixed(1))} KHZ`;
+function formatBitRate(bitRate?: number): string | null {
+  if (!bitRate) return null;
+  return `${Math.round(bitRate / 1000)} kbps`;
 }
 
 function formatBpm(bpm?: number): string | null {
@@ -77,7 +77,7 @@ export function Player({
   const trackInfo = activeTrack
     ? [
         formatAudioFormat(activeTrack),
-        formatSampleRate(activeTrack.sampleRate),
+        formatBitRate(activeTrack.bitRate),
         formatBpm(activeTrack.bpm),
       ].filter((part): part is string => Boolean(part))
     : [];

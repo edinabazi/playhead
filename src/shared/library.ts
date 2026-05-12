@@ -32,6 +32,7 @@ export type LibraryTrack = {
   duration: number;
   audioFormat?: string;
   sampleRate?: number;
+  bitRate?: number;
   bpm?: number;
   folderId: string;
 };
