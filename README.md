@@ -109,6 +109,10 @@ Editable fields include:
 
 Metadata reading is powered by `music-metadata`. Metadata writing uses a native bridge through `node-taglib-sharp`, so write support depends on the audio format and tag support available through that layer.
 
+### Last.fm integration
+
+Connect Last.fm to scrobble completed plays and optionally sync future Loved changes. Scrobbling is on by default after connecting, while Loved sync stays off until you enable it.
+
 ### Built for speed and simplicity
 
 Playhead is intentionally minimal. The goal is zero learning curve.
@@ -122,6 +126,7 @@ Playhead is intentionally minimal. The goal is zero learning curve.
 - Folder watching
 - Playlists
 - Favorites
+- Last.fm scrobbling and Loved sync
 - Shuffle and repeat
 - Search
 - Backup and restore of local library state
@@ -131,7 +136,9 @@ Playhead is intentionally minimal. The goal is zero learning curve.
 
 Playhead is local-first by design.
 
-It is not a streaming app. It does not require an account. It does not upload your library to a cloud service. It does not serve ads.
+It is not a streaming app. It does not require a Playhead account. It does not upload your library to a cloud service. It does not serve ads.
+
+Last.fm integration is optional. When connected, Playhead only sends the track metadata needed for scrobbling and Loved sync.
 
 The app includes optional telemetry support for product improvement. Release builds can run without a telemetry key, and telemetry can be disabled in settings.
 
