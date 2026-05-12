@@ -4,7 +4,7 @@ export function WindowControls() {
   if (!usesCustomWindowControls()) return null;
 
   return (
-    <div className="app-window-controls no-drag left-[35px] top-[38px] z-[60] flex items-center gap-2">
+    <div className="app-window-controls no-drag left-[19px] top-[12px] z-[60] flex items-center gap-2">
       <button
         type="button"
         className="window-control bg-[#ff5f57] hover:bg-[#ff716a]"

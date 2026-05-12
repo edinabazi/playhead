@@ -103,6 +103,8 @@ function getUpdateMessageDismissedKey(version: string): string {
   return `playhead:update-message-dismissed:${version}`;
 }
 
+const updateMessagePreviewVersion = "0.1.10";
+
 export function App() {
   const topGapWindowDragHandlers = useWindowDrag<HTMLDivElement>();
   const wavesurferRef = useRef<WaveSurfer | null>(null);
@@ -170,7 +172,14 @@ export function App() {
   const [updateMessage, setUpdateMessage] = useState<{
     version: string;
     message: UpdateMessage;
-  } | null>(null);
+  } | null>(
+    updateMessagesByVersion[updateMessagePreviewVersion]
+      ? {
+          version: updateMessagePreviewVersion,
+          message: updateMessagesByVersion[updateMessagePreviewVersion],
+        }
+      : null,
+  );
   const [lastfmState, setLastfmState] = useState<LastfmState>({
     configured: false,
     connected: false,
@@ -1611,6 +1620,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (updateMessagesByVersion[updateMessagePreviewVersion]) return;
+
     void window.playhead.getAppVersion().then((version) => {
       const message = updateMessagesByVersion[version];
       if (!message) return;
