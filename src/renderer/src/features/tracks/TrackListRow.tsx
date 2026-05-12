@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { formatTime } from "@/lib/format";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
-import type { LibraryPlaylist, LibraryTrack } from "../../../../shared/library";
+import type { LibraryPlaylist, LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { FavoriteHeartButton } from "./FavoriteHeartButton";
 import { TrackArtwork } from "./TrackArtwork";
 import { TrackCell } from "./TrackCell";
@@ -17,7 +17,9 @@ type TrackListRowProps = {
   favorite: boolean;
   selectedTracks: LibraryTrack[];
   selectedPlaylist: LibraryPlaylist | null;
+  selectedTag: LibraryTag | null;
   playlists: LibraryPlaylist[];
+  tags: LibraryTag[];
   menuOpen: boolean;
   menuAnchorPoint: MenuAnchorPoint | null;
   menuIcon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
@@ -40,7 +42,10 @@ type TrackListRowProps = {
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
   onAddTracksToPlaylist: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (tracks: LibraryTrack[]) => void;
+  onAddTracksToTag: (tracks: LibraryTrack[], tag: LibraryTag) => void;
+  onCreateTag: (tracks: LibraryTrack[]) => void;
   onRemoveFromPlaylist: (trackIds: string[]) => void;
+  onRemoveFromTag: (trackIds: string[]) => void;
   onShowInFolder: (track: LibraryTrack) => void;
   onShowMetadata: (track: LibraryTrack) => void;
   onViewArtist?: (track: LibraryTrack) => void;
@@ -57,7 +62,9 @@ export function TrackListRow({
   favorite,
   selectedTracks,
   selectedPlaylist,
+  selectedTag,
   playlists,
+  tags,
   menuOpen,
   menuAnchorPoint,
   menuIcon,
@@ -76,7 +83,10 @@ export function TrackListRow({
   onAddToPlaylist,
   onAddTracksToPlaylist,
   onCreatePlaylist,
+  onAddTracksToTag,
+  onCreateTag,
   onRemoveFromPlaylist,
+  onRemoveFromTag,
   onShowInFolder,
   onShowMetadata,
   onViewArtist,
@@ -131,7 +141,9 @@ export function TrackListRow({
           track={track}
           selectedTracks={selectedTracks}
           playlists={playlists}
+          tags={tags}
           selectedPlaylist={selectedPlaylist}
+          selectedTag={selectedTag}
           menuIcon={menuIcon}
           open={menuOpen}
           anchorPoint={menuAnchorPoint}
@@ -139,7 +151,10 @@ export function TrackListRow({
           onAddToPlaylist={onAddToPlaylist}
           onAddTracksToPlaylist={onAddTracksToPlaylist}
           onCreatePlaylist={onCreatePlaylist}
+          onAddTracksToTag={onAddTracksToTag}
+          onCreateTag={onCreateTag}
           onRemoveFromPlaylist={onRemoveFromPlaylist}
+          onRemoveFromTag={onRemoveFromTag}
           onShowInFolder={onShowInFolder}
           onShowMetadata={onShowMetadata}
           onViewArtist={onViewArtist}

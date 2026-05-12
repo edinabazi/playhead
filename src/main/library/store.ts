@@ -37,6 +37,7 @@ export async function normalizeLibraryState(state: Partial<LibraryState>): Promi
   return materializeStoredArtwork({
     ...emptyLibraryState(),
     ...state,
+    tags: state.tags || [],
     favoriteTrackIds: state.favoriteTrackIds || [],
     settings,
   });

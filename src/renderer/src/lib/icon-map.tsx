@@ -53,6 +53,7 @@ import {
   SquareLibrary,
   Star,
   Sun,
+  Tag,
   Trash2,
   User,
   Users,
@@ -89,6 +90,7 @@ export type IconName =
   | "square-library"
   | "clock"
   | "star"
+  | "tag"
   | "settings"
   | "pencil"
   | "trash-2"
@@ -155,6 +157,7 @@ const lucideMap: Record<IconName, IconComponent> = {
   "square-library": SquareLibrary,
   clock: Clock,
   star: Star,
+  tag: Tag,
   settings: Settings,
   pencil: Pencil,
   "trash-2": Trash2,

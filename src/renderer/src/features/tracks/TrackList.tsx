@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useIcons } from "@/lib/icon-context";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
-import type { LibraryPlaylist, LibraryTrack } from "../../../../shared/library";
+import type { LibraryPlaylist, LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { TrackListRow } from "./TrackListRow";
 import {
   createTrackStackDragImage,
@@ -16,16 +16,21 @@ export function TrackList({
   selectedTrackIds,
   scrollToTrackId,
   selectedPlaylist,
+  selectedTag,
   canReorderTracks = true,
   playlists,
+  tags,
   favoriteTrackIds,
   onSelectTrack,
   onPlayTrack,
   onAddToPlaylist,
   onAddTracksToPlaylist,
   onCreatePlaylist,
+  onAddTracksToTag,
+  onCreateTag,
   onToggleFavorite,
   onRemoveFromPlaylist,
+  onRemoveFromTag,
   onShowInFolder,
   onShowMetadata,
   onViewArtist,
@@ -39,16 +44,21 @@ export function TrackList({
   selectedTrackIds: string[];
   scrollToTrackId: string | null;
   selectedPlaylist: LibraryPlaylist | null;
+  selectedTag: LibraryTag | null;
   canReorderTracks?: boolean;
   playlists: LibraryPlaylist[];
+  tags: LibraryTag[];
   favoriteTrackIds: string[];
   onSelectTrack: (track: LibraryTrack, event?: React.MouseEvent<HTMLDivElement>) => void;
   onPlayTrack: (track: LibraryTrack) => void;
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
   onAddTracksToPlaylist: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (tracks: LibraryTrack[]) => void;
+  onAddTracksToTag: (tracks: LibraryTrack[], tag: LibraryTag) => void;
+  onCreateTag: (tracks: LibraryTrack[]) => void;
   onToggleFavorite: (track: LibraryTrack) => void;
   onRemoveFromPlaylist: (trackIds: string[]) => void;
+  onRemoveFromTag: (trackIds: string[]) => void;
   onShowInFolder: (track: LibraryTrack) => void;
   onShowMetadata: (track: LibraryTrack) => void;
   onViewArtist?: (track: LibraryTrack) => void;
@@ -91,8 +101,8 @@ export function TrackList({
           className="thin-scrollbar no-drag h-full min-h-0 overflow-y-auto pr-2"
         >
           {tracks.length === 0 ? (
-            <div className="flex h-full min-h-[180px] items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.025] text-[14px] text-muted-foreground">
-              No tracks to show.
+            <div className="flex h-[calc(100%-1rem)] min-h-[180px] items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.025] text-[14px] text-muted-foreground">
+              No tracks here yet. Start by adding something.
             </div>
           ) : (
             <div className="flex flex-col gap-0.5 pb-8">
@@ -114,9 +124,13 @@ export function TrackList({
                       selected={selectedTrackIds.includes(track.id)}
                       dragging={draggedTrackIds.includes(track.id)}
                       favorite={isFavorite}
-                      selectedTracks={selectedTrackIds.includes(track.id) ? selectedTracks : [track]}
+                      selectedTracks={
+                        selectedTrackIds.includes(track.id) ? selectedTracks : [track]
+                      }
                       selectedPlaylist={selectedPlaylist}
+                      selectedTag={selectedTag}
                       playlists={playlists}
+                      tags={tags}
                       menuOpen={menuTrackId === track.id}
                       menuAnchorPoint={menuTrackId === track.id ? contextMenuPoint : null}
                       menuIcon={MenuIcon}
@@ -158,7 +172,10 @@ export function TrackList({
                       onAddToPlaylist={onAddToPlaylist}
                       onAddTracksToPlaylist={onAddTracksToPlaylist}
                       onCreatePlaylist={onCreatePlaylist}
+                      onAddTracksToTag={onAddTracksToTag}
+                      onCreateTag={onCreateTag}
                       onRemoveFromPlaylist={onRemoveFromPlaylist}
+                      onRemoveFromTag={onRemoveFromTag}
                       onShowInFolder={onShowInFolder}
                       onShowMetadata={onShowMetadata}
                       onViewArtist={onViewArtist}

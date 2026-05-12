@@ -1,4 +1,4 @@
-import type { LibraryTrack } from "../../../../shared/library";
+import type { LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { AnimatePresence, motion } from "framer-motion";
 import { SliderComfortable } from "@/components/ui/slider";
 import { formatTime } from "@/lib/format";
@@ -29,6 +29,7 @@ function formatBpm(bpm?: number): string | null {
 
 export function Player({
   activeTrack,
+  activeTags,
   isPlaying,
   isLoading,
   hasWaveform,
@@ -49,6 +50,7 @@ export function Player({
   onVolumeChange,
 }: {
   activeTrack: LibraryTrack | null;
+  activeTags: LibraryTag[];
   isPlaying: boolean;
   isLoading: boolean;
   hasWaveform: boolean;
@@ -81,6 +83,8 @@ export function Player({
         formatBpm(activeTrack.bpm),
       ].filter((part): part is string => Boolean(part))
     : [];
+  const visibleTags = activeTags.slice(0, 3);
+  const hiddenTagCount = Math.max(0, activeTags.length - visibleTags.length);
 
   return (
     <section className="relative flex shrink-0 flex-col gap-[10px] px-4 pt-4">
@@ -130,14 +134,33 @@ export function Player({
                   filter: { duration: 0.2 },
                 }}
               >
-                <motion.h1
-                  className="truncate text-[16px] font-semibold leading-[1.2]"
+                <motion.div
+                  className="flex min-w-0 items-center gap-2"
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.03, duration: 0.16 }}
                 >
-                  {activeTrack?.title || "No track selected"}
-                </motion.h1>
+                  <h1 className="min-w-0 truncate text-[16px] font-semibold leading-[1.2]">
+                    {activeTrack?.title || "No track selected"}
+                  </h1>
+                  {visibleTags.length > 0 && (
+                    <div className="flex min-w-0 shrink-0 items-center gap-1">
+                      {visibleTags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="max-w-[92px] truncate rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[11px] font-medium leading-none text-muted-foreground"
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                      {hiddenTagCount > 0 && (
+                        <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[11px] font-medium leading-none text-muted-foreground">
+                          +{hiddenTagCount}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
                 <motion.p
                   className="mt-0.5 truncate text-[14px] font-medium leading-[1.25] text-muted-foreground"
                   initial={{ opacity: 0, y: 5 }}

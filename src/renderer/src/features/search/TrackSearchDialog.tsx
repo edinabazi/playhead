@@ -6,10 +6,19 @@ import {
   dialogPanelMotion,
 } from "@/components/ui/dialog-motion";
 import type { LibraryAlbum, LibraryArtist } from "@/features/library/library-model";
+import { LibraryCollectionContextMenu } from "@/features/library/LibraryBrowser";
 import { useIcons } from "@/lib/icon-context";
-import type { LibraryFolder, LibraryMode, LibraryTrack } from "../../../../shared/library";
+import type { MenuAnchorPoint } from "@/lib/menu-position";
+import type {
+  LibraryFolder,
+  LibraryMode,
+  LibraryPlaylist,
+  LibraryTag,
+  LibraryTrack,
+} from "../../../../shared/library";
 import { TrackArtwork } from "@/features/tracks/TrackArtwork";
 import { ArtistArtwork } from "@/features/library/ArtistArtwork";
+import { TrackRowMenu } from "@/features/tracks/TrackRowMenu";
 
 type SearchResult =
   | { type: "artist"; artist: LibraryArtist }
@@ -41,20 +50,38 @@ export function TrackSearchDialog({
   folders,
   artists,
   albums,
+  playlists,
+  tags,
   libraryMode,
   onSelectTrack,
   onSelectArtist,
   onSelectAlbum,
+  onAddToPlaylist,
+  onAddTracksToPlaylist,
+  onCreatePlaylist,
+  onAddTracksToTag,
+  onCreateTag,
+  onShowInFolder,
+  onShowMetadata,
   onClose,
 }: {
   tracks: LibraryTrack[];
   folders: LibraryFolder[];
   artists: LibraryArtist[];
   albums: LibraryAlbum[];
+  playlists: LibraryPlaylist[];
+  tags: LibraryTag[];
   libraryMode: LibraryMode;
   onSelectTrack: (track: LibraryTrack) => void;
   onSelectArtist: (artist: LibraryArtist) => void;
   onSelectAlbum: (album: LibraryAlbum) => void;
+  onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
+  onAddTracksToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
+  onCreatePlaylist: (tracks: LibraryTrack[]) => void;
+  onAddTracksToTag: (tracks: LibraryTrack[], tag: LibraryTag) => void;
+  onCreateTag: (tracks: LibraryTrack[]) => void;
+  onShowInFolder: (track: LibraryTrack) => void;
+  onShowMetadata: (track: LibraryTrack) => void;
   onClose: () => void;
 }) {
   const icons = useIcons();
@@ -66,6 +93,11 @@ export function TrackSearchDialog({
   const resultRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+  const [contextMenu, setContextMenu] = useState<
+    | { type: "track"; track: LibraryTrack; point: MenuAnchorPoint }
+    | { type: "collection"; trackIds: string[]; point: MenuAnchorPoint }
+    | null
+  >(null);
   const folderNames = useMemo(
     () => new Map(folders.map((folder) => [folder.id, folder.name])),
     [folders],
@@ -155,6 +187,19 @@ export function TrackSearchDialog({
     onSelectTrack(result.track);
   };
 
+  const openContextMenu = (result: SearchResult, point: MenuAnchorPoint) => {
+    if (result.type === "track") {
+      setContextMenu({ type: "track", track: result.track, point });
+      return;
+    }
+
+    setContextMenu({
+      type: "collection",
+      trackIds: result.type === "artist" ? result.artist.trackIds : result.album.trackIds,
+      point,
+    });
+  };
+
   return (
     <DialogOverlay
       {...dialogOverlayMotion}
@@ -231,6 +276,11 @@ export function TrackSearchDialog({
                       : "hover:bg-[var(--surface-track-hover)]"
                   }`}
                   onMouseEnter={() => setActiveIndex(index)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setActiveIndex(index);
+                    openContextMenu(result, { x: event.clientX, y: event.clientY, align: "left" });
+                  }}
                   onClick={() => selectResult(result)}
                 >
                   {result.type === "track" ? (
@@ -294,6 +344,69 @@ export function TrackSearchDialog({
           )}
         </div>
       </DialogPanel>
+      {contextMenu?.type === "track" && (
+        <TrackRowMenu
+          track={contextMenu.track}
+          selectedTracks={[contextMenu.track]}
+          playlists={playlists}
+          tags={tags}
+          selectedPlaylist={null}
+          selectedTag={null}
+          menuIcon={icons.ellipsis}
+          open
+          showTrigger={false}
+          anchorPoint={contextMenu.point}
+          onOpenChange={(open) => {
+            if (!open) setContextMenu(null);
+          }}
+          onAddToPlaylist={onAddToPlaylist}
+          onAddTracksToPlaylist={(tracksToAdd, playlist) =>
+            onAddTracksToPlaylist(
+              tracksToAdd.map((track) => track.id),
+              playlist,
+            )
+          }
+          onCreatePlaylist={onCreatePlaylist}
+          onAddTracksToTag={onAddTracksToTag}
+          onCreateTag={onCreateTag}
+          onRemoveFromPlaylist={() => undefined}
+          onRemoveFromTag={() => undefined}
+          onShowInFolder={onShowInFolder}
+          onShowMetadata={(track) => {
+            setContextMenu(null);
+            onShowMetadata(track);
+          }}
+          onViewArtist={
+            libraryMode === "library"
+              ? (track) => {
+                  const artist = artists.find((item) => item.trackIds.includes(track.id));
+                  if (!artist) return;
+                  setContextMenu(null);
+                  onSelectArtist(artist);
+                }
+              : undefined
+          }
+          onViewAlbum={
+            libraryMode === "library"
+              ? (track) => {
+                  const album = albums.find((item) => item.trackIds.includes(track.id));
+                  if (!album) return;
+                  setContextMenu(null);
+                  onSelectAlbum(album);
+                }
+              : undefined
+          }
+        />
+      )}
+      {contextMenu?.type === "collection" && (
+        <LibraryCollectionContextMenu
+          point={contextMenu.point}
+          trackIds={contextMenu.trackIds}
+          playlists={playlists}
+          onAddTrackIdsToPlaylist={onAddTracksToPlaylist}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </DialogOverlay>
   );
 }

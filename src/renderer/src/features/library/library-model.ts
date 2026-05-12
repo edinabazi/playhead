@@ -2,11 +2,13 @@ import {
   emptyLibraryState,
   type LibraryPlaylist,
   type LibraryState,
+  type LibraryTag,
   type LibraryTrack,
   type ScannedFolder,
 } from "../../../../shared/library";
 
 const playlistName = "New Playlist";
+const tagName = "New Tag";
 const unknownArtist = "Unknown Artist";
 const unknownAlbum = "Unknown Album";
 
@@ -78,12 +80,17 @@ export function mergeScannedFolder(state: LibraryState, scanned: ScannedFolder):
     ...playlist,
     trackIds: playlist.trackIds.filter((trackId) => validTrackIds.has(trackId)),
   }));
+  const tags = (state.tags || []).map((tag) => ({
+    ...tag,
+    trackIds: tag.trackIds.filter((trackId) => validTrackIds.has(trackId)),
+  }));
 
   return {
     ...state,
     folders,
     tracks,
     playlists,
+    tags,
     selectedSource: { type: "folder", id: scanned.folder.id },
   };
 }
@@ -168,6 +175,15 @@ export function getSourceTracks(state: LibraryState): LibraryTrack[] {
       .filter((track): track is LibraryTrack => Boolean(track));
   }
 
+  if (source.type === "tag") {
+    return (
+      (state.tags || [])
+        .find((tag) => tag.id === source.id)
+        ?.trackIds.map((trackId) => state.tracks[trackId])
+        .filter((track): track is LibraryTrack => Boolean(track)) || []
+    );
+  }
+
   const sourceIds =
     source.type === "folder"
       ? state.folders.find((folder) => folder.id === source.id)?.trackIds
@@ -185,6 +201,20 @@ export function createPlaylist(existing: LibraryPlaylist[], name?: string): Libr
 
   return {
     id: `playlist-${crypto.randomUUID()}`,
+    name: name?.trim() || fallbackName,
+    trackIds: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export function createTag(existing: LibraryTag[], name?: string): LibraryTag {
+  const now = new Date().toISOString();
+  const nextNumber = existing.length + 1;
+  const fallbackName = nextNumber === 1 ? tagName : `${tagName} ${nextNumber}`;
+
+  return {
+    id: `tag-${crypto.randomUUID()}`,
     name: name?.trim() || fallbackName,
     trackIds: [],
     createdAt: now,

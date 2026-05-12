@@ -3,6 +3,7 @@ export type LibraryMode = "folder" | "library";
 export type SourceType =
   | "folder"
   | "playlist"
+  | "tag"
   | "loved"
   | "library-artists"
   | "library-artist"
@@ -80,6 +81,14 @@ export type LibraryPlaylist = {
   updatedAt: string;
 };
 
+export type LibraryTag = {
+  id: string;
+  name: string;
+  trackIds: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SelectedSource = {
   type: SourceType;
   id?: string;
@@ -89,6 +98,7 @@ export type LibraryState = {
   folders: LibraryFolder[];
   tracks: Record<string, LibraryTrack>;
   playlists: LibraryPlaylist[];
+  tags: LibraryTag[];
   favoriteTrackIds: string[];
   selectedSource: SelectedSource | null;
   settings: AppSettings;
@@ -276,6 +286,7 @@ export const emptyLibraryState = (): LibraryState => ({
   folders: [],
   tracks: {},
   playlists: [],
+  tags: [],
   favoriteTrackIds: [],
   selectedSource: null,
   settings: defaultAppSettings(),

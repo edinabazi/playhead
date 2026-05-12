@@ -4,11 +4,12 @@ import { useIcons } from "@/lib/icon-context";
 import { clampMenuPoint, type MenuAnchorPoint } from "@/lib/menu-position";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import type { LibraryFolder, LibraryPlaylist } from "../../../../shared/library";
+import type { LibraryFolder, LibraryPlaylist, LibraryTag } from "../../../../shared/library";
 
 export type SidebarContextMenuState =
   | { type: "folder"; item: LibraryFolder; point: MenuAnchorPoint }
   | { type: "playlist"; item: LibraryPlaylist; point: MenuAnchorPoint }
+  | { type: "tag"; item: LibraryTag; point: MenuAnchorPoint }
   | null;
 
 export function SidebarContextMenu({
@@ -17,12 +18,16 @@ export function SidebarContextMenu({
   onRemoveFolder,
   onRenamePlaylist,
   onDeletePlaylist,
+  onRenameTag,
+  onDeleteTag,
 }: {
   state: SidebarContextMenuState;
   onOpenChange: (state: SidebarContextMenuState) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
   onRenamePlaylist: (playlist: LibraryPlaylist) => void;
   onDeletePlaylist: (playlist: LibraryPlaylist) => void;
+  onRenameTag: (tag: LibraryTag) => void;
+  onDeleteTag: (tag: LibraryTag) => void;
 }) {
   const icons = useIcons();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -61,7 +66,7 @@ export function SidebarContextMenu({
               onOpenChange(null);
             }}
           />
-        ) : (
+        ) : state.type === "playlist" ? (
           <>
             <MenuItem
               icon={icons.pencil}
@@ -82,10 +87,30 @@ export function SidebarContextMenu({
               }}
             />
           </>
+        ) : (
+          <>
+            <MenuItem
+              icon={icons.pencil}
+              label="Rename Tag"
+              index={0}
+              onSelect={() => {
+                onRenameTag(state.item);
+                onOpenChange(null);
+              }}
+            />
+            <MenuItem
+              icon={icons["trash-2"]}
+              label="Delete Tag"
+              index={1}
+              onSelect={() => {
+                onDeleteTag(state.item);
+                onOpenChange(null);
+              }}
+            />
+          </>
         )}
       </Dropdown>
     </div>,
     document.body,
   );
 }
-

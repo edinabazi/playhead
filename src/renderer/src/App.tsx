@@ -13,6 +13,7 @@ import {
   type LibraryMode,
   type LibraryPlaylist,
   type LibraryState,
+  type LibraryTag,
   type LibraryTrack,
   type PlaybackSettings,
   type TelemetrySettings,
@@ -35,6 +36,7 @@ import type { RepeatMode } from "@/features/player/types";
 import { TrackSearchDialog } from "@/features/search/TrackSearchDialog";
 import { SettingsDialog, type AdvancedSettingsAction } from "@/features/settings/SettingsDialog";
 import { DeletePlaylistDialog } from "@/features/sidebar/DeletePlaylistDialog";
+import { DeleteTagDialog } from "@/features/sidebar/DeleteTagDialog";
 import { RemoveFolderDialog } from "@/features/sidebar/RemoveFolderDialog";
 import { Sidebar } from "@/features/sidebar/Sidebar";
 import { TrackList } from "@/features/tracks/TrackList";
@@ -51,6 +53,7 @@ import {
 } from "@/features/toasts/action-toasts";
 import {
   createPlaylist,
+  createTag,
   emptyLibraryState,
   getLibraryAlbums,
   getLibraryArtists,
@@ -145,18 +148,22 @@ export function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
+  const [isCreateTagOpen, setIsCreateTagOpen] = useState(false);
   const [tracksPendingPlaylistCreation, setTracksPendingPlaylistCreation] = useState<
     LibraryTrack[]
   >([]);
+  const [tracksPendingTagCreation, setTracksPendingTagCreation] = useState<LibraryTrack[]>([]);
   const [folderPendingRemoval, setFolderPendingRemoval] = useState<LibraryFolder | null>(null);
   const [playlistPendingDeletion, setPlaylistPendingDeletion] = useState<LibraryPlaylist | null>(
     null,
   );
+  const [tagPendingDeletion, setTagPendingDeletion] = useState<LibraryTag | null>(null);
   const [playlistTrackIdsPendingRemoval, setPlaylistTrackIdsPendingRemoval] = useState<string[]>(
     [],
   );
   const [selectedLibraryBrowserItemIds, setSelectedLibraryBrowserItemIds] = useState<string[]>([]);
   const [renamingPlaylistId, setRenamingPlaylistId] = useState<string | null>(null);
+  const [renamingTagId, setRenamingTagId] = useState<string | null>(null);
   const [scrollToTrackId, setScrollToTrackId] = useState<string | null>(null);
   const [previewAppTransparency, setPreviewAppTransparency] = useState<number | null>(null);
   const [updateState, setUpdateState] = useState<AppUpdateState>({ status: "idle" });
@@ -203,6 +210,9 @@ export function App() {
       return library.folders.find((folder) => folder.id === source.id)?.name || "Folder";
     }
     if (source.type === "loved") return "Loved";
+    if (source.type === "tag") {
+      return (library.tags || []).find((tag) => tag.id === source.id)?.name || "Tag";
+    }
     return library.playlists.find((playlist) => playlist.id === source.id)?.name || "Playlist";
   }, [library, libraryAlbums, libraryArtists]);
   const appTransparency =
@@ -685,6 +695,47 @@ export function App() {
     [library, persistLibrary],
   );
 
+  const createNewTag = useCallback(
+    async (name: string, tracksToAdd: LibraryTrack[] = []) => {
+      const trimmedName = name.trim();
+      if (!trimmedName) return;
+      const duplicate = (library.tags || []).some(
+        (tag) => tag.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+      );
+      if (duplicate) {
+        showSimpleActionToast(`Tag already exists: ${trimmedName}`);
+        return;
+      }
+
+      const tag = createTag(library.tags || [], trimmedName);
+      const trackIdsToAdd = tracksToAdd
+        .filter(
+          (track, index) =>
+            library.tracks[track.id] &&
+            tracksToAdd.findIndex((item) => item.id === track.id) === index,
+        )
+        .map((track) => track.id);
+      const now = new Date().toISOString();
+
+      await persistLibrary({
+        ...library,
+        tags: [
+          ...(library.tags || []),
+          trackIdsToAdd.length > 0 ? { ...tag, trackIds: trackIdsToAdd, updatedAt: now } : tag,
+        ],
+        selectedSource: { type: "tag", id: tag.id },
+      });
+      showSimpleActionToast(
+        trackIdsToAdd.length > 0
+          ? `${trackIdsToAdd.length} ${trackIdsToAdd.length === 1 ? "track" : "tracks"} tagged ${tag.name}.`
+          : `Tag created: ${tag.name}`,
+      );
+      setIsCreateTagOpen(false);
+      setTracksPendingTagCreation([]);
+    },
+    [library, persistLibrary],
+  );
+
   const removeFolderFromPlayhead = useCallback(
     async (folderId: string) => {
       const removedTrackIds = new Set(
@@ -724,6 +775,10 @@ export function App() {
         playlists: library.playlists.map((playlist) => ({
           ...playlist,
           trackIds: playlist.trackIds.filter((trackId) => !removedTrackIds.has(trackId)),
+        })),
+        tags: (library.tags || []).map((tag) => ({
+          ...tag,
+          trackIds: tag.trackIds.filter((trackId) => !removedTrackIds.has(trackId)),
         })),
         favoriteTrackIds: (library.favoriteTrackIds || []).filter(
           (trackId) => !removedTrackIds.has(trackId),
@@ -773,6 +828,62 @@ export function App() {
             : library.selectedSource,
       });
       if (deletedPlaylist) showSimpleActionToast(`Playlist deleted: ${deletedPlaylist.name}`);
+    },
+    [library, persistLibrary],
+  );
+
+  const renameTag = useCallback(
+    async (tagId: string, name: string) => {
+      const tag = (library.tags || []).find((item) => item.id === tagId);
+      if (!tag) return;
+
+      const trimmedName = name.trim();
+      if (!trimmedName || trimmedName === tag.name) {
+        setRenamingTagId(null);
+        return;
+      }
+      const duplicate = (library.tags || []).some(
+        (item) => item.id !== tagId && item.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+      );
+      if (duplicate) {
+        showSimpleActionToast(`Tag already exists: ${trimmedName}`);
+        return;
+      }
+      const now = new Date().toISOString();
+
+      await persistLibrary({
+        ...library,
+        tags: (library.tags || []).map((item) =>
+          item.id === tagId ? { ...item, name: trimmedName, updatedAt: now } : item,
+        ),
+      });
+      setRenamingTagId(null);
+    },
+    [library, persistLibrary],
+  );
+
+  const deleteTag = useCallback(
+    async (tagId: string) => {
+      const deletedTag = (library.tags || []).find((tag) => tag.id === tagId);
+      const nextTags = (library.tags || []).filter((tag) => tag.id !== tagId);
+
+      await persistLibrary({
+        ...library,
+        tags: nextTags,
+        selectedSource:
+          library.selectedSource?.type === "tag" && library.selectedSource.id === tagId
+            ? library.settings.library.mode === "library"
+              ? { type: "library-tracks" }
+              : library.folders[0]
+                ? { type: "folder", id: library.folders[0].id }
+                : library.playlists[0]
+                  ? { type: "playlist", id: library.playlists[0].id }
+                  : nextTags[0]
+                    ? { type: "tag", id: nextTags[0].id }
+                    : null
+            : library.selectedSource,
+      });
+      if (deletedTag) showSimpleActionToast(`Tag deleted: ${deletedTag.name}`);
     },
     [library, persistLibrary],
   );
@@ -929,6 +1040,65 @@ export function App() {
       }
 
       showSimpleActionToast(`${trackIdsToAdd.length} tracks added to ${playlist.name}.`);
+    },
+    [library, persistLibrary],
+  );
+
+  const addTracksToTag = useCallback(
+    async (trackIds: string[], tag: LibraryTag) => {
+      const trackIdsToAdd = trackIds.filter(
+        (trackId, index) =>
+          library.tracks[trackId] &&
+          !tag.trackIds.includes(trackId) &&
+          trackIds.indexOf(trackId) === index,
+      );
+      if (trackIdsToAdd.length === 0) return;
+
+      const now = new Date().toISOString();
+      await persistLibrary({
+        ...library,
+        tags: (library.tags || []).map((item) =>
+          item.id === tag.id
+            ? { ...item, trackIds: [...item.trackIds, ...trackIdsToAdd], updatedAt: now }
+            : item,
+        ),
+      });
+
+      const firstTrack = library.tracks[trackIdsToAdd[0]];
+      if (trackIdsToAdd.length === 1 && firstTrack) {
+        showTrackActionToast({
+          action: "Tagged",
+          track: firstTrack,
+          detail: tag.name,
+        });
+        return;
+      }
+
+      showSimpleActionToast(`${trackIdsToAdd.length} tracks tagged ${tag.name}.`);
+    },
+    [library, persistLibrary],
+  );
+
+  const removeTracksFromSelectedTag = useCallback(
+    async (trackIds: string[]) => {
+      const source = library.selectedSource;
+      if (!source || source.type !== "tag") return;
+      const trackIdsToRemove = new Set(trackIds);
+      if (trackIdsToRemove.size === 0) return;
+      const now = new Date().toISOString();
+
+      await persistLibrary({
+        ...library,
+        tags: (library.tags || []).map((tag) =>
+          tag.id === source.id
+            ? {
+                ...tag,
+                trackIds: tag.trackIds.filter((item) => !trackIdsToRemove.has(item)),
+                updatedAt: now,
+              }
+            : tag,
+        ),
+      });
     },
     [library, persistLibrary],
   );
@@ -1648,6 +1818,10 @@ export function App() {
     selectedSource?.type === "playlist"
       ? library.playlists.find((playlist) => playlist.id === selectedSource.id) || null
       : null;
+  const selectedTag =
+    selectedSource?.type === "tag"
+      ? (library.tags || []).find((tag) => tag.id === selectedSource.id) || null
+      : null;
   const hasLovedTracks = (library.favoriteTrackIds || []).some(
     (trackId) => library.tracks[trackId],
   );
@@ -1672,6 +1846,7 @@ export function App() {
             albumCount={libraryAlbums.length}
             trackCount={libraryTrackCount}
             playlists={library.playlists}
+            tags={library.tags || []}
             lovedCount={hasLovedTracks ? library.favoriteTrackIds.length : 0}
             selectedSource={library.selectedSource}
             isScanning={isScanning}
@@ -1686,10 +1861,12 @@ export function App() {
               void window.playhead.installUpdate();
             }}
             onCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+            onCreateTag={() => setIsCreateTagOpen(true)}
             onSelectSource={selectLibrarySource}
             onDropTrackToPlaylist={(trackIds, playlist) =>
               void addTracksToPlaylist(trackIds, playlist)
             }
+            onDropTrackToTag={(trackIds, tag) => void addTracksToTag(trackIds, tag)}
             onRemoveFolder={(folder) => setFolderPendingRemoval(folder)}
             onRenamePlaylist={(playlist) => setRenamingPlaylistId(playlist.id)}
             onDeletePlaylist={(playlist) => {
@@ -1698,6 +1875,14 @@ export function App() {
                 return;
               }
               setPlaylistPendingDeletion(playlist);
+            }}
+            onRenameTag={(tag) => setRenamingTagId(tag.id)}
+            onDeleteTag={(tag) => {
+              if (tag.trackIds.length === 0) {
+                void deleteTag(tag.id);
+                return;
+              }
+              setTagPendingDeletion(tag);
             }}
           />
 
@@ -1719,6 +1904,11 @@ export function App() {
               <>
                 <Player
                   activeTrack={activeTrack}
+                  activeTags={
+                    activeTrack
+                      ? (library.tags || []).filter((tag) => tag.trackIds.includes(activeTrack.id))
+                      : []
+                  }
                   isPlaying={isPlaying}
                   isLoading={isLoadingTrack}
                   hasWaveform={hasWaveform}
@@ -1812,8 +2002,12 @@ export function App() {
                       selectedTrackIds={selectedTrackIds}
                       scrollToTrackId={scrollToTrackId}
                       selectedPlaylist={selectedPlaylist}
-                      canReorderTracks={selectedSource?.type !== "library-tracks"}
+                      selectedTag={selectedTag}
+                      canReorderTracks={
+                        selectedSource?.type !== "library-tracks" && selectedSource?.type !== "tag"
+                      }
                       playlists={library.playlists}
+                      tags={library.tags || []}
                       favoriteTrackIds={library.favoriteTrackIds || []}
                       onSelectTrack={selectTrackInList}
                       onPlayTrack={(track) => selectTrack(track, true)}
@@ -1828,8 +2022,19 @@ export function App() {
                         setTracksPendingPlaylistCreation(tracks);
                         setIsCreatePlaylistOpen(true);
                       }}
+                      onAddTracksToTag={(tracks, tag) =>
+                        addTracksToTag(
+                          tracks.map((track) => track.id),
+                          tag,
+                        )
+                      }
+                      onCreateTag={(tracks) => {
+                        setTracksPendingTagCreation(tracks);
+                        setIsCreateTagOpen(true);
+                      }}
                       onToggleFavorite={(track) => toggleFavoriteTrack(track.id)}
                       onRemoveFromPlaylist={requestRemoveTracksFromSelectedPlaylist}
+                      onRemoveFromTag={removeTracksFromSelectedTag}
                       onShowInFolder={(track) => window.playhead.showItemInFolder(track.path)}
                       onShowMetadata={(track) => setMetadataDialog({ track })}
                       onViewArtist={
@@ -1867,6 +2072,8 @@ export function App() {
               folders={library.folders}
               artists={libraryArtists}
               albums={libraryAlbums}
+              playlists={library.playlists}
+              tags={library.tags || []}
               libraryMode={library.settings.library.mode}
               onSelectTrack={playSearchResult}
               onSelectArtist={(artist) => {
@@ -1876,6 +2083,27 @@ export function App() {
               onSelectAlbum={(album) => {
                 setIsSearchOpen(false);
                 selectLibrarySource({ type: "library-album", id: album.id });
+              }}
+              onAddToPlaylist={(track, playlist) => addTrackToPlaylist(track.id, playlist)}
+              onAddTracksToPlaylist={addTracksToPlaylist}
+              onCreatePlaylist={(tracks) => {
+                setTracksPendingPlaylistCreation(tracks);
+                setIsCreatePlaylistOpen(true);
+              }}
+              onAddTracksToTag={(tracks, tag) =>
+                addTracksToTag(
+                  tracks.map((track) => track.id),
+                  tag,
+                )
+              }
+              onCreateTag={(tracks) => {
+                setTracksPendingTagCreation(tracks);
+                setIsCreateTagOpen(true);
+              }}
+              onShowInFolder={(track) => window.playhead.showItemInFolder(track.path)}
+              onShowMetadata={(track) => {
+                setIsSearchOpen(false);
+                setMetadataDialog({ track });
               }}
               onClose={() => setIsSearchOpen(false)}
             />
@@ -1948,6 +2176,18 @@ export function App() {
               onClose={() => setPlaylistPendingDeletion(null)}
             />
           )}
+          {tagPendingDeletion && (
+            <DeleteTagDialog
+              key={`delete-tag-${tagPendingDeletion.id}`}
+              tag={tagPendingDeletion}
+              onConfirm={() => {
+                const tagId = tagPendingDeletion.id;
+                setTagPendingDeletion(null);
+                void deleteTag(tagId);
+              }}
+              onClose={() => setTagPendingDeletion(null)}
+            />
+          )}
           {playlistTrackIdsPendingRemoval.length > 1 && selectedPlaylist && (
             <RemoveTracksFromPlaylistDialog
               key="remove-tracks-from-playlist"
@@ -1978,6 +2218,25 @@ export function App() {
               }}
             />
           )}
+          {isCreateTagOpen && (
+            <CreatePlaylistDialog
+              key="create-tag"
+              title="Create Tag"
+              description={
+                tracksPendingTagCreation.length === 1
+                  ? `Name the tag. ${tracksPendingTagCreation[0].title} will be added to it.`
+                  : tracksPendingTagCreation.length > 1
+                    ? `Name the tag. ${tracksPendingTagCreation.length} tracks will be added to it.`
+                    : "Name the tag before adding it to Playhead."
+              }
+              submitLabel="Create"
+              onCreate={(name) => void createNewTag(name, tracksPendingTagCreation)}
+              onClose={() => {
+                setIsCreateTagOpen(false);
+                setTracksPendingTagCreation([]);
+              }}
+            />
+          )}
           {renamingPlaylistId && (
             <CreatePlaylistDialog
               key={`rename-playlist-${renamingPlaylistId}`}
@@ -1989,6 +2248,17 @@ export function App() {
               submitLabel="Rename"
               onCreate={(name) => void renamePlaylist(renamingPlaylistId, name)}
               onClose={() => setRenamingPlaylistId(null)}
+            />
+          )}
+          {renamingTagId && (
+            <CreatePlaylistDialog
+              key={`rename-tag-${renamingTagId}`}
+              title="Rename Tag"
+              description="Update the tag name."
+              initialName={(library.tags || []).find((tag) => tag.id === renamingTagId)?.name || ""}
+              submitLabel="Rename"
+              onCreate={(name) => void renameTag(renamingTagId, name)}
+              onClose={() => setRenamingTagId(null)}
             />
           )}
         </AnimatePresence>

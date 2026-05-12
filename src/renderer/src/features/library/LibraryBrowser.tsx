@@ -200,7 +200,7 @@ export function LibraryBrowser({
   );
 }
 
-function LibraryCollectionContextMenu({
+export function LibraryCollectionContextMenu({
   point,
   trackIds,
   playlists,

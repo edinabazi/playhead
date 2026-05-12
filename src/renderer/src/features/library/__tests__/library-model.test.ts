@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createPlaylist,
+  createTag,
   getLibraryAlbums,
   getLibraryArtists,
   getSourceTracks,
@@ -51,6 +52,7 @@ const baseState: LibraryState = {
   playlists: [
     { id: "playlist-1", name: "Set", trackIds: ["track-1"], createdAt: "", updatedAt: "" },
   ],
+  tags: [{ id: "tag-1", name: "Warmup", trackIds: ["track-1"], createdAt: "", updatedAt: "" }],
   favoriteTrackIds: ["track-1"],
   selectedSource: { type: "folder", id: "folder-1" },
   settings: defaultAppSettings(),
@@ -79,6 +81,11 @@ describe("library model", () => {
         selectedSource: { type: "library-album", id: "album artist::album" },
       }).map((track) => track.id),
     ).toEqual(["track-2", "track-1"]);
+    expect(
+      getSourceTracks({ ...baseState, selectedSource: { type: "tag", id: "tag-1" } }).map(
+        (track) => track.id,
+      ),
+    ).toEqual(["track-1"]);
   });
 
   it("builds library artists and albums", () => {
@@ -141,11 +148,17 @@ describe("library model", () => {
     const next = mergeScannedFolder(baseState, scanned);
     expect(Object.keys(next.tracks)).toEqual(["track-2"]);
     expect(next.playlists[0].trackIds).toEqual([]);
+    expect(next.tags[0].trackIds).toEqual([]);
     expect(next.selectedSource).toEqual({ type: "folder", id: "folder-1" });
   });
 
   it("creates numbered playlists", () => {
     expect(createPlaylist([]).name).toBe("New Playlist");
     expect(createPlaylist([baseState.playlists[0]]).name).toBe("New Playlist 2");
+  });
+
+  it("creates numbered tags", () => {
+    expect(createTag([]).name).toBe("New Tag");
+    expect(createTag([baseState.tags[0]]).name).toBe("New Tag 2");
   });
 });

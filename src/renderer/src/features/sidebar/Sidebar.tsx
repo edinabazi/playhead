@@ -10,6 +10,7 @@ import type {
   LibraryFolder,
   LibraryMode,
   LibraryPlaylist,
+  LibraryTag,
   SelectedSource,
 } from "../../../../shared/library";
 import { SidebarContextMenu, type SidebarContextMenuState } from "./SidebarContextMenu";
@@ -23,6 +24,7 @@ export function Sidebar({
   albumCount,
   trackCount,
   playlists,
+  tags,
   lovedCount,
   selectedSource,
   isScanning,
@@ -32,11 +34,15 @@ export function Sidebar({
   onOpenSettings,
   onInstallUpdate,
   onCreatePlaylist,
+  onCreateTag,
   onSelectSource,
   onDropTrackToPlaylist,
+  onDropTrackToTag,
   onRemoveFolder,
   onRenamePlaylist,
   onDeletePlaylist,
+  onRenameTag,
+  onDeleteTag,
 }: {
   folders: LibraryFolder[];
   libraryMode: LibraryMode;
@@ -44,6 +50,7 @@ export function Sidebar({
   albumCount: number;
   trackCount: number;
   playlists: LibraryPlaylist[];
+  tags: LibraryTag[];
   lovedCount: number;
   selectedSource: SelectedSource | null;
   isScanning: boolean;
@@ -53,15 +60,20 @@ export function Sidebar({
   onOpenSettings: () => void;
   onInstallUpdate: () => void;
   onCreatePlaylist: () => void;
+  onCreateTag: () => void;
   onSelectSource: (source: SelectedSource) => void;
   onDropTrackToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
+  onDropTrackToTag: (trackIds: string[], tag: LibraryTag) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
   onRenamePlaylist: (playlist: LibraryPlaylist) => void;
   onDeletePlaylist: (playlist: LibraryPlaylist) => void;
+  onRenameTag: (tag: LibraryTag) => void;
+  onDeleteTag: (tag: LibraryTag) => void;
 }) {
   const icons = useIcons();
   const [foldersCollapsed, setFoldersCollapsed] = useState(false);
   const [playlistsCollapsed, setPlaylistsCollapsed] = useState(false);
+  const [tagsCollapsed, setTagsCollapsed] = useState(false);
   const [contextMenu, setContextMenu] = useState<SidebarContextMenuState>(null);
   const FolderPlusIcon = icons["folder-plus"];
   const SearchIcon = icons.search;
@@ -228,6 +240,34 @@ export function Sidebar({
               </AnimatePresence>
             )}
           </SidebarGroup>
+
+          <SidebarGroup
+            title="Tags"
+            collapsed={tagsCollapsed}
+            onToggleCollapsed={() => setTagsCollapsed((value) => !value)}
+            actionLabel="Create tag"
+            actionIcon={icons.plus}
+            onAction={onCreateTag}
+          >
+            {tags.length === 0 ? (
+              <SidebarEmpty key="tags-empty">No tags yet</SidebarEmpty>
+            ) : (
+              <AnimatePresence>
+                {tags.map((tag) => (
+                  <SidebarItem
+                    key={tag.id}
+                    active={selectedSource?.type === "tag" && selectedSource.id === tag.id}
+                    icon={icons.tag}
+                    label={tag.name}
+                    detail={`${tag.trackIds.length}`}
+                    onClick={() => onSelectSource({ type: "tag", id: tag.id })}
+                    onDropTrack={(trackIds) => onDropTrackToTag(trackIds, tag)}
+                    onContextMenu={(point) => setContextMenu({ type: "tag", item: tag, point })}
+                  />
+                ))}
+              </AnimatePresence>
+            )}
+          </SidebarGroup>
         </div>
       </div>
 
@@ -254,6 +294,8 @@ export function Sidebar({
         onRemoveFolder={onRemoveFolder}
         onRenamePlaylist={onRenamePlaylist}
         onDeletePlaylist={onDeletePlaylist}
+        onRenameTag={onRenameTag}
+        onDeleteTag={onDeleteTag}
       />
     </aside>
   );
