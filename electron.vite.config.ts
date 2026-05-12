@@ -16,6 +16,8 @@ export default defineConfig(({ mode }) => {
       define: {
         "process.env.POSTHOG_PROJECT_API_KEY": JSON.stringify(env.POSTHOG_PROJECT_API_KEY || ""),
         "process.env.POSTHOG_HOST": JSON.stringify(env.POSTHOG_HOST || "https://eu.i.posthog.com"),
+        "process.env.LASTFM_API_KEY": JSON.stringify(env.LASTFM_API_KEY || ""),
+        "process.env.LASTFM_SHARED_SECRET": JSON.stringify(env.LASTFM_SHARED_SECRET || ""),
       },
       plugins: [externalizeDepsPlugin()],
     },

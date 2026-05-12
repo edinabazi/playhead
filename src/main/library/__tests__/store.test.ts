@@ -35,6 +35,19 @@ describe("library store settings", () => {
     });
   });
 
+  it("normalizes missing Last.fm settings", () => {
+    const settings = normalizeSettings({
+      playback: {
+        seekStepSeconds: 10,
+      },
+    } as unknown as Parameters<typeof normalizeSettings>[0]);
+
+    expect(settings.lastfm).toEqual({
+      scrobblingEnabled: true,
+      loveSyncEnabled: false,
+    });
+  });
+
   it("normalizes legacy flat library settings", () => {
     const settings = normalizeSettings({
       enabledAudioExtensions: [".mp3"],

@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { electron } from "./electron";
 import { closeFolderWatcher } from "./library/folder-watcher";
+import { registerLastfmIpc } from "./lastfm/lastfm";
 import { registerLibraryIpc } from "./library/library-ipc";
 import { registerMediaShortcuts } from "./media/media-shortcuts";
 import { installApplicationMenu } from "./menu";
@@ -43,6 +44,7 @@ app.whenReady().then(() => {
   }
 
   registerLibraryIpc();
+  registerLastfmIpc();
   registerTelemetryIpc();
   registerMediaShortcuts();
   registerUpdaterIpc();

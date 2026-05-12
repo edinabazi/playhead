@@ -5,6 +5,9 @@ import {
   type AppearanceSettings,
   type AppUpdateState,
   type EditableTrackMetadata,
+  type LastfmSettings,
+  type LastfmState,
+  type LastfmTrackPayload,
   type LibraryFolder,
   type LibrarySettings,
   type LibraryMode,
@@ -20,6 +23,12 @@ import { isEditableTarget } from "@/lib/dom";
 import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
+import {
+  createLastfmPlaybackSession,
+  shouldScrobbleLastfmTrack,
+  updateLastfmPlaybackProgress,
+  type LastfmPlaybackSession,
+} from "@/features/player/lastfm-scrobble";
 import { CreatePlaylistDialog } from "@/features/playlists/CreatePlaylistDialog";
 import { setMediaActionHandler, updateMediaPosition } from "@/features/player/media-session";
 import type { RepeatMode } from "@/features/player/types";
@@ -63,12 +72,36 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error.message.replace(/^Error invoking remote method '[^']+': Error: /, "");
 }
 
+function toLastfmTrackPayload(
+  track: LibraryTrack,
+  timestamp?: number,
+  duration?: number,
+): LastfmTrackPayload | null {
+  const artist = track.artist.trim();
+  const title = track.title.trim();
+  if (!artist || !title) return null;
+
+  return {
+    artist,
+    title,
+    album: track.album?.trim() || undefined,
+    albumArtist: track.albumArtist?.trim() || undefined,
+    duration: duration || track.duration || undefined,
+    timestamp,
+  };
+}
+
 export function App() {
   const topGapWindowDragHandlers = useWindowDrag<HTMLDivElement>();
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const playNextTrackOnEndRef = useRef<() => boolean>(() => false);
   const playAdjacentTrackRef = useRef<() => void>(() => {});
   const activeTrackIdRef = useRef<string | null>(null);
+  const activeTrackRef = useRef<LibraryTrack | null>(null);
+  const lastfmSettingsRef = useRef<LastfmSettings>({
+    scrobblingEnabled: true,
+    loveSyncEnabled: false,
+  });
   const rememberTrackPositionRef = useRef<(trackId: string, time: number) => void>(() => {});
   const clearTrackPositionRef = useRef<(trackId: string) => void>(() => {});
   const volumeRef = useRef(1);
@@ -81,6 +114,8 @@ export function App() {
   const trackLoadQueueRef = useRef(Promise.resolve());
   const loadedTrackIdRef = useRef<string | null>(null);
   const lastLibraryBackGestureAtRef = useRef(0);
+  const lastfmPlaybackSessionRef = useRef<LastfmPlaybackSession | null>(null);
+  const lastfmNowPlayingTrackIdRef = useRef<string | null>(null);
 
   const [library, setLibrary] = useState<LibraryState>(emptyLibraryState);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
@@ -116,6 +151,13 @@ export function App() {
   const [scrollToTrackId, setScrollToTrackId] = useState<string | null>(null);
   const [previewAppTransparency, setPreviewAppTransparency] = useState<number | null>(null);
   const [updateState, setUpdateState] = useState<AppUpdateState>({ status: "idle" });
+  const [lastfmState, setLastfmState] = useState<LastfmState>({
+    configured: false,
+    connected: false,
+    pendingAuth: false,
+    queueSize: 0,
+  });
+  const [lastfmActionPending, setLastfmActionPending] = useState(false);
 
   const tracks = useMemo(() => getSourceTracks(library), [library]);
   const allTracks = useMemo(() => Object.values(library.tracks), [library.tracks]);
@@ -184,6 +226,8 @@ export function App() {
       const requestId = trackLoadRequestIdRef.current + 1;
       trackLoadRequestIdRef.current = requestId;
       loadedTrackIdRef.current = null;
+      lastfmPlaybackSessionRef.current = null;
+      lastfmNowPlayingTrackIdRef.current = null;
 
       wavesurfer.pause();
       setIsLoadingTrack(true);
@@ -217,6 +261,8 @@ export function App() {
         if (requestId !== trackLoadRequestIdRef.current) return;
 
         loadedTrackIdRef.current = track.id;
+        lastfmPlaybackSessionRef.current = null;
+        lastfmNowPlayingTrackIdRef.current = null;
         setHasWaveform(true);
         setDuration(wavesurfer.getDuration() || track.duration || 0);
         window.playhead.trackEvent("track_loaded", {
@@ -475,6 +521,48 @@ export function App() {
     [library, persistLibrary],
   );
 
+  const updateLastfmSettings = useCallback(
+    async (settings: LastfmSettings) => {
+      await persistLibrary({
+        ...library,
+        settings: { ...library.settings, lastfm: settings },
+      });
+    },
+    [library, persistLibrary],
+  );
+
+  const runLastfmAction = useCallback(async (action: () => Promise<LastfmState>) => {
+    setLastfmActionPending(true);
+    try {
+      const nextState = await action();
+      setLastfmState(nextState);
+      if (nextState.lastError) showSimpleActionToast(nextState.lastError, "error");
+    } catch (error) {
+      showSimpleActionToast(
+        error instanceof Error ? error.message : "Last.fm action failed.",
+        "error",
+      );
+    } finally {
+      setLastfmActionPending(false);
+    }
+  }, []);
+
+  const startLastfmAuth = useCallback(() => {
+    void runLastfmAction(() => window.playhead.startLastfmAuth());
+  }, [runLastfmAction]);
+
+  const completeLastfmAuth = useCallback(() => {
+    void runLastfmAction(() => window.playhead.completeLastfmAuth());
+  }, [runLastfmAction]);
+
+  const disconnectLastfm = useCallback(() => {
+    void runLastfmAction(() => window.playhead.disconnectLastfm());
+  }, [runLastfmAction]);
+
+  const flushLastfmQueue = useCallback(() => {
+    void runLastfmAction(() => window.playhead.flushLastfmQueue());
+  }, [runLastfmAction]);
+
   const clearPlaybackState = useCallback(() => {
     wavesurferRef.current?.stop();
     wavesurferRef.current?.empty();
@@ -731,6 +819,13 @@ export function App() {
             : library.selectedSource,
       });
       window.playhead.trackEvent(wasFavorite ? "track_unfavorited" : "track_favorited");
+      const lastfmPayload = track ? toLastfmTrackPayload(track) : null;
+      if (lastfmPayload && library.settings.lastfm.loveSyncEnabled) {
+        void (wasFavorite
+          ? window.playhead.unloveLastfmTrack(lastfmPayload)
+          : window.playhead.loveLastfmTrack(lastfmPayload)
+        ).then(setLastfmState);
+      }
 
       if (track) {
         showTrackActionToast({
@@ -1216,9 +1311,17 @@ export function App() {
 
   useEffect(() => {
     activeTrackIdRef.current = activeTrackId;
+    activeTrackRef.current = activeTrack;
+    lastfmSettingsRef.current = library.settings.lastfm;
     rememberTrackPositionRef.current = rememberTrackPosition;
     clearTrackPositionRef.current = clearTrackPosition;
-  }, [activeTrackId, clearTrackPosition, rememberTrackPosition]);
+  }, [
+    activeTrack,
+    activeTrackId,
+    clearTrackPosition,
+    library.settings.lastfm,
+    rememberTrackPosition,
+  ]);
 
   useEffect(() => {
     playAdjacentTrackRef.current = () => playAdjacentTrack(1);
@@ -1325,6 +1428,10 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    void window.playhead.getLastfmState().then(setLastfmState);
+  }, []);
+
+  useEffect(() => {
     playNextTrackOnEndRef.current = playNextTrackOnEnd;
   }, [playNextTrackOnEnd]);
 
@@ -1357,15 +1464,58 @@ export function App() {
       wavesurfer.on("timeupdate", (time) => {
         setCurrentTime(time);
         const trackId = activeTrackIdRef.current;
-        if (!trackId || Date.now() - lastPositionSaveRef.current < 5000) return;
-        lastPositionSaveRef.current = Date.now();
-        rememberTrackPositionRef.current(trackId, time);
+        if (trackId && Date.now() - lastPositionSaveRef.current >= 5000) {
+          lastPositionSaveRef.current = Date.now();
+          rememberTrackPositionRef.current(trackId, time);
+        }
+        const session = lastfmPlaybackSessionRef.current;
+        const track = activeTrackRef.current;
+        if (
+          !lastfmSettingsRef.current.scrobblingEnabled ||
+          !session ||
+          !track ||
+          session.trackId !== track.id
+        ) {
+          return;
+        }
+        const nextSession = updateLastfmPlaybackProgress(session, time);
+        lastfmPlaybackSessionRef.current = nextSession;
+        const trackDuration = wavesurfer.getDuration() || track.duration || 0;
+        if (!shouldScrobbleLastfmTrack(nextSession, trackDuration)) return;
+        lastfmPlaybackSessionRef.current = { ...nextSession, scrobbled: true };
+        const payload = toLastfmTrackPayload(
+          track,
+          Math.floor(nextSession.startedAt / 1000),
+          trackDuration,
+        );
+        if (payload) void window.playhead.scrobbleLastfmTrack(payload).then(setLastfmState);
       }),
-      wavesurfer.on("seeking", (time) => setCurrentTime(time)),
-      wavesurfer.on("play", () => setIsPlaying(true)),
+      wavesurfer.on("seeking", (time) => {
+        setCurrentTime(time);
+        const session = lastfmPlaybackSessionRef.current;
+        if (session) lastfmPlaybackSessionRef.current = { ...session, lastTime: time };
+      }),
+      wavesurfer.on("play", () => {
+        setIsPlaying(true);
+        const track = activeTrackRef.current;
+        if (!track || !lastfmSettingsRef.current.scrobblingEnabled) return;
+        if (lastfmPlaybackSessionRef.current?.trackId !== track.id) {
+          lastfmPlaybackSessionRef.current = createLastfmPlaybackSession(
+            track.id,
+            Date.now(),
+            wavesurfer.getCurrentTime(),
+          );
+        }
+        if (lastfmNowPlayingTrackIdRef.current === track.id) return;
+        const payload = toLastfmTrackPayload(track, undefined, wavesurfer.getDuration());
+        if (!payload) return;
+        lastfmNowPlayingTrackIdRef.current = track.id;
+        void window.playhead.updateLastfmNowPlaying(payload).then(setLastfmState);
+      }),
       wavesurfer.on("pause", () => setIsPlaying(false)),
       wavesurfer.on("finish", () => {
         if (activeTrackIdRef.current) clearTrackPositionRef.current(activeTrackIdRef.current);
+        lastfmPlaybackSessionRef.current = null;
         if (!playNextTrackOnEndRef.current()) setIsPlaying(false);
       }),
       wavesurfer.on("error", () => {
@@ -1724,6 +1874,15 @@ export function App() {
               onAppearancePreviewChange={setPreviewAppTransparency}
               telemetrySettings={library.settings.telemetry}
               onTelemetrySettingsChange={(settings) => void updateTelemetrySettings(settings)}
+              lastfmState={lastfmState}
+              lastfmSettings={library.settings.lastfm}
+              lastfmActionPending={lastfmActionPending}
+              onLastfmSettingsChange={(settings) => void updateLastfmSettings(settings)}
+              onStartLastfmAuth={startLastfmAuth}
+              onCompleteLastfmAuth={completeLastfmAuth}
+              onCancelLastfmAuth={disconnectLastfm}
+              onDisconnectLastfm={disconnectLastfm}
+              onFlushLastfmQueue={flushLastfmQueue}
               onAdvancedAction={runAdvancedSettingsAction}
               onClose={() => setIsSettingsOpen(false)}
             />

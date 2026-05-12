@@ -7,6 +7,8 @@ import {
   defaultPlaybackSettings,
   defaultTelemetrySettings,
   type AppearanceSettings,
+  type LastfmSettings,
+  type LastfmState,
   type LibraryFolder,
   type LibrarySettings,
   type PlaybackSettings,
@@ -30,6 +32,7 @@ import {
 } from "./settings-config";
 import { AdvancedSettingsPane } from "./AdvancedSettingsPane";
 import { AppearanceSettingsPane } from "./AppearanceSettingsPane";
+import { IntegrationsSettingsPane } from "./IntegrationsSettingsPane";
 import { LibrarySettingsPane } from "./LibrarySettingsPane";
 import { PlaybackSettingsPane } from "./PlaybackSettingsPane";
 import { ShortcutsSettingsPane } from "./ShortcutsSettingsPane";
@@ -57,6 +60,15 @@ export function SettingsDialog({
   onAppearancePreviewChange,
   telemetrySettings,
   onTelemetrySettingsChange,
+  lastfmState,
+  lastfmSettings,
+  lastfmActionPending,
+  onLastfmSettingsChange,
+  onStartLastfmAuth,
+  onCompleteLastfmAuth,
+  onCancelLastfmAuth,
+  onDisconnectLastfm,
+  onFlushLastfmQueue,
   onAdvancedAction,
   onClose,
 }: {
@@ -74,6 +86,15 @@ export function SettingsDialog({
   onAppearancePreviewChange: (appTransparency: number | null) => void;
   telemetrySettings: TelemetrySettings;
   onTelemetrySettingsChange: (settings: TelemetrySettings) => void;
+  lastfmState: LastfmState;
+  lastfmSettings: LastfmSettings;
+  lastfmActionPending: boolean;
+  onLastfmSettingsChange: (settings: LastfmSettings) => void;
+  onStartLastfmAuth: () => void;
+  onCompleteLastfmAuth: () => void;
+  onCancelLastfmAuth: () => void;
+  onDisconnectLastfm: () => void;
+  onFlushLastfmQueue: () => void;
   onAdvancedAction: (action: AdvancedSettingsAction) => Promise<string>;
   onClose: () => void;
 }) {
@@ -139,6 +160,7 @@ export function SettingsDialog({
     { id: "playback", label: "Playback", icon: icons.play },
     { id: "appearance", label: "Appearance", icon: icons.palette },
     { id: "shortcuts", label: "Shortcuts", icon: icons.keyboard },
+    { id: "integrations", label: "Integrations", icon: icons["radio-tower"] },
     { id: "advanced", label: "Advanced", icon: icons.settings },
   ] satisfies Array<{
     id: SettingsCategoryId;
@@ -381,7 +403,7 @@ export function SettingsDialog({
               );
             })}
           </nav>
-          <div className="mt-auto px-3.5 pb-1 text-[10px] leading-4 text-muted-foreground/65">
+          <div className="mt-auto px-3.5 pb-1 text-[11px] leading-4 text-muted-foreground/65">
             <p>Playhead {__APP_VERSION__}</p>
             <p>
               Designed and built by{" "}
@@ -389,7 +411,7 @@ export function SettingsDialog({
                 href="https://edinabazi.com"
                 className="hover:text-muted-foreground cursor-pointer!"
               >
-                Edin Abazi
+                Edin
               </a>
               .
             </p>
@@ -471,6 +493,22 @@ export function SettingsDialog({
               />
             ) : activeCategory === "shortcuts" ? (
               <ShortcutsSettingsPane shortcuts={shortcuts} />
+            ) : activeCategory === "integrations" ? (
+              <IntegrationsSettingsPane
+                lastfmState={lastfmState}
+                lastfmSettings={lastfmSettings}
+                pendingAction={lastfmActionPending}
+                icons={{
+                  loader: icons.loader,
+                  x: icons.x,
+                }}
+                onLastfmSettingsChange={onLastfmSettingsChange}
+                onConnectLastfm={onStartLastfmAuth}
+                onCompleteLastfmAuth={onCompleteLastfmAuth}
+                onCancelLastfmAuth={onCancelLastfmAuth}
+                onDisconnectLastfm={onDisconnectLastfm}
+                onFlushLastfmQueue={onFlushLastfmQueue}
+              />
             ) : (
               <AdvancedSettingsPane
                 actions={advancedActions}

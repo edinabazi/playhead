@@ -1,6 +1,12 @@
 import type { AdvancedSettingsAction } from "./SettingsDialog";
 
-export type SettingsCategoryId = "library" | "playback" | "appearance" | "shortcuts" | "advanced";
+export type SettingsCategoryId =
+  | "library"
+  | "playback"
+  | "appearance"
+  | "shortcuts"
+  | "integrations"
+  | "advanced";
 
 export const fileFormatOptions = [
   { extension: ".mp3", label: "MP3" },
@@ -62,5 +68,6 @@ export const settingsHeaderDescriptions: Record<SettingsCategoryId, string> = {
   playback: "Keyboard playback behavior.",
   appearance: "Window transparency and motion.",
   shortcuts: "Current keyboard controls.",
+  integrations: "Connected music services.",
   advanced: "Maintenance, backup, and diagnostics.",
 };

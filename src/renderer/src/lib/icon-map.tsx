@@ -22,6 +22,7 @@ import {
   ListPlus,
   Lightbulb,
   Link,
+  RadioTower,
   Loader,
   Lock,
   Mail,
@@ -111,6 +112,7 @@ export type IconName =
   | "image"
   | "keyboard"
   | "link"
+  | "radio-tower"
   | "check"
   | "rotate-ccw"
   | "info"
@@ -183,6 +185,7 @@ const lucideMap: Record<IconName, IconComponent> = {
   "list-filter": ListFilter,
   "minimize-2": Minimize2,
   link: Link,
+  "radio-tower": RadioTower,
   check: Check,
   "rotate-ccw": RotateCcw,
   play: Play,

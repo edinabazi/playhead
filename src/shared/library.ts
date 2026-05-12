@@ -98,6 +98,7 @@ export type AppSettings = {
   playback: PlaybackSettings;
   appearance: AppearanceSettings;
   telemetry: TelemetrySettings;
+  lastfm: LastfmSettings;
   session: SessionSettings;
 };
 
@@ -125,6 +126,11 @@ export type TelemetrySettings = {
   enabled: boolean;
 };
 
+export type LastfmSettings = {
+  scrobblingEnabled: boolean;
+  loveSyncEnabled: boolean;
+};
+
 export type SessionSettings = {
   activeTrackId: string | null;
   selectedTrackIds: string[];
@@ -146,6 +152,24 @@ export type AppUpdateState =
   | { status: "downloading"; version?: string; progress?: number }
   | { status: "ready"; version?: string }
   | { status: "error"; version?: string; message: string };
+
+export type LastfmState = {
+  configured: boolean;
+  connected: boolean;
+  username?: string;
+  pendingAuth: boolean;
+  queueSize: number;
+  lastError?: string;
+};
+
+export type LastfmTrackPayload = {
+  artist: string;
+  title: string;
+  album?: string;
+  albumArtist?: string;
+  duration?: number;
+  timestamp?: number;
+};
 
 export type PlayheadApi = {
   getLibraryState: () => Promise<LibraryState>;
@@ -171,6 +195,15 @@ export type PlayheadApi = {
   getUpdateState: () => Promise<AppUpdateState>;
   checkForUpdates: () => Promise<AppUpdateState>;
   installUpdate: () => Promise<boolean>;
+  getLastfmState: () => Promise<LastfmState>;
+  startLastfmAuth: () => Promise<LastfmState>;
+  completeLastfmAuth: () => Promise<LastfmState>;
+  disconnectLastfm: () => Promise<LastfmState>;
+  updateLastfmNowPlaying: (track: LastfmTrackPayload) => Promise<LastfmState>;
+  scrobbleLastfmTrack: (track: LastfmTrackPayload) => Promise<LastfmState>;
+  loveLastfmTrack: (track: LastfmTrackPayload) => Promise<LastfmState>;
+  unloveLastfmTrack: (track: LastfmTrackPayload) => Promise<LastfmState>;
+  flushLastfmQueue: () => Promise<LastfmState>;
   minimizeWindow: () => Promise<void>;
   toggleMaximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;
@@ -215,6 +248,11 @@ export const defaultTelemetrySettings = (): TelemetrySettings => ({
   enabled: true,
 });
 
+export const defaultLastfmSettings = (): LastfmSettings => ({
+  scrobblingEnabled: true,
+  loveSyncEnabled: false,
+});
+
 export const defaultSessionSettings = (): SessionSettings => ({
   activeTrackId: null,
   selectedTrackIds: [],
@@ -228,6 +266,7 @@ export const defaultAppSettings = (): AppSettings => ({
   playback: defaultPlaybackSettings(),
   appearance: defaultAppearanceSettings(),
   telemetry: defaultTelemetrySettings(),
+  lastfm: defaultLastfmSettings(),
   session: defaultSessionSettings(),
 });
 

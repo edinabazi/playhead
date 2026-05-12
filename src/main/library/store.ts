@@ -55,6 +55,7 @@ export function normalizeSettings(
       playback: { ...defaults.playback, ...(grouped.playback || {}) },
       appearance: { ...defaults.appearance, ...(grouped.appearance || {}) },
       telemetry: { ...defaults.telemetry, ...(grouped.telemetry || {}) },
+      lastfm: { ...defaults.lastfm, ...(grouped.lastfm || {}) },
       session: { ...defaults.session, ...(grouped.session || {}) },
     };
   }
