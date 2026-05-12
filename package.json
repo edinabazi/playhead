@@ -1,7 +1,7 @@
 {
   "name": "playhead",
   "productName": "Playhead",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Local-first desktop music player prototype with waveform playback.",
   "author": "Edin",
   "license": "MIT",
