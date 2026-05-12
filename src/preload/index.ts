@@ -13,6 +13,7 @@ import { electron } from "./electron";
 const { contextBridge, ipcRenderer, webUtils } = electron;
 
 const api: PlayheadApi = {
+  getAppVersion: () => ipcRenderer.invoke("app:get-version"),
   getLibraryState: () => ipcRenderer.invoke("library:get-state"),
   saveLibraryState: (state: LibraryState) => ipcRenderer.invoke("library:save-state", state),
   selectMusicFolder: (extensions?: string[]) =>

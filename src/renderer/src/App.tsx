@@ -40,6 +40,11 @@ import { Sidebar } from "@/features/sidebar/Sidebar";
 import { TrackList } from "@/features/tracks/TrackList";
 import { RemoveTracksFromPlaylistDialog } from "@/features/tracks/RemoveTracksFromPlaylistDialog";
 import {
+  UpdateMessageDialog,
+  type UpdateMessage,
+} from "@/features/updates/UpdateMessageDialog";
+import { updateMessagesByVersion } from "@/features/updates/update-messages";
+import {
   showFolderActionToast,
   showSimpleActionToast,
   showTrackActionToast,
@@ -89,6 +94,10 @@ function toLastfmTrackPayload(
     duration: duration || track.duration || undefined,
     timestamp,
   };
+}
+
+function getUpdateMessageDismissedKey(version: string): string {
+  return `playhead:update-message-dismissed:${version}`;
 }
 
 export function App() {
@@ -151,6 +160,10 @@ export function App() {
   const [scrollToTrackId, setScrollToTrackId] = useState<string | null>(null);
   const [previewAppTransparency, setPreviewAppTransparency] = useState<number | null>(null);
   const [updateState, setUpdateState] = useState<AppUpdateState>({ status: "idle" });
+  const [updateMessage, setUpdateMessage] = useState<{
+    version: string;
+    message: UpdateMessage;
+  } | null>(null);
   const [lastfmState, setLastfmState] = useState<LastfmState>({
     configured: false,
     connected: false,
@@ -1428,6 +1441,18 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    void window.playhead.getAppVersion().then((version) => {
+      const message = updateMessagesByVersion[version];
+      if (!message) return;
+
+      const dismissedKey = getUpdateMessageDismissedKey(version);
+      if (localStorage.getItem(dismissedKey) === "true") return;
+
+      setUpdateMessage({ version, message });
+    });
+  }, []);
+
+  useEffect(() => {
     void window.playhead.getLastfmState().then(setLastfmState);
   }, []);
 
@@ -1889,6 +1914,16 @@ export function App() {
           )}
         </AnimatePresence>
         <AnimatePresence>
+          {updateMessage && (
+            <UpdateMessageDialog
+              key="update-message"
+              message={updateMessage.message}
+              onClose={() => {
+                localStorage.setItem(getUpdateMessageDismissedKey(updateMessage.version), "true");
+                setUpdateMessage(null);
+              }}
+            />
+          )}
           {folderPendingRemoval && (
             <RemoveFolderDialog
               key={`remove-folder-${folderPendingRemoval.id}`}

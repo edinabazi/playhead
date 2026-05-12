@@ -10,7 +10,7 @@ import { registerUpdaterIpc, startUpdater } from "./updater";
 import { createWindow } from "./window/create-window";
 import { registerWindowControlsIpc } from "./window/window-controls";
 
-const { app, BrowserWindow, globalShortcut, nativeImage, protocol } = electron;
+const { app, BrowserWindow, globalShortcut, ipcMain, nativeImage, protocol } = electron;
 
 if (process.platform === "darwin") {
   app.commandLine.appendSwitch("use-mock-keychain");
@@ -49,6 +49,7 @@ app.whenReady().then(() => {
   registerMediaShortcuts();
   registerUpdaterIpc();
   registerWindowControlsIpc();
+  ipcMain.handle("app:get-version", () => app.getVersion());
   createWindow();
   startUpdater();
   void trackAppLaunch();

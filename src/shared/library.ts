@@ -173,6 +173,7 @@ export type LastfmTrackPayload = {
 };
 
 export type PlayheadApi = {
+  getAppVersion: () => Promise<string>;
   getLibraryState: () => Promise<LibraryState>;
   saveLibraryState: (state: LibraryState) => Promise<LibraryState>;
   selectMusicFolder: (extensions?: string[]) => Promise<ScannedFolder | null>;
