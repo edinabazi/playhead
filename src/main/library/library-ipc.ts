@@ -2,12 +2,19 @@ import { createReadStream } from "node:fs";
 import { readFile, rm, stat, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { Readable } from "node:stream";
-import type { EditableTrackMetadata, LibraryFolder, LibraryState } from "../../shared/library";
+import type {
+  EditableTrackMetadata,
+  LibraryFolder,
+  LibraryState,
+  WaveformCacheRequest,
+  WaveformCacheWrite,
+} from "../../shared/library";
 import { electron } from "../electron";
 import { readTrackMetadata, saveTrackMetadata } from "../metadata/metadata";
 import { watchLibraryFolders } from "./folder-watcher";
 import { scanFolderPath } from "./scanner";
 import { normalizeLibraryState, readLibraryState, writeLibraryState } from "./store";
+import { readWaveformCache, writeWaveformCache } from "./waveform-cache";
 
 const { app, dialog, ipcMain, protocol, shell } = electron;
 
@@ -116,13 +123,13 @@ export function registerLibraryIpc(): void {
 
   ipcMain.handle("library:select-folder", async (_event, extensions?: string[]) => {
     const result = await dialog.showOpenDialog({
-      properties: ["openDirectory"],
+      properties: ["openDirectory", "multiSelections"],
       title: "Add music folder",
     });
 
-    if (result.canceled || !result.filePaths[0]) return null;
+    if (result.canceled || result.filePaths.length === 0) return [];
 
-    return scanFolderPath(result.filePaths[0], extensions);
+    return Promise.all(result.filePaths.map((folderPath) => scanFolderPath(folderPath, extensions)));
   });
 
   ipcMain.handle(
@@ -153,6 +160,18 @@ export function registerLibraryIpc(): void {
   ipcMain.handle("library:read-audio-file", async (_event, filePath: string) => {
     const bytes = await readFile(filePath);
     return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  });
+
+  ipcMain.handle("library:get-waveform-cache", async (_event, request: WaveformCacheRequest) => {
+    return readWaveformCache(request, {
+      directory: join(app.getPath("userData"), "waveforms"),
+    });
+  });
+
+  ipcMain.handle("library:save-waveform-cache", async (_event, write: WaveformCacheWrite) => {
+    await writeWaveformCache(write, {
+      directory: join(app.getPath("userData"), "waveforms"),
+    });
   });
 
   ipcMain.handle("library:get-track-metadata", async (_event, filePath: string) => {

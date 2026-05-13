@@ -7,6 +7,8 @@ import type {
   LibraryState,
   MediaCommand,
   PlayheadApi,
+  WaveformCacheRequest,
+  WaveformCacheWrite,
 } from "../shared/library";
 import { electron } from "./electron";
 
@@ -25,6 +27,10 @@ const api: PlayheadApi = {
   getDroppedFilePath: (file: File) => webUtils.getPathForFile(file),
   getAudioFileUrl: (path: string) => ipcRenderer.invoke("library:get-audio-url", path),
   readAudioFile: (path: string) => ipcRenderer.invoke("library:read-audio-file", path),
+  getWaveformCache: (request: WaveformCacheRequest) =>
+    ipcRenderer.invoke("library:get-waveform-cache", request),
+  saveWaveformCache: (write: WaveformCacheWrite) =>
+    ipcRenderer.invoke("library:save-waveform-cache", write),
   getTrackMetadata: (path: string) => ipcRenderer.invoke("library:get-track-metadata", path),
   saveTrackMetadata: (path: string, folderId: string, metadata: EditableTrackMetadata) =>
     ipcRenderer.invoke("library:save-track-metadata", path, folderId, metadata),

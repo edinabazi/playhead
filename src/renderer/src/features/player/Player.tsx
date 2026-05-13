@@ -33,6 +33,7 @@ export function Player({
   isPlaying,
   isLoading,
   hasWaveform,
+  shouldAnimateWaveform,
   reduceMotion,
   isFavorite,
   currentTime,
@@ -54,6 +55,7 @@ export function Player({
   isPlaying: boolean;
   isLoading: boolean;
   hasWaveform: boolean;
+  shouldAnimateWaveform: boolean;
   reduceMotion: boolean;
   isFavorite: boolean;
   currentTime: number;
@@ -195,10 +197,12 @@ export function Player({
               }}
               transition={{
                 clipPath: {
-                  duration: reduceMotion ? 0 : 0.55,
+                  duration: reduceMotion || !shouldAnimateWaveform ? 0 : 0.55,
                   ease: [0.22, 1, 0.36, 1],
                 },
-                opacity: { duration: reduceMotion ? 0 : hasWaveform ? 0.08 : 0.18 },
+                opacity: {
+                  duration: reduceMotion || !shouldAnimateWaveform ? 0 : hasWaveform ? 0.08 : 0.18,
+                },
               }}
             >
               <div ref={waveformRef} className="no-drag h-full w-full rounded-[2px]" />
@@ -209,7 +213,7 @@ export function Player({
             {!hasWaveform && (
               <WaveformEmptyState
                 key={activeTrack ? "loading-waveform" : "empty-waveform"}
-                isLoading={isLoading || !activeTrack}
+                isLoading={(isLoading && shouldAnimateWaveform) || !activeTrack}
                 reduceMotion={reduceMotion}
               />
             )}

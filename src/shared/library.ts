@@ -182,16 +182,33 @@ export type LastfmTrackPayload = {
   timestamp?: number;
 };
 
+export type WaveformCacheRequest = {
+  trackId: string;
+  path: string;
+  duration: number;
+};
+
+export type WaveformCacheEntry = {
+  duration: number;
+  peaks: number[][];
+};
+
+export type WaveformCacheWrite = WaveformCacheRequest & {
+  peaks: number[][];
+};
+
 export type PlayheadApi = {
   getAppVersion: () => Promise<string>;
   getLibraryState: () => Promise<LibraryState>;
   saveLibraryState: (state: LibraryState) => Promise<LibraryState>;
-  selectMusicFolder: (extensions?: string[]) => Promise<ScannedFolder | null>;
+  selectMusicFolder: (extensions?: string[]) => Promise<ScannedFolder[]>;
   scanFolder: (folder: LibraryFolder, extensions?: string[]) => Promise<ScannedFolder>;
   scanFolderPath: (path: string, extensions?: string[]) => Promise<ScannedFolder>;
   getDroppedFilePath: (file: File) => string;
   getAudioFileUrl: (path: string) => Promise<string>;
   readAudioFile: (path: string) => Promise<ArrayBuffer>;
+  getWaveformCache: (request: WaveformCacheRequest) => Promise<WaveformCacheEntry | null>;
+  saveWaveformCache: (write: WaveformCacheWrite) => Promise<void>;
   getTrackMetadata: (path: string) => Promise<TrackMetadata>;
   saveTrackMetadata: (
     path: string,

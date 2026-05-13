@@ -70,6 +70,9 @@ import { normalizeSourceForMode } from "@/features/library/source";
 import { usePlayerKeyboardShortcuts } from "@/hooks/use-player-keyboard-shortcuts";
 import { useWindowDrag } from "@/hooks/use-window-drag";
 
+const waveformCachePeakRate = 20;
+const waveformCacheMaxPeaks = 24_000;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -148,6 +151,7 @@ export function App() {
   const [duration, setDuration] = useState(0);
   const [waveformElement, setWaveformElement] = useState<HTMLDivElement | null>(null);
   const [isWaveformEngineReady, setIsWaveformEngineReady] = useState(false);
+  const [shouldAnimateWaveform, setShouldAnimateWaveform] = useState(false);
   const [volume, setVolume] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -265,9 +269,9 @@ export function App() {
 
       wavesurfer.pause();
       setIsLoadingTrack(true);
+      setShouldAnimateWaveform(false);
       setError("");
       setActiveTrackId(track.id);
-      setHasWaveform(false);
       setCurrentTime(0);
       setDuration(track.duration || 0);
       setIsPlaying(false);
@@ -285,12 +289,25 @@ export function App() {
       try {
         const audioUrl = await window.playhead.getAudioFileUrl(track.path);
         if (requestId !== trackLoadRequestIdRef.current) return;
+        const waveformCacheRequest = {
+          trackId: track.id,
+          path: track.path,
+          duration: track.duration,
+        };
+        const cachedWaveform = await window.playhead.getWaveformCache(waveformCacheRequest);
+        if (requestId !== trackLoadRequestIdRef.current) return;
+        setShouldAnimateWaveform(!cachedWaveform);
+        if (!cachedWaveform) setHasWaveform(false);
 
         await (trackLoadQueueRef.current = trackLoadQueueRef.current
           .catch(() => undefined)
           .then(async () => {
             if (requestId !== trackLoadRequestIdRef.current) return;
-            await wavesurfer.load(audioUrl);
+            await wavesurfer.load(
+              audioUrl,
+              cachedWaveform?.peaks,
+              cachedWaveform?.duration || track.duration || undefined,
+            );
           }));
         if (requestId !== trackLoadRequestIdRef.current) return;
 
@@ -299,6 +316,23 @@ export function App() {
         lastfmNowPlayingTrackIdRef.current = null;
         setHasWaveform(true);
         setDuration(wavesurfer.getDuration() || track.duration || 0);
+        if (!cachedWaveform) {
+          const loadedDuration = wavesurfer.getDuration() || track.duration || 0;
+          const maxLength = Math.max(
+            1,
+            Math.min(waveformCacheMaxPeaks, Math.ceil(loadedDuration * waveformCachePeakRate)),
+          );
+          const peaks = wavesurfer.exportPeaks({ channels: 1, maxLength, precision: 127 });
+          void window.playhead
+            .saveWaveformCache({
+              ...waveformCacheRequest,
+              duration: loadedDuration,
+              peaks,
+            })
+            .catch((cacheError) => {
+              console.warn("Failed to cache waveform", { path: track.path, error: cacheError });
+            });
+        }
         window.playhead.trackEvent("track_loaded", {
           autoplay,
           has_duration: Boolean(track.duration),
@@ -323,6 +357,7 @@ export function App() {
         loadedTrackIdRef.current = null;
         setError("This track could not be loaded.");
         setHasWaveform(false);
+        setShouldAnimateWaveform(false);
         if (autoplay && allowSkipUnavailable && library.settings.playback.skipUnavailableTracks) {
           showTrackActionToast({ action: "Skipped unavailable track", track });
           playAdjacentTrackRef.current();
@@ -362,23 +397,33 @@ export function App() {
     setError("");
 
     try {
-      const scanned = await window.playhead.selectMusicFolder(
+      const scannedFolders = await window.playhead.selectMusicFolder(
         library.settings.library.enabledAudioExtensions,
       );
-      if (!scanned) return;
-      const nextState = {
-        ...mergeScannedFolder(library, scanned),
+      if (scannedFolders.length === 0) return;
+      let nextState = library;
+      let lastScannedFolderId: string | null = null;
+
+      for (const scanned of scannedFolders) {
+        nextState = mergeScannedFolder(nextState, scanned);
+        lastScannedFolderId = scanned.folder.id;
+        window.playhead.trackEvent("folder_added", {
+          source: "picker",
+          track_count: scanned.tracks.length,
+        });
+        showFolderActionToast({ folder: scanned.folder, trackCount: scanned.tracks.length });
+      }
+
+      nextState = {
+        ...nextState,
         selectedSource:
           library.settings.library.mode === "library"
             ? { type: "library-tracks" as const }
-            : { type: "folder" as const, id: scanned.folder.id },
+            : lastScannedFolderId
+              ? { type: "folder" as const, id: lastScannedFolderId }
+              : nextState.selectedSource,
       };
       await persistLibrary(nextState);
-      window.playhead.trackEvent("folder_added", {
-        source: "picker",
-        track_count: scanned.tracks.length,
-      });
-      showFolderActionToast({ folder: scanned.folder, trackCount: scanned.tracks.length });
     } catch (error) {
       const message = getErrorMessage(error, "Could not scan that folder.");
       setError(message);
@@ -461,6 +506,7 @@ export function App() {
           setDuration(0);
           setIsPlaying(false);
           setHasWaveform(false);
+          setShouldAnimateWaveform(false);
         }
 
         await persistLibrary({ ...nextState, selectedSource: state.selectedSource });
@@ -604,6 +650,7 @@ export function App() {
     setSelectedTrackIds([]);
     setScrollToTrackId(null);
     setHasWaveform(false);
+    setShouldAnimateWaveform(false);
     setCurrentTime(0);
     setDuration(0);
     setIsPlaying(false);
@@ -777,6 +824,7 @@ export function App() {
         setDuration(0);
         setIsPlaying(false);
         setHasWaveform(false);
+        setShouldAnimateWaveform(false);
       }
 
       await persistLibrary({
@@ -1735,6 +1783,7 @@ export function App() {
       wavesurfer.on("error", () => {
         setError("This track could not be loaded.");
         setHasWaveform(false);
+        setShouldAnimateWaveform(false);
         setIsLoadingTrack(false);
       }),
     ];
@@ -1931,6 +1980,7 @@ export function App() {
                   isPlaying={isPlaying}
                   isLoading={isLoadingTrack}
                   hasWaveform={hasWaveform}
+                  shouldAnimateWaveform={shouldAnimateWaveform}
                   reduceMotion={reduceMotion}
                   isFavorite={
                     activeTrack ? (library.favoriteTrackIds || []).includes(activeTrack.id) : false
