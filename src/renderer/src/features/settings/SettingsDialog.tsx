@@ -70,6 +70,8 @@ export function SettingsDialog({
   onDisconnectLastfm,
   onFlushLastfmQueue,
   onAdvancedAction,
+  batchAnalysis,
+  onAnalyzeMissingAudioData,
   onClose,
 }: {
   librarySettings: LibrarySettings;
@@ -96,6 +98,14 @@ export function SettingsDialog({
   onDisconnectLastfm: () => void;
   onFlushLastfmQueue: () => void;
   onAdvancedAction: (action: AdvancedSettingsAction) => Promise<string>;
+  batchAnalysis: {
+    status: "idle" | "running" | "complete";
+    total: number;
+    completed: number;
+    failed: number;
+    currentTrackTitle: string;
+  };
+  onAnalyzeMissingAudioData: () => Promise<string>;
   onClose: () => void;
 }) {
   const icons = useIcons();
@@ -107,6 +117,7 @@ export function SettingsDialog({
   const [draftLibrarySettings, setDraftLibrarySettings] = useState<LibrarySettings>(() => ({
     ...defaultLibrarySettings(),
     ...librarySettings,
+    watchFolders: true,
   }));
   const [draftPlaybackSettings, setDraftPlaybackSettings] = useState<PlaybackSettings>(() => ({
     ...defaultPlaybackSettings(),
@@ -126,10 +137,11 @@ export function SettingsDialog({
   const [pendingAdvancedAction, setPendingAdvancedAction] = useState<AdvancedSettingsAction | null>(
     null,
   );
+  const [audioAnalysisPending, setAudioAnalysisPending] = useState(false);
   const [advancedActionPendingConfirmation, setAdvancedActionPendingConfirmation] =
     useState<AdvancedSettingsAction | null>(null);
   const modifierLabel = getPrimaryModifierLabel();
-  const savedSettings = { ...defaultLibrarySettings(), ...librarySettings };
+  const savedSettings = { ...defaultLibrarySettings(), ...librarySettings, watchFolders: true };
   const savedPlaybackSettings = { ...defaultPlaybackSettings(), ...playbackSettings };
   const savedAppearanceSettings = { ...defaultAppearanceSettings(), ...appearanceSettings };
   const savedTelemetrySettings = { ...defaultTelemetrySettings(), ...telemetrySettings };
@@ -268,7 +280,7 @@ export function SettingsDialog({
 
   const saveLibrarySettings = () => {
     if (!settingsChanged) return;
-    onLibrarySettingsChange(draftLibrarySettings);
+    onLibrarySettingsChange({ ...draftLibrarySettings, watchFolders: true });
     onClose();
   };
 
@@ -305,10 +317,15 @@ export function SettingsDialog({
     setDraftTelemetrySettings(savedTelemetrySettings);
   };
 
-  const saveTelemetrySettings = () => {
-    if (!telemetrySettingsChanged) return;
-    onTelemetrySettingsChange(draftTelemetrySettings);
-    onClose();
+  const resetAdvancedSettings = () => {
+    resetLibrarySettings();
+    resetTelemetrySettings();
+  };
+
+  const saveAdvancedSettings = () => {
+    if (settingsChanged) onLibrarySettingsChange({ ...draftLibrarySettings, watchFolders: true });
+    if (telemetrySettingsChanged) onTelemetrySettingsChange(draftTelemetrySettings);
+    if (settingsChanged || telemetrySettingsChanged) onClose();
   };
 
   const runAdvancedAction = async (action: AdvancedSettingsAction) => {
@@ -335,6 +352,24 @@ export function SettingsDialog({
     } finally {
       setPendingAdvancedAction(null);
       setAdvancedActionPendingConfirmation(null);
+    }
+  };
+
+  const runAudioAnalysis = async () => {
+    setAudioAnalysisPending(true);
+    try {
+      const message = await onAnalyzeMissingAudioData();
+      showSimpleActionToast(
+        message,
+        message.includes("already") || message.startsWith("All tracks") ? "info" : "success",
+      );
+    } catch (error) {
+      showSimpleActionToast(
+        error instanceof Error ? error.message : "Audio analysis could not be started.",
+        "error",
+      );
+    } finally {
+      setAudioAnalysisPending(false);
     }
   };
 
@@ -453,10 +488,14 @@ export function SettingsDialog({
               <LibrarySettingsPane
                 settings={draftLibrarySettings}
                 folders={libraryFolders}
+                batchAnalysis={batchAnalysis}
+                audioAnalysisPending={audioAnalysisPending}
                 changed={settingsChanged}
                 isScanning={isScanning}
                 icons={{
+                  audioWaveform: icons["audio-waveform"],
                   check: CheckIcon,
+                  chevronRight: ChevronRightIcon,
                   folderOpen: FolderOpenIcon,
                   folderPlus: FolderPlusIcon,
                   listMusic: icons["list-music"],
@@ -466,6 +505,7 @@ export function SettingsDialog({
                 onChange={setDraftLibrarySettings}
                 onToggleExtension={toggleExtension}
                 onAddFolder={onAddLibraryFolder}
+                onAnalyzeMissingAudioData={() => void runAudioAnalysis()}
                 onDropFolderPaths={onDropLibraryFolderPaths}
                 onRemoveFolder={onRemoveLibraryFolder}
                 onReset={resetLibrarySettings}
@@ -512,14 +552,16 @@ export function SettingsDialog({
             ) : (
               <AdvancedSettingsPane
                 actions={advancedActions}
+                librarySettings={draftLibrarySettings}
                 telemetrySettings={draftTelemetrySettings}
-                telemetryChanged={telemetrySettingsChanged}
+                changed={settingsChanged || telemetrySettingsChanged}
                 pendingAction={pendingAdvancedAction}
                 loaderIcon={icons.loader}
                 chevronRightIcon={ChevronRightIcon}
+                onLibrarySettingsChange={setDraftLibrarySettings}
                 onTelemetryChange={setDraftTelemetrySettings}
-                onResetTelemetry={resetTelemetrySettings}
-                onSaveTelemetry={saveTelemetrySettings}
+                onReset={resetAdvancedSettings}
+                onSave={saveAdvancedSettings}
                 onRunAction={(action) => void runAdvancedAction(action)}
               />
             )}

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import WaveSurfer from "wavesurfer.js";
-import { analyze } from "web-audio-beat-detector";
 import {
   type AppearanceSettings,
   type AppUpdateState,
@@ -53,6 +52,14 @@ import {
   showTrackActionToast,
 } from "@/features/toasts/action-toasts";
 import {
+  analyzeBpmFromBuffer,
+  buildWaveformCachePeaks,
+  decodeAudioTrack,
+  shouldAnalyzeTrackBpm,
+  waveformAnalysisMaxPeaks,
+  waveformAnalysisPeakRate,
+} from "@/features/audio/audio-analysis";
+import {
   createPlaylist,
   createTag,
   emptyLibraryState,
@@ -71,8 +78,41 @@ import { normalizeSourceForMode } from "@/features/library/source";
 import { usePlayerKeyboardShortcuts } from "@/hooks/use-player-keyboard-shortcuts";
 import { useWindowDrag } from "@/hooks/use-window-drag";
 
-const waveformCachePeakRate = 20;
-const waveformCacheMaxPeaks = 24_000;
+const waveformCachePeakRate = waveformAnalysisPeakRate;
+const waveformCacheMaxPeaks = waveformAnalysisMaxPeaks;
+
+type BatchAnalysisState = {
+  status: "idle" | "running" | "complete";
+  total: number;
+  completed: number;
+  failed: number;
+  currentTrackTitle: string;
+};
+
+const emptyBatchAnalysisState = (): BatchAnalysisState => ({
+  status: "idle",
+  total: 0,
+  completed: 0,
+  failed: 0,
+  currentTrackTitle: "",
+});
+
+async function runWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex];
+      nextIndex += 1;
+      await worker(item);
+    }
+  });
+
+  await Promise.all(workers);
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -197,6 +237,9 @@ export function App() {
     queueSize: 0,
   });
   const [lastfmActionPending, setLastfmActionPending] = useState(false);
+  const [batchAnalysis, setBatchAnalysis] = useState<BatchAnalysisState>(
+    emptyBatchAnalysisState,
+  );
 
   const tracks = useMemo(() => getSourceTracks(library), [library]);
   const allTracks = useMemo(() => Object.values(library.tracks), [library.tracks]);
@@ -284,14 +327,9 @@ export function App() {
     void window.playhead.saveLibraryState(nextState);
   }, []);
 
-  const shouldAnalyzeBpm = useCallback((track: LibraryTrack): boolean => {
-    if (!track.bpm) return true;
-    return track.bpmSource === "analysis";
-  }, []);
-
   const analyzeTrackBpm = useCallback(
     async (track: LibraryTrack) => {
-      if (!shouldAnalyzeBpm(track) || bpmAnalysisTrackIdsRef.current.has(track.id)) return;
+      if (!shouldAnalyzeTrackBpm(track) || bpmAnalysisTrackIdsRef.current.has(track.id)) return;
 
       bpmAnalysisTrackIdsRef.current.add(track.id);
       bpmAnalysisQueueRef.current = bpmAnalysisQueueRef.current
@@ -305,25 +343,16 @@ export function App() {
               return;
             }
 
-            const bytes = await window.playhead.readAudioFile(track.path);
-            const audioContext = new AudioContext({ sampleRate: 16000 });
-            try {
-              const buffer = await audioContext.decodeAudioData(bytes.slice(0));
-              const tempo = await analyze(buffer);
-              const bpm = Math.round(tempo);
-              if (!Number.isFinite(bpm) || bpm <= 0) return;
-
-              const analyzedAt = new Date().toISOString();
-              await window.playhead.saveBpmCache({
-                ...request,
-                bpm,
-                tempo,
-                analyzedAt,
-              });
-              saveAnalyzedBpm(track.id, bpm);
-            } finally {
-              await audioContext.close();
-            }
+            const buffer = await decodeAudioTrack(track, window.playhead.readAudioFile);
+            const { bpm, tempo } = await analyzeBpmFromBuffer(buffer);
+            const analyzedAt = new Date().toISOString();
+            await window.playhead.saveBpmCache({
+              ...request,
+              bpm,
+              tempo,
+              analyzedAt,
+            });
+            saveAnalyzedBpm(track.id, bpm);
           } catch (error) {
             console.warn("Failed to analyze BPM", { path: track.path, error });
           } finally {
@@ -331,8 +360,124 @@ export function App() {
           }
         });
     },
-    [saveAnalyzedBpm, shouldAnalyzeBpm],
+    [saveAnalyzedBpm],
   );
+
+  const getBatchAnalysisCandidates = useCallback(async (tracksToCheck: LibraryTrack[]) => {
+    const candidates: LibraryTrack[] = [];
+
+    for (const track of tracksToCheck) {
+      const request = { trackId: track.id, path: track.path, duration: track.duration };
+      const [cachedWaveform, cachedBpm] = await Promise.all([
+        window.playhead.getWaveformCache(request),
+        shouldAnalyzeTrackBpm(track)
+          ? window.playhead.getBpmCache({ trackId: track.id, path: track.path })
+          : Promise.resolve(null),
+      ]);
+
+      if (!cachedWaveform || (shouldAnalyzeTrackBpm(track) && !cachedBpm)) {
+        candidates.push(track);
+        continue;
+      }
+
+      if (cachedBpm) saveAnalyzedBpm(track.id, Math.round(cachedBpm.bpm));
+    }
+
+    return candidates;
+  }, [saveAnalyzedBpm]);
+
+  const analyzeTrackAudioData = useCallback(
+    async (track: LibraryTrack) => {
+      const waveformRequest = { trackId: track.id, path: track.path, duration: track.duration };
+      const bpmRequest = { trackId: track.id, path: track.path };
+      const [cachedWaveform, cachedBpm] = await Promise.all([
+        window.playhead.getWaveformCache(waveformRequest),
+        shouldAnalyzeTrackBpm(track) ? window.playhead.getBpmCache(bpmRequest) : Promise.resolve(null),
+      ]);
+      const needsWaveform = !cachedWaveform;
+      const needsBpm = shouldAnalyzeTrackBpm(track) && !cachedBpm;
+
+      if (cachedBpm) saveAnalyzedBpm(track.id, Math.round(cachedBpm.bpm));
+      if (!needsWaveform && !needsBpm) return;
+
+      const buffer = await decodeAudioTrack(track, window.playhead.readAudioFile);
+      const loadedDuration = buffer.duration || track.duration || 0;
+
+      if (needsWaveform) {
+        await window.playhead.saveWaveformCache({
+          ...waveformRequest,
+          duration: loadedDuration,
+          peaks: buildWaveformCachePeaks(buffer, loadedDuration),
+        });
+      }
+
+      if (needsBpm) {
+        const { bpm, tempo } = await analyzeBpmFromBuffer(buffer);
+        await window.playhead.saveBpmCache({
+          ...bpmRequest,
+          bpm,
+          tempo,
+          analyzedAt: new Date().toISOString(),
+        });
+        saveAnalyzedBpm(track.id, bpm);
+      }
+    },
+    [saveAnalyzedBpm],
+  );
+
+  const analyzeMissingAudioData = useCallback(async () => {
+    if (batchAnalysis.status === "running") return "Audio analysis is already running.";
+
+    const tracksToAnalyze = await getBatchAnalysisCandidates(Object.values(libraryRef.current.tracks));
+    if (tracksToAnalyze.length === 0) {
+      setBatchAnalysis({
+        status: "complete",
+        total: 0,
+        completed: 0,
+        failed: 0,
+        currentTrackTitle: "",
+      });
+      return "All tracks already have audio data.";
+    }
+
+    setBatchAnalysis({
+      status: "running",
+      total: tracksToAnalyze.length,
+      completed: 0,
+      failed: 0,
+      currentTrackTitle: tracksToAnalyze[0]?.title || "",
+    });
+
+    let completed = 0;
+    let failed = 0;
+
+    await runWithConcurrency(tracksToAnalyze, 2, async (track) => {
+      setBatchAnalysis((current) => ({
+        ...current,
+        currentTrackTitle: track.title,
+      }));
+
+      try {
+        await analyzeTrackAudioData(track);
+      } catch (error) {
+        failed += 1;
+        console.warn("Failed to analyze track audio data", { path: track.path, error });
+      } finally {
+        completed += 1;
+        setBatchAnalysis({
+          status: completed === tracksToAnalyze.length ? "complete" : "running",
+          total: tracksToAnalyze.length,
+          completed,
+          failed,
+          currentTrackTitle: completed === tracksToAnalyze.length ? "" : track.title,
+        });
+      }
+    });
+
+    return failed > 0
+      ? `Audio analysis completed with ${failed} failed track${failed === 1 ? "" : "s"}.`
+      : "Audio analysis completed.";
+  }, [analyzeTrackAudioData, batchAnalysis.status, getBatchAnalysisCandidates]);
 
   const selectTrack = useCallback(
     async (track: LibraryTrack, autoplay = true, startTime = 0, allowSkipUnavailable = true) => {
@@ -600,23 +745,24 @@ export function App() {
 
   const updateLibrarySettings = useCallback(
     async (settings: LibrarySettings) => {
+      const nextLibrarySettings = { ...settings, watchFolders: true };
       const onlyModeChanged =
-        settings.mode !== library.settings.library.mode &&
-        settings.watchFolders === library.settings.library.watchFolders &&
-        settings.rescanOnLaunch === library.settings.library.rescanOnLaunch &&
-        settings.enabledAudioExtensions.join("|") ===
+        nextLibrarySettings.mode !== library.settings.library.mode &&
+        nextLibrarySettings.watchFolders === library.settings.library.watchFolders &&
+        nextLibrarySettings.rescanOnLaunch === library.settings.library.rescanOnLaunch &&
+        nextLibrarySettings.enabledAudioExtensions.join("|") ===
           library.settings.library.enabledAudioExtensions.join("|");
       const nextState = {
         ...library,
         selectedSource:
-          settings.mode !== library.settings.library.mode
-            ? settings.mode === "library"
+          nextLibrarySettings.mode !== library.settings.library.mode
+            ? nextLibrarySettings.mode === "library"
               ? { type: "library-tracks" as const }
               : library.folders[0]
                 ? { type: "folder" as const, id: library.folders[0].id }
                 : null
             : library.selectedSource,
-        settings: { ...library.settings, library: settings },
+        settings: { ...library.settings, library: nextLibrarySettings },
       };
       if (onlyModeChanged) {
         await persistLibrary(nextState);
@@ -2287,6 +2433,8 @@ export function App() {
               onDisconnectLastfm={disconnectLastfm}
               onFlushLastfmQueue={flushLastfmQueue}
               onAdvancedAction={runAdvancedSettingsAction}
+              batchAnalysis={batchAnalysis}
+              onAnalyzeMissingAudioData={analyzeMissingAudioData}
               onClose={() => setIsSettingsOpen(false)}
             />
           )}

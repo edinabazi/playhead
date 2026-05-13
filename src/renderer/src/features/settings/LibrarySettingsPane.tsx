@@ -1,4 +1,3 @@
-import { Switch } from "@/components/ui/switch";
 import type { IconComponent } from "@/lib/icon-context";
 import { getFolderPickerName } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -9,12 +8,15 @@ import { fileFormatOptions } from "./settings-config";
 export function LibrarySettingsPane({
   settings,
   folders,
+  batchAnalysis,
+  audioAnalysisPending,
   changed,
   isScanning,
   icons,
   onChange,
   onToggleExtension,
   onAddFolder,
+  onAnalyzeMissingAudioData,
   onDropFolderPaths,
   onRemoveFolder,
   onReset,
@@ -22,10 +24,20 @@ export function LibrarySettingsPane({
 }: {
   settings: LibrarySettings;
   folders: LibraryFolder[];
+  batchAnalysis: {
+    status: "idle" | "running" | "complete";
+    total: number;
+    completed: number;
+    failed: number;
+    currentTrackTitle: string;
+  };
+  audioAnalysisPending: boolean;
   changed: boolean;
   isScanning: boolean;
   icons: {
+    audioWaveform: IconComponent;
     check: IconComponent;
+    chevronRight: IconComponent;
     folderOpen: IconComponent;
     folderPlus: IconComponent;
     listMusic: IconComponent;
@@ -35,6 +47,7 @@ export function LibrarySettingsPane({
   onChange: (settings: LibrarySettings) => void;
   onToggleExtension: (extension: string) => void;
   onAddFolder: () => void;
+  onAnalyzeMissingAudioData: () => void;
   onDropFolderPaths: (folderPaths: string[]) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
   onReset: () => void;
@@ -63,22 +76,19 @@ export function LibrarySettingsPane({
           onDropFolderPaths={onDropFolderPaths}
           onRemoveFolder={onRemoveFolder}
         />
+        <AudioAnalysisCard
+          batchAnalysis={batchAnalysis}
+          isPending={audioAnalysisPending}
+          isScanning={isScanning}
+          waveformIcon={icons.audioWaveform}
+          loaderIcon={icons.loader}
+          chevronRightIcon={icons.chevronRight}
+          onAnalyzeMissingAudioData={onAnalyzeMissingAudioData}
+        />
         <FileFormatsCard
           settings={settings}
           checkIcon={icons.check}
           onToggleExtension={onToggleExtension}
-        />
-        <LibrarySwitch
-          title="Watch folders"
-          description="Keep folders updated when music files are added, changed, or removed."
-          checked={settings.watchFolders}
-          onCheckedChange={(checked) => onChange({ ...settings, watchFolders: checked })}
-        />
-        <LibrarySwitch
-          title="Rescan on launch"
-          description="Refresh folders each time Playhead opens."
-          checked={settings.rescanOnLaunch}
-          onCheckedChange={(checked) => onChange({ ...settings, rescanOnLaunch: checked })}
         />
       </div>
 
@@ -96,6 +106,88 @@ export function LibrarySettingsPane({
         onSave={onSave}
       />
     </>
+  );
+}
+
+function AudioAnalysisCard({
+  batchAnalysis,
+  isPending,
+  isScanning,
+  waveformIcon: WaveformIcon,
+  loaderIcon: LoaderIcon,
+  chevronRightIcon: ChevronRightIcon,
+  onAnalyzeMissingAudioData,
+}: {
+  batchAnalysis: {
+    status: "idle" | "running" | "complete";
+    total: number;
+    completed: number;
+    failed: number;
+    currentTrackTitle: string;
+  };
+  isPending: boolean;
+  isScanning: boolean;
+  waveformIcon: IconComponent;
+  loaderIcon: IconComponent;
+  chevronRightIcon: IconComponent;
+  onAnalyzeMissingAudioData: () => void;
+}) {
+  const isRunning = batchAnalysis.status === "running";
+  const isPreparing = isPending && !isRunning;
+  const progress =
+    batchAnalysis.total > 0
+      ? Math.round((batchAnalysis.completed / batchAnalysis.total) * 100)
+      : batchAnalysis.status === "complete"
+        ? 100
+        : 0;
+  const description = isPreparing
+    ? "Preparing audio analysis..."
+    : isRunning
+      ? batchAnalysis.currentTrackTitle
+        ? `Analyzing ${batchAnalysis.currentTrackTitle}`
+        : "Analyzing library audio data."
+      : "Generate missing waveforms and BPM estimates. This can take a while with large libraries or slower computers.";
+
+  return (
+    <button
+      type="button"
+      className="group flex w-full items-center justify-between gap-4 rounded-[22px] border border-white/10 bg-white/[0.035] p-4 text-left transition hover:bg-white/[0.065]"
+      disabled={isScanning || isPending || isRunning}
+      onClick={onAnalyzeMissingAudioData}
+    >
+      <span className="flex min-w-0 items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-[14px] bg-white/10 text-muted-foreground">
+          <WaveformIcon size={17} strokeWidth={1.8} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-semibold leading-5 text-foreground">
+            Analyze missing audio data
+          </span>
+          <span className="mt-1 block max-w-[520px] text-[12px] font-medium leading-4 text-muted-foreground">
+            {description}
+          </span>
+          {(isPreparing || isRunning) && (
+            <span className="mt-3 block">
+              <span className="block h-1 overflow-hidden rounded-full bg-white/10">
+                <span
+                  className={`block h-full rounded-full bg-primary transition-[width] duration-200 ${
+                    isPreparing ? "animate-pulse" : ""
+                  }`}
+                  style={{ width: isPreparing ? "34%" : `${progress}%` }}
+                />
+              </span>
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition group-hover:text-foreground">
+        {isPending || isRunning ? (
+          <LoaderIcon size={16} strokeWidth={1.8} className="animate-spin" />
+        ) : (
+          <ChevronRightIcon size={17} strokeWidth={1.8} />
+        )}
+      </span>
+    </button>
   );
 }
 
@@ -364,32 +456,6 @@ function FileFormatsCard({
             </button>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-function LibrarySwitch({
-  title,
-  description,
-  checked,
-  onCheckedChange,
-}: {
-  title: string;
-  description: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  return (
-    <div className="rounded-[22px] border border-white/10 bg-white/[0.035] p-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h4 className="text-[14px] font-semibold leading-5 text-foreground">{title}</h4>
-          <p className="mt-1 max-w-[420px] text-[12px] font-medium leading-4 text-muted-foreground">
-            {description}
-          </p>
-        </div>
-        <Switch checked={checked} onCheckedChange={onCheckedChange} />
       </div>
     </div>
   );
