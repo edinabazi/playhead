@@ -117,6 +117,8 @@ export async function buildTrack(filePath: string, folderId: string): Promise<Li
     const trackId = makeId(filePath);
     const metadata = await parseFile(filePath, { duration: true });
 
+    const bpm = metadata.common.bpm;
+
     return {
       id: trackId,
       path: filePath,
@@ -133,7 +135,8 @@ export async function buildTrack(filePath: string, folderId: string): Promise<Li
       audioFormat: metadata.format.container || extname(filePath).slice(1).toUpperCase(),
       sampleRate: metadata.format.sampleRate,
       bitRate: metadata.format.bitrate,
-      bpm: metadata.common.bpm,
+      bpm,
+      bpmSource: bpm ? "metadata" : undefined,
       folderId,
     };
   } catch {

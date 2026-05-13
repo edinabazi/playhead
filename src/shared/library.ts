@@ -35,6 +35,7 @@ export type LibraryTrack = {
   sampleRate?: number;
   bitRate?: number;
   bpm?: number;
+  bpmSource?: "metadata" | "analysis";
   folderId: string;
 };
 
@@ -197,6 +198,19 @@ export type WaveformCacheWrite = WaveformCacheRequest & {
   peaks: number[][];
 };
 
+export type BpmCacheRequest = {
+  trackId: string;
+  path: string;
+};
+
+export type BpmCacheEntry = {
+  bpm: number;
+  tempo: number;
+  analyzedAt: string;
+};
+
+export type BpmCacheWrite = BpmCacheRequest & BpmCacheEntry;
+
 export type PlayheadApi = {
   getAppVersion: () => Promise<string>;
   getLibraryState: () => Promise<LibraryState>;
@@ -209,6 +223,8 @@ export type PlayheadApi = {
   readAudioFile: (path: string) => Promise<ArrayBuffer>;
   getWaveformCache: (request: WaveformCacheRequest) => Promise<WaveformCacheEntry | null>;
   saveWaveformCache: (write: WaveformCacheWrite) => Promise<void>;
+  getBpmCache: (request: BpmCacheRequest) => Promise<BpmCacheEntry | null>;
+  saveBpmCache: (write: BpmCacheWrite) => Promise<void>;
   getTrackMetadata: (path: string) => Promise<TrackMetadata>;
   saveTrackMetadata: (
     path: string,

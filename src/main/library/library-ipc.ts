@@ -8,6 +8,8 @@ import type {
   LibraryState,
   WaveformCacheRequest,
   WaveformCacheWrite,
+  BpmCacheRequest,
+  BpmCacheWrite,
 } from "../../shared/library";
 import { electron } from "../electron";
 import { readTrackMetadata, saveTrackMetadata } from "../metadata/metadata";
@@ -15,6 +17,7 @@ import { watchLibraryFolders } from "./folder-watcher";
 import { scanFolderPath } from "./scanner";
 import { normalizeLibraryState, readLibraryState, writeLibraryState } from "./store";
 import { readWaveformCache, writeWaveformCache } from "./waveform-cache";
+import { readBpmCache, writeBpmCache } from "./bpm-cache";
 
 const { app, dialog, ipcMain, protocol, shell } = electron;
 
@@ -171,6 +174,18 @@ export function registerLibraryIpc(): void {
   ipcMain.handle("library:save-waveform-cache", async (_event, write: WaveformCacheWrite) => {
     await writeWaveformCache(write, {
       directory: join(app.getPath("userData"), "waveforms"),
+    });
+  });
+
+  ipcMain.handle("library:get-bpm-cache", async (_event, request: BpmCacheRequest) => {
+    return readBpmCache(request, {
+      directory: join(app.getPath("userData"), "bpm"),
+    });
+  });
+
+  ipcMain.handle("library:save-bpm-cache", async (_event, write: BpmCacheWrite) => {
+    await writeBpmCache(write, {
+      directory: join(app.getPath("userData"), "bpm"),
     });
   });
 

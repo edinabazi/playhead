@@ -68,7 +68,13 @@ export function mergeScannedFolder(state: LibraryState, scanned: ScannedFolder):
   const tracks = Object.fromEntries(
     Object.entries(state.tracks).filter(([, track]) => track.folderId !== scanned.folder.id),
   );
-  for (const track of scanned.tracks) tracks[track.id] = track;
+  for (const track of scanned.tracks) {
+    const existing = state.tracks[track.id];
+    tracks[track.id] =
+      track.bpm || !existing?.bpm || existing.bpmSource !== "analysis"
+        ? track
+        : { ...track, bpm: existing.bpm, bpmSource: "analysis" };
+  }
 
   const folders = [
     ...state.folders.filter((folder) => folder.id !== scanned.folder.id),

@@ -152,6 +152,68 @@ describe("library model", () => {
     expect(next.selectedSource).toEqual({ type: "folder", id: "folder-1" });
   });
 
+  it("preserves analyzed bpm when rescanned metadata has no bpm", () => {
+    const scanned: ScannedFolder = {
+      folder: { id: "folder-1", name: "Music", path: "/music", trackIds: ["track-1"] },
+      tracks: [
+        {
+          ...baseState.tracks["track-1"],
+          bpm: undefined,
+          bpmSource: undefined,
+        },
+      ],
+    };
+
+    const next = mergeScannedFolder(
+      {
+        ...baseState,
+        tracks: {
+          ...baseState.tracks,
+          "track-1": {
+            ...baseState.tracks["track-1"],
+            bpm: 128,
+            bpmSource: "analysis",
+          },
+        },
+      },
+      scanned,
+    );
+
+    expect(next.tracks["track-1"].bpm).toBe(128);
+    expect(next.tracks["track-1"].bpmSource).toBe("analysis");
+  });
+
+  it("prefers metadata bpm over preserved analyzed bpm", () => {
+    const scanned: ScannedFolder = {
+      folder: { id: "folder-1", name: "Music", path: "/music", trackIds: ["track-1"] },
+      tracks: [
+        {
+          ...baseState.tracks["track-1"],
+          bpm: 140,
+          bpmSource: "metadata",
+        },
+      ],
+    };
+
+    const next = mergeScannedFolder(
+      {
+        ...baseState,
+        tracks: {
+          ...baseState.tracks,
+          "track-1": {
+            ...baseState.tracks["track-1"],
+            bpm: 128,
+            bpmSource: "analysis",
+          },
+        },
+      },
+      scanned,
+    );
+
+    expect(next.tracks["track-1"].bpm).toBe(140);
+    expect(next.tracks["track-1"].bpmSource).toBe("metadata");
+  });
+
   it("creates numbered playlists", () => {
     expect(createPlaylist([]).name).toBe("New Playlist");
     expect(createPlaylist([baseState.playlists[0]]).name).toBe("New Playlist 2");

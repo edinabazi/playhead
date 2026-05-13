@@ -228,7 +228,7 @@ export function Player({
       <div className="grid grid-cols-[1fr_auto_1fr] items-center py-1">
         <div className="min-w-0 pr-4">
           {trackInfo.length > 0 && (
-            <div className="truncate font-mono text-[11px] font-medium uppercase leading-none text-muted-foreground">
+            <div className="truncate text-[12px] font-medium leading-normal text-muted-foreground">
               {trackInfo.join(" · ")}
             </div>
           )}

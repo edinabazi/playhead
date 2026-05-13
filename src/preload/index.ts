@@ -1,6 +1,8 @@
 import type { IpcRendererEvent } from "electron";
 import type {
   AppUpdateState,
+  BpmCacheRequest,
+  BpmCacheWrite,
   EditableTrackMetadata,
   LastfmTrackPayload,
   LibraryFolder,
@@ -31,6 +33,8 @@ const api: PlayheadApi = {
     ipcRenderer.invoke("library:get-waveform-cache", request),
   saveWaveformCache: (write: WaveformCacheWrite) =>
     ipcRenderer.invoke("library:save-waveform-cache", write),
+  getBpmCache: (request: BpmCacheRequest) => ipcRenderer.invoke("library:get-bpm-cache", request),
+  saveBpmCache: (write: BpmCacheWrite) => ipcRenderer.invoke("library:save-bpm-cache", write),
   getTrackMetadata: (path: string) => ipcRenderer.invoke("library:get-track-metadata", path),
   saveTrackMetadata: (path: string, folderId: string, metadata: EditableTrackMetadata) =>
     ipcRenderer.invoke("library:save-track-metadata", path, folderId, metadata),

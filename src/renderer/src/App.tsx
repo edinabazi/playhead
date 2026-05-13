@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import WaveSurfer from "wavesurfer.js";
+import { analyze } from "web-audio-beat-detector";
 import {
   type AppearanceSettings,
   type AppUpdateState,
@@ -138,10 +139,13 @@ export function App() {
   const libraryBrowserSelectionAnchorIdRef = useRef<string | null>(null);
   const trackLoadRequestIdRef = useRef(0);
   const trackLoadQueueRef = useRef(Promise.resolve());
+  const bpmAnalysisQueueRef = useRef(Promise.resolve());
+  const bpmAnalysisTrackIdsRef = useRef(new Set<string>());
   const loadedTrackIdRef = useRef<string | null>(null);
   const lastLibraryBackGestureAtRef = useRef(0);
   const lastfmPlaybackSessionRef = useRef<LastfmPlaybackSession | null>(null);
   const lastfmNowPlayingTrackIdRef = useRef<string | null>(null);
+  const libraryRef = useRef<LibraryState>(emptyLibraryState());
 
   const [library, setLibrary] = useState<LibraryState>(emptyLibraryState);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
@@ -235,6 +239,7 @@ export function App() {
   const reduceMotion = library.settings.appearance.reduceMotion;
 
   const persistLibrary = useCallback(async (nextState: LibraryState) => {
+    libraryRef.current = nextState;
     setLibrary(nextState);
     await window.playhead.saveLibraryState(nextState);
     await window.playhead.watchLibraryFolders(
@@ -255,6 +260,78 @@ export function App() {
       }));
     },
     [library],
+  );
+
+  const saveAnalyzedBpm = useCallback((trackId: string, bpm: number) => {
+    const current = libraryRef.current;
+    const track = current.tracks[trackId];
+    if (!track) return;
+
+    const nextState: LibraryState = {
+      ...current,
+      tracks: {
+        ...current.tracks,
+        [trackId]: {
+          ...track,
+          bpm,
+          bpmSource: "analysis" as const,
+        },
+      },
+    };
+
+    libraryRef.current = nextState;
+    setLibrary(nextState);
+    void window.playhead.saveLibraryState(nextState);
+  }, []);
+
+  const shouldAnalyzeBpm = useCallback((track: LibraryTrack): boolean => {
+    if (!track.bpm) return true;
+    return track.bpmSource === "analysis";
+  }, []);
+
+  const analyzeTrackBpm = useCallback(
+    async (track: LibraryTrack) => {
+      if (!shouldAnalyzeBpm(track) || bpmAnalysisTrackIdsRef.current.has(track.id)) return;
+
+      bpmAnalysisTrackIdsRef.current.add(track.id);
+      bpmAnalysisQueueRef.current = bpmAnalysisQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          try {
+            const request = { trackId: track.id, path: track.path };
+            const cachedBpm = await window.playhead.getBpmCache(request);
+            if (cachedBpm) {
+              saveAnalyzedBpm(track.id, Math.round(cachedBpm.bpm));
+              return;
+            }
+
+            const bytes = await window.playhead.readAudioFile(track.path);
+            const audioContext = new AudioContext({ sampleRate: 16000 });
+            try {
+              const buffer = await audioContext.decodeAudioData(bytes.slice(0));
+              const tempo = await analyze(buffer);
+              const bpm = Math.round(tempo);
+              if (!Number.isFinite(bpm) || bpm <= 0) return;
+
+              const analyzedAt = new Date().toISOString();
+              await window.playhead.saveBpmCache({
+                ...request,
+                bpm,
+                tempo,
+                analyzedAt,
+              });
+              saveAnalyzedBpm(track.id, bpm);
+            } finally {
+              await audioContext.close();
+            }
+          } catch (error) {
+            console.warn("Failed to analyze BPM", { path: track.path, error });
+          } finally {
+            bpmAnalysisTrackIdsRef.current.delete(track.id);
+          }
+        });
+    },
+    [saveAnalyzedBpm, shouldAnalyzeBpm],
   );
 
   const selectTrack = useCallback(
@@ -338,6 +415,7 @@ export function App() {
           has_duration: Boolean(track.duration),
           audio_format: track.audioFormat || "unknown",
         });
+        void analyzeTrackBpm(track);
         if (startTime > 0) {
           wavesurfer.setTime(clamp(startTime, 0, wavesurfer.getDuration() || startTime));
           setCurrentTime(wavesurfer.getCurrentTime());
@@ -371,6 +449,7 @@ export function App() {
       library.settings.playback.restoreLastSession,
       library.settings.playback.skipUnavailableTracks,
       library.settings.session,
+      analyzeTrackBpm,
       persistSessionSettings,
     ],
   );
@@ -1552,6 +1631,7 @@ export function App() {
   }, [activeTrackId, repeatMode, selectTrack, shuffleEnabled, tracks]);
 
   useEffect(() => {
+    libraryRef.current = library;
     activeTrackIdRef.current = activeTrackId;
     activeTrackRef.current = activeTrack;
     lastfmSettingsRef.current = library.settings.lastfm;
@@ -1561,6 +1641,7 @@ export function App() {
     activeTrack,
     activeTrackId,
     clearTrackPosition,
+    library,
     library.settings.lastfm,
     rememberTrackPosition,
   ]);
