@@ -30,6 +30,9 @@ export function SidebarShell({
   const SettingsIcon = icons.settings;
   const modifierLabel = getPrimaryModifierLabel();
   const hasReadyUpdate = updateState.status === "ready";
+  const queueTooltip = `${queueOpen ? "Hide queue" : "Show queue"} (${modifierLabel} L)`;
+  const searchTooltip = `Search library (${modifierLabel} K)`;
+  const settingsTooltip = `Open settings (${modifierLabel} ,)`;
 
   return (
     <aside className="app-drag relative flex size-full flex-col overflow-hidden rounded-[41px] bg-[rgba(0,0,0,0.2)] px-[18px] pb-[18px] pt-[54px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -54,7 +57,7 @@ export function SidebarShell({
       <div className="relative flex min-h-[30px] shrink-0 items-center justify-between">
         <img className="h-[26px]" src={playheadLogo} alt="Playhead" draggable={false} />
         <div className="flex items-center gap-0 translate-y-0.5 -mr-2">
-          <Tooltip content={queueOpen ? "Hide queue" : "Queue"} side="top" sideOffset={7}>
+          <Tooltip content={queueTooltip} side="top" sideOffset={7}>
             <button
               type="button"
               className={`no-drag grid size-8 place-items-center rounded-full transition ${
@@ -69,7 +72,7 @@ export function SidebarShell({
               <QueueIcon size={16} strokeWidth={1.8} />
             </button>
           </Tooltip>
-          <Tooltip content={`${modifierLabel} K`} side="top" sideOffset={7}>
+          <Tooltip content={searchTooltip} side="top" sideOffset={7}>
             <button
               type="button"
               className="no-drag grid size-8 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
@@ -79,7 +82,7 @@ export function SidebarShell({
               <SearchIcon size={16} strokeWidth={1.8} />
             </button>
           </Tooltip>
-          <Tooltip content={`${modifierLabel} ,`} side="top" sideOffset={7}>
+          <Tooltip content={settingsTooltip} side="top" sideOffset={7}>
             <button
               type="button"
               className="no-drag grid size-8 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"

@@ -1802,8 +1802,18 @@ export function App() {
     };
   }, [waveformElement]);
 
+  const playbackQueue = usePlaybackQueue({
+    library,
+    shuffleEnabled,
+    persistSessionSettings,
+    selectTrack,
+    setSelectedTrackIds,
+    setScrollToTrackId,
+  });
+
   usePlayerKeyboardShortcuts({
     playbackSettings: library.settings.playback,
+    onToggleQueue: playbackQueue.togglePanel,
     onOpenSearch: () => setIsSearchOpen(true),
     onOpenSettings: () => setIsSettingsOpen(true),
     onTogglePlayback: () => void togglePlayback(),
@@ -1896,14 +1906,6 @@ export function App() {
     selectedSource?.type === "tag"
       ? (library.tags || []).find((tag) => tag.id === selectedSource.id) || null
       : null;
-  const playbackQueue = usePlaybackQueue({
-    library,
-    shuffleEnabled,
-    persistSessionSettings,
-    selectTrack,
-    setSelectedTrackIds,
-    setScrollToTrackId,
-  });
 
   const hasLovedTracks = (library.favoriteTrackIds || []).some(
     (trackId) => library.tracks[trackId],

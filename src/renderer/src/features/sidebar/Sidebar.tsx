@@ -1,5 +1,6 @@
 import { useIcons } from "@/lib/icon-context";
-import { AnimatePresence, motion } from "framer-motion";
+import { panelContentVariants } from "@/lib/motion-variants";
+import { motion } from "framer-motion";
 import { useState } from "react";
 import type {
   AppUpdateState,
@@ -89,13 +90,10 @@ export function Sidebar({
       onOpenSettings={onOpenSettings}
       onInstallUpdate={onInstallUpdate}
       footer={
-        <motion.button
+        <button
           className="no-drag mt-[18px] hidden h-[49px] w-full shrink-0 items-center justify-center gap-2 rounded-[33px] bg-primary px-4 text-[14px] font-medium leading-none text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.48),0_14px_34px_rgba(255,255,0,0.08)] transition-colors disabled:opacity-55"
           title={isLibraryMode ? "Manage library" : "Add folder"}
           disabled={!isLibraryMode && isScanning}
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.985, y: 0 }}
-          transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.7 }}
           onClick={isLibraryMode ? onOpenSettings : onAddFolder}
         >
           {isLibraryMode ? (
@@ -104,11 +102,16 @@ export function Sidebar({
             <FolderPlusIcon size={17} strokeWidth={1.9} />
           )}
           {isLibraryMode ? "Manage Library" : isScanning ? "Scanning..." : "Add Folder"}
-        </motion.button>
+        </button>
       }
     >
       <div className="thin-scrollbar -mx-2 mt-[30px] min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2">
-        <div className="flex flex-col gap-[30px] overflow-visible no-drag">
+        <motion.div
+          className="flex flex-col gap-[30px] overflow-visible no-drag"
+          variants={panelContentVariants}
+          initial="hidden"
+          animate="show"
+        >
           {libraryMode === "library" ? (
             <SidebarGroup
               title="Library"
@@ -118,32 +121,30 @@ export function Sidebar({
               actionIcon={icons["folder-plus"]}
               onAction={onAddFolder}
             >
-              <AnimatePresence>
-                <SidebarItem
-                  key="library-artists"
-                  active={selectedSource?.type === "library-artists"}
-                  icon={icons.user}
-                  label="Artists"
-                  detail={`${artistCount}`}
-                  onClick={() => onSelectSource({ type: "library-artists" })}
-                />
-                <SidebarItem
-                  key="library-albums"
-                  active={selectedSource?.type === "library-albums"}
-                  icon={icons["square-library"]}
-                  label="Albums"
-                  detail={`${albumCount}`}
-                  onClick={() => onSelectSource({ type: "library-albums" })}
-                />
-                <SidebarItem
-                  key="library-tracks"
-                  active={selectedSource?.type === "library-tracks"}
-                  icon={icons.music}
-                  label="Tracks"
-                  detail={`${trackCount}`}
-                  onClick={() => onSelectSource({ type: "library-tracks" })}
-                />
-              </AnimatePresence>
+              <SidebarItem
+                key="library-artists"
+                active={selectedSource?.type === "library-artists"}
+                icon={icons.user}
+                label="Artists"
+                detail={`${artistCount}`}
+                onClick={() => onSelectSource({ type: "library-artists" })}
+              />
+              <SidebarItem
+                key="library-albums"
+                active={selectedSource?.type === "library-albums"}
+                icon={icons["square-library"]}
+                label="Albums"
+                detail={`${albumCount}`}
+                onClick={() => onSelectSource({ type: "library-albums" })}
+              />
+              <SidebarItem
+                key="library-tracks"
+                active={selectedSource?.type === "library-tracks"}
+                icon={icons.music}
+                label="Tracks"
+                detail={`${trackCount}`}
+                onClick={() => onSelectSource({ type: "library-tracks" })}
+              />
             </SidebarGroup>
           ) : (
             <SidebarGroup
@@ -159,21 +160,19 @@ export function Sidebar({
                   {isScanning ? "Scanning..." : "No folders added"}
                 </SidebarEmpty>
               ) : (
-                <AnimatePresence>
-                  {folders.map((folder) => (
-                    <SidebarItem
-                      key={folder.id}
-                      active={selectedSource?.type === "folder" && selectedSource.id === folder.id}
-                      icon={icons["folder-open"]}
-                      label={folder.name}
-                      detail={`${folder.trackIds.length}`}
-                      onClick={() => onSelectSource({ type: "folder", id: folder.id })}
-                      onContextMenu={(point) =>
-                        setContextMenu({ type: "folder", item: folder, point })
-                      }
-                    />
-                  ))}
-                </AnimatePresence>
+                folders.map((folder) => (
+                  <SidebarItem
+                    key={folder.id}
+                    active={selectedSource?.type === "folder" && selectedSource.id === folder.id}
+                    icon={icons["folder-open"]}
+                    label={folder.name}
+                    detail={`${folder.trackIds.length}`}
+                    onClick={() => onSelectSource({ type: "folder", id: folder.id })}
+                    onContextMenu={(point) =>
+                      setContextMenu({ type: "folder", item: folder, point })
+                    }
+                  />
+                ))
               )}
             </SidebarGroup>
           )}
@@ -189,7 +188,7 @@ export function Sidebar({
             {lovedCount === 0 && playlists.length === 0 ? (
               <SidebarEmpty key="playlists-empty">No playlists yet</SidebarEmpty>
             ) : (
-              <AnimatePresence>
+              <>
                 {lovedCount > 0 && (
                   <SidebarItem
                     key="loved"
@@ -217,7 +216,7 @@ export function Sidebar({
                     }
                   />
                 ))}
-              </AnimatePresence>
+              </>
             )}
           </SidebarGroup>
 
@@ -232,23 +231,21 @@ export function Sidebar({
             {tags.length === 0 ? (
               <SidebarEmpty key="tags-empty">No tags yet</SidebarEmpty>
             ) : (
-              <AnimatePresence>
-                {tags.map((tag) => (
-                  <SidebarItem
-                    key={tag.id}
-                    active={selectedSource?.type === "tag" && selectedSource.id === tag.id}
-                    icon={icons.tag}
-                    label={tag.name}
-                    detail={`${tag.trackIds.length}`}
-                    onClick={() => onSelectSource({ type: "tag", id: tag.id })}
-                    onDropTrack={(trackIds) => onDropTrackToTag(trackIds, tag)}
-                    onContextMenu={(point) => setContextMenu({ type: "tag", item: tag, point })}
-                  />
-                ))}
-              </AnimatePresence>
+              tags.map((tag) => (
+                <SidebarItem
+                  key={tag.id}
+                  active={selectedSource?.type === "tag" && selectedSource.id === tag.id}
+                  icon={icons.tag}
+                  label={tag.name}
+                  detail={`${tag.trackIds.length}`}
+                  onClick={() => onSelectSource({ type: "tag", id: tag.id })}
+                  onDropTrack={(trackIds) => onDropTrackToTag(trackIds, tag)}
+                  onContextMenu={(point) => setContextMenu({ type: "tag", item: tag, point })}
+                />
+              ))
             )}
           </SidebarGroup>
-        </div>
+        </motion.div>
       </div>
 
       <SidebarContextMenu

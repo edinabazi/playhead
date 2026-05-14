@@ -1,6 +1,7 @@
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
-import { AnimatePresence, motion } from "framer-motion";
+import { panelSectionVariants } from "@/lib/motion-variants";
+import { motion } from "framer-motion";
 import { useState } from "react";
 
 type SidebarIcon = React.ComponentType<{
@@ -37,7 +38,8 @@ export function SidebarGroup({
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <section
+    <motion.section
+      variants={panelSectionVariants}
       className="no-drag flex flex-col gap-1"
       onPointerEnter={() => setIsHovered(true)}
       onPointerLeave={() => setIsHovered(false)}
@@ -84,19 +86,7 @@ export function SidebarGroup({
           </Tooltip>
         </div>
       </div>
-      <AnimatePresence initial={false}>
-        {!collapsed && (
-          <motion.div
-            className="-mx-2 flex flex-col gap-1 overflow-hidden px-2"
-            initial={{ height: 0, opacity: 0, y: -4 }}
-            animate={{ height: "auto", opacity: 1, y: 0 }}
-            exit={{ height: 0, opacity: 0, y: -4 }}
-            transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.8 }}
-          >
-            {children}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </section>
+      {!collapsed && <div className="-mx-2 flex flex-col gap-1 px-2">{children}</div>}
+    </motion.section>
   );
 }

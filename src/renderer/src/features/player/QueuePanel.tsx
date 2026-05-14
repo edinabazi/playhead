@@ -1,5 +1,11 @@
+import { motion } from "framer-motion";
 import { useState } from "react";
 import { useIcons } from "@/lib/icon-context";
+import {
+  panelContentVariants,
+  panelItemVariants,
+  panelSectionVariants,
+} from "@/lib/motion-variants";
 import type { LibraryTrack, PlaybackQueueItem } from "../../../../shared/library";
 import { TrackArtwork } from "@/features/tracks/TrackArtwork";
 import { TrackCell } from "@/features/tracks/TrackCell";
@@ -71,12 +77,29 @@ export function QueuePanel({
         }}
       >
         {validItems.length === 0 || !activeItem || !activeTrack ? (
-          <div className="flex h-full min-h-[180px] items-center justify-center rounded-[22px] border border-dashed border-white/12 bg-white/[0.025] px-5 text-center text-[13px] font-medium leading-normal text-muted-foreground">
+          <motion.div
+            className="flex h-full min-h-[180px] items-center justify-center rounded-[22px] border border-dashed border-white/12 bg-white/[0.025] px-5 text-center text-[13px] font-medium leading-normal text-muted-foreground"
+            initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{
+              type: "spring",
+              stiffness: 520,
+              damping: 38,
+              mass: 0.76,
+              opacity: { duration: 0.16 },
+              filter: { duration: 0.18 },
+            }}
+          >
             Drop tracks here to build a queue.
-          </div>
+          </motion.div>
         ) : (
-          <div className="flex flex-col gap-4 pb-4">
-            <div className="flex flex-col gap-0.5">
+          <motion.div
+            className="flex flex-col gap-4 pb-4"
+            variants={panelContentVariants}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.div className="flex flex-col gap-0.5" variants={panelSectionVariants}>
               <SectionLabel>Now Playing</SectionLabel>
               <QueueRow
                 item={activeItem}
@@ -96,14 +119,17 @@ export function QueuePanel({
                 setDraggedItemIds={setDraggedItemIds}
                 setDropIndicator={setDropIndicator}
               />
-            </div>
+            </motion.div>
 
-            <div className="flex flex-col gap-0.5">
+            <motion.div className="flex flex-col gap-0.5" variants={panelSectionVariants}>
               <SectionLabel>Up Next</SectionLabel>
               {upcomingItems.length === 0 ? (
-                <div className="rounded-[18px] border border-dashed border-white/10 bg-white/[0.025] px-4 py-5 text-center text-[13px] font-medium text-muted-foreground">
+                <motion.div
+                  className="rounded-[18px] border border-dashed border-white/10 bg-white/[0.025] px-4 py-5 text-center text-[13px] font-medium text-muted-foreground"
+                  variants={panelItemVariants}
+                >
                   No upcoming tracks.
-                </div>
+                </motion.div>
               ) : (
                 upcomingItems.map((item) => {
                   const track = tracksById[item.trackId];
@@ -134,8 +160,8 @@ export function QueuePanel({
                   );
                 })
               )}
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
       </div>
     </div>
@@ -188,7 +214,11 @@ function QueueRow({
   >;
 }) {
   return (
-    <div className="relative -mx-2 w-[calc(100%+16px)]">
+    <motion.div
+      layout="position"
+      className="relative -mx-2 w-[calc(100%+16px)]"
+      variants={panelItemVariants}
+    >
       {showBeforeLine && <DropIndicator />}
       <TrackCell
         draggable={!nowPlaying}
@@ -291,7 +321,7 @@ function QueueRow({
         )}
       </TrackCell>
       {showAfterLine && <DropIndicator />}
-    </div>
+    </motion.div>
   );
 }
 

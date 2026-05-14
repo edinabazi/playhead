@@ -18,4 +18,18 @@ export const updateMessagesByVersion: Record<string, UpdateMessage> = {
     ),
     buttonLabel: "Got it",
   },
+  "0.1.12": {
+    title: "Playhead has been updated",
+    description: (
+      <ul>
+        <li>
+          Added <strong>queue</strong> support (CMD/Ctrl+L)
+        </li>
+        <li>Improved shuffle logic</li>
+        <li>Fixed sidebar animations</li>
+        <li>Code cleanup and refactoring</li>
+      </ul>
+    ),
+    buttonLabel: "Got it",
+  },
 };
