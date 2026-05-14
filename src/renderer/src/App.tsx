@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import WaveSurfer from "wavesurfer.js";
-import playheadLogo from "@/assets/playhead-logo.svg";
-import { WindowControls } from "@/components/WindowControls";
-import { Tooltip } from "@/components/ui/tooltip";
 import {
   type AppearanceSettings,
   type AppUpdateState,
@@ -18,29 +15,23 @@ import {
   type LibraryState,
   type LibraryTag,
   type LibraryTrack,
-  type PlaybackQueueItem,
   type PlaybackSettings,
   type TelemetrySettings,
   defaultSessionSettings,
 } from "../../shared/library";
 import { getMediaArtworkSrc } from "@/lib/artwork";
 import { isEditableTarget } from "@/lib/dom";
-import { useIcons } from "@/lib/icon-context";
-import { getPrimaryModifierLabel } from "@/lib/platform";
 import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
-import { QueuePanel } from "@/features/player/QueuePanel";
+import { QueueSidebar } from "@/features/player/QueueSidebar";
+import { usePlaybackQueue } from "@/features/player/use-playback-queue";
 import {
-  addTracksToQueue as addTracksToPlaybackQueue,
   buildQueueFromTracks,
   getActiveQueueIndex,
   getVisibleQueueItems,
-  removeQueueItem,
-  reorderQueueItems,
   setQueueActiveTrack,
   smartShuffleQueue,
-  type QueueDropEdge,
 } from "@/features/player/queue-model";
 import {
   createLastfmPlaybackSession,
@@ -75,8 +66,6 @@ import {
   waveformAnalysisPeakRate,
 } from "@/features/audio/audio-analysis";
 import {
-  createPlaylist,
-  createTag,
   emptyLibraryState,
   getLibraryAlbums,
   getLibraryArtists,
@@ -86,6 +75,7 @@ import {
   getTrackArtistId,
   mergeScannedFolder,
 } from "@/features/library/library-model";
+import { useLibraryActions } from "@/features/library/use-library-actions";
 import { EmptyLibraryState } from "@/features/library/EmptyLibraryState";
 import { LibraryDetailHeader } from "@/features/library/LibraryDetailHeader";
 import { LibraryBrowser } from "@/features/library/LibraryBrowser";
@@ -194,11 +184,6 @@ function dismissUpdateMessage(version: string): void {
 }
 
 export function App() {
-  const icons = useIcons();
-  const QueueIcon = icons["list-plus"];
-  const SearchIcon = icons.search;
-  const SettingsIcon = icons.settings;
-  const modifierLabel = getPrimaryModifierLabel();
   const topGapWindowDragHandlers = useWindowDrag<HTMLDivElement>();
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const playNextTrackOnEndRef = useRef<() => boolean>(() => false);
@@ -281,10 +266,6 @@ export function App() {
 
   const tracks = useMemo(() => getSourceTracks(library), [library]);
   const allTracks = useMemo(() => Object.values(library.tracks), [library.tracks]);
-  const queueItems = useMemo(
-    () => getVisibleQueueItems(library.settings.session.queue, shuffleEnabled),
-    [library.settings.session.queue, shuffleEnabled],
-  );
   const libraryArtists = useMemo(() => getLibraryArtists(library), [library]);
   const libraryAlbums = useMemo(() => getLibraryAlbums(library), [library]);
   const libraryTrackCount = useMemo(() => getAllLibraryTracks(library).length, [library]);
@@ -1000,91 +981,6 @@ export function App() {
     [clearPlaybackState, library, persistLibrary, rescanLibrary],
   );
 
-  const createNewPlaylist = useCallback(
-    async (name: string, tracksToAdd: LibraryTrack[] = []) => {
-      const playlist = createPlaylist(library.playlists, name);
-      const trackIdsToAdd = tracksToAdd
-        .filter(
-          (track, index) =>
-            library.tracks[track.id] &&
-            tracksToAdd.findIndex((item) => item.id === track.id) === index,
-        )
-        .map((track) => track.id);
-      const now = new Date().toISOString();
-      await persistLibrary({
-        ...library,
-        playlists: [
-          ...library.playlists,
-          trackIdsToAdd.length > 0
-            ? { ...playlist, trackIds: trackIdsToAdd, updatedAt: now }
-            : playlist,
-        ],
-        selectedSource: { type: "playlist", id: playlist.id },
-      });
-      window.playhead.trackEvent("playlist_created", {
-        from_track: trackIdsToAdd.length > 0,
-      });
-      if (trackIdsToAdd.length === 1) {
-        const track = tracksToAdd.find((item) => item.id === trackIdsToAdd[0]);
-        if (track) {
-          showTrackActionToast({
-            action: "Playlist created",
-            track,
-            detail: `Added to ${playlist.name}`,
-          });
-        }
-      } else if (trackIdsToAdd.length > 1) {
-        showSimpleActionToast(`${trackIdsToAdd.length} tracks added to ${playlist.name}.`);
-      } else {
-        showSimpleActionToast(`Playlist created: ${playlist.name}`);
-      }
-      setIsCreatePlaylistOpen(false);
-      setTracksPendingPlaylistCreation([]);
-    },
-    [library, persistLibrary],
-  );
-
-  const createNewTag = useCallback(
-    async (name: string, tracksToAdd: LibraryTrack[] = []) => {
-      const trimmedName = name.trim();
-      if (!trimmedName) return;
-      const duplicate = (library.tags || []).some(
-        (tag) => tag.name.trim().toLowerCase() === trimmedName.toLowerCase(),
-      );
-      if (duplicate) {
-        showSimpleActionToast(`Tag already exists: ${trimmedName}`);
-        return;
-      }
-
-      const tag = createTag(library.tags || [], trimmedName);
-      const trackIdsToAdd = tracksToAdd
-        .filter(
-          (track, index) =>
-            library.tracks[track.id] &&
-            tracksToAdd.findIndex((item) => item.id === track.id) === index,
-        )
-        .map((track) => track.id);
-      const now = new Date().toISOString();
-
-      await persistLibrary({
-        ...library,
-        tags: [
-          ...(library.tags || []),
-          trackIdsToAdd.length > 0 ? { ...tag, trackIds: trackIdsToAdd, updatedAt: now } : tag,
-        ],
-        selectedSource: { type: "tag", id: tag.id },
-      });
-      showSimpleActionToast(
-        trackIdsToAdd.length > 0
-          ? `${trackIdsToAdd.length} ${trackIdsToAdd.length === 1 ? "track" : "tracks"} tagged ${tag.name}.`
-          : `Tag created: ${tag.name}`,
-      );
-      setIsCreateTagOpen(false);
-      setTracksPendingTagCreation([]);
-    },
-    [library, persistLibrary],
-  );
-
   const removeFolderFromPlayhead = useCallback(
     async (folderId: string) => {
       const removedTrackIds = new Set(
@@ -1137,141 +1033,6 @@ export function App() {
       });
     },
     [activeTrackId, library, persistLibrary],
-  );
-
-  const renamePlaylist = useCallback(
-    async (playlistId: string, name: string) => {
-      const playlist = library.playlists.find((item) => item.id === playlistId);
-      if (!playlist) return;
-
-      const trimmedName = name.trim();
-      if (!trimmedName || trimmedName === playlist.name) {
-        setRenamingPlaylistId(null);
-        return;
-      }
-      const now = new Date().toISOString();
-
-      await persistLibrary({
-        ...library,
-        playlists: library.playlists.map((item) =>
-          item.id === playlistId ? { ...item, name: trimmedName, updatedAt: now } : item,
-        ),
-      });
-      setRenamingPlaylistId(null);
-    },
-    [library, persistLibrary],
-  );
-
-  const deletePlaylist = useCallback(
-    async (playlistId: string) => {
-      const deletedPlaylist = library.playlists.find((playlist) => playlist.id === playlistId);
-      const nextPlaylists = library.playlists.filter((playlist) => playlist.id !== playlistId);
-
-      await persistLibrary({
-        ...library,
-        playlists: nextPlaylists,
-        selectedSource:
-          library.selectedSource?.type === "playlist" && library.selectedSource.id === playlistId
-            ? library.folders[0]
-              ? { type: "folder", id: library.folders[0].id }
-              : null
-            : library.selectedSource,
-      });
-      if (deletedPlaylist) showSimpleActionToast(`Playlist deleted: ${deletedPlaylist.name}`);
-    },
-    [library, persistLibrary],
-  );
-
-  const renameTag = useCallback(
-    async (tagId: string, name: string) => {
-      const tag = (library.tags || []).find((item) => item.id === tagId);
-      if (!tag) return;
-
-      const trimmedName = name.trim();
-      if (!trimmedName || trimmedName === tag.name) {
-        setRenamingTagId(null);
-        return;
-      }
-      const duplicate = (library.tags || []).some(
-        (item) => item.id !== tagId && item.name.trim().toLowerCase() === trimmedName.toLowerCase(),
-      );
-      if (duplicate) {
-        showSimpleActionToast(`Tag already exists: ${trimmedName}`);
-        return;
-      }
-      const now = new Date().toISOString();
-
-      await persistLibrary({
-        ...library,
-        tags: (library.tags || []).map((item) =>
-          item.id === tagId ? { ...item, name: trimmedName, updatedAt: now } : item,
-        ),
-      });
-      setRenamingTagId(null);
-    },
-    [library, persistLibrary],
-  );
-
-  const deleteTag = useCallback(
-    async (tagId: string) => {
-      const deletedTag = (library.tags || []).find((tag) => tag.id === tagId);
-      const nextTags = (library.tags || []).filter((tag) => tag.id !== tagId);
-
-      await persistLibrary({
-        ...library,
-        tags: nextTags,
-        selectedSource:
-          library.selectedSource?.type === "tag" && library.selectedSource.id === tagId
-            ? library.settings.library.mode === "library"
-              ? { type: "library-tracks" }
-              : library.folders[0]
-                ? { type: "folder", id: library.folders[0].id }
-                : library.playlists[0]
-                  ? { type: "playlist", id: library.playlists[0].id }
-                  : nextTags[0]
-                    ? { type: "tag", id: nextTags[0].id }
-                    : null
-            : library.selectedSource,
-      });
-      if (deletedTag) showSimpleActionToast(`Tag deleted: ${deletedTag.name}`);
-    },
-    [library, persistLibrary],
-  );
-
-  const removeTracksFromSelectedPlaylist = useCallback(
-    async (trackIds: string[]) => {
-      const source = library.selectedSource;
-      if (!source || source.type !== "playlist") return;
-      const trackIdsToRemove = new Set(trackIds);
-      if (trackIdsToRemove.size === 0) return;
-      const now = new Date().toISOString();
-
-      await persistLibrary({
-        ...library,
-        playlists: library.playlists.map((playlist) =>
-          playlist.id === source.id
-            ? {
-                ...playlist,
-                trackIds: playlist.trackIds.filter((item) => !trackIdsToRemove.has(item)),
-                updatedAt: now,
-              }
-            : playlist,
-        ),
-      });
-    },
-    [library, persistLibrary],
-  );
-
-  const requestRemoveTracksFromSelectedPlaylist = useCallback(
-    (trackIds: string[]) => {
-      if (trackIds.length > 1) {
-        setPlaylistTrackIdsPendingRemoval(trackIds);
-        return;
-      }
-
-      void removeTracksFromSelectedPlaylist(trackIds);
-    },
-    [removeTracksFromSelectedPlaylist],
   );
 
   const toggleFavoriteTrack = useCallback(
@@ -1335,124 +1096,30 @@ export function App() {
     [library, persistLibrary],
   );
 
-  const addTrackToPlaylist = useCallback(
-    async (trackId: string, playlist: LibraryPlaylist) => {
-      if (playlist.trackIds.includes(trackId)) return;
-      const track = library.tracks[trackId];
-      const now = new Date().toISOString();
-
-      await persistLibrary({
-        ...library,
-        playlists: library.playlists.map((item) =>
-          item.id === playlist.id
-            ? { ...item, trackIds: [...item.trackIds, trackId], updatedAt: now }
-            : item,
-        ),
-      });
-      if (track) {
-        showTrackActionToast({
-          action: "Added to playlist",
-          track,
-          detail: playlist.name,
-        });
-      }
-    },
-    [library, persistLibrary],
-  );
-
-  const addTracksToPlaylist = useCallback(
-    async (trackIds: string[], playlist: LibraryPlaylist) => {
-      const trackIdsToAdd = trackIds.filter(
-        (trackId, index) =>
-          library.tracks[trackId] &&
-          !playlist.trackIds.includes(trackId) &&
-          trackIds.indexOf(trackId) === index,
-      );
-      if (trackIdsToAdd.length === 0) return;
-
-      const now = new Date().toISOString();
-      await persistLibrary({
-        ...library,
-        playlists: library.playlists.map((item) =>
-          item.id === playlist.id
-            ? { ...item, trackIds: [...item.trackIds, ...trackIdsToAdd], updatedAt: now }
-            : item,
-        ),
-      });
-
-      const firstTrack = library.tracks[trackIdsToAdd[0]];
-      if (trackIdsToAdd.length === 1 && firstTrack) {
-        showTrackActionToast({
-          action: "Added to playlist",
-          track: firstTrack,
-          detail: playlist.name,
-        });
-        return;
-      }
-
-      showSimpleActionToast(`${trackIdsToAdd.length} tracks added to ${playlist.name}.`);
-    },
-    [library, persistLibrary],
-  );
-
-  const addTracksToTag = useCallback(
-    async (trackIds: string[], tag: LibraryTag) => {
-      const trackIdsToAdd = trackIds.filter(
-        (trackId, index) =>
-          library.tracks[trackId] &&
-          !tag.trackIds.includes(trackId) &&
-          trackIds.indexOf(trackId) === index,
-      );
-      if (trackIdsToAdd.length === 0) return;
-
-      const now = new Date().toISOString();
-      await persistLibrary({
-        ...library,
-        tags: (library.tags || []).map((item) =>
-          item.id === tag.id
-            ? { ...item, trackIds: [...item.trackIds, ...trackIdsToAdd], updatedAt: now }
-            : item,
-        ),
-      });
-
-      const firstTrack = library.tracks[trackIdsToAdd[0]];
-      if (trackIdsToAdd.length === 1 && firstTrack) {
-        showTrackActionToast({
-          action: "Tagged",
-          track: firstTrack,
-          detail: tag.name,
-        });
-        return;
-      }
-
-      showSimpleActionToast(`${trackIdsToAdd.length} tracks tagged ${tag.name}.`);
-    },
-    [library, persistLibrary],
-  );
-
-  const removeTracksFromSelectedTag = useCallback(
-    async (trackIds: string[]) => {
-      const source = library.selectedSource;
-      if (!source || source.type !== "tag") return;
-      const trackIdsToRemove = new Set(trackIds);
-      if (trackIdsToRemove.size === 0) return;
-      const now = new Date().toISOString();
-
-      await persistLibrary({
-        ...library,
-        tags: (library.tags || []).map((tag) =>
-          tag.id === source.id
-            ? {
-                ...tag,
-                trackIds: tag.trackIds.filter((item) => !trackIdsToRemove.has(item)),
-                updatedAt: now,
-              }
-            : tag,
-        ),
-      });
-    },
-    [library, persistLibrary],
-  );
+  const {
+    createNewPlaylist,
+    createNewTag,
+    renamePlaylist,
+    deletePlaylist,
+    renameTag,
+    deleteTag,
+    removeTracksFromSelectedPlaylist,
+    requestRemoveTracksFromSelectedPlaylist,
+    addTrackToPlaylist,
+    addTracksToPlaylist,
+    addTracksToTag,
+    removeTracksFromSelectedTag,
+  } = useLibraryActions({
+    library,
+    persistLibrary,
+    setIsCreatePlaylistOpen,
+    setTracksPendingPlaylistCreation,
+    setIsCreateTagOpen,
+    setTracksPendingTagCreation,
+    setPlaylistTrackIdsPendingRemoval,
+    setRenamingPlaylistId,
+    setRenamingTagId,
+  });
 
   const reorderTrack = useCallback(
     async (trackIds: string[], targetTrackId: string, edge: "before" | "after" = "before") => {
@@ -2229,74 +1896,14 @@ export function App() {
     selectedSource?.type === "tag"
       ? (library.tags || []).find((tag) => tag.id === selectedSource.id) || null
       : null;
-  const queuePanelOpen = library.settings.session.queue.panelOpen;
-  const updatePlaybackQueue = useCallback(
-    (queue: LibraryState["settings"]["session"]["queue"]) => {
-      persistSessionSettings({
-        ...library.settings.session,
-        queue,
-      });
-    },
-    [library.settings.session, persistSessionSettings],
-  );
-  const toggleQueuePanel = useCallback(() => {
-    updatePlaybackQueue({
-      ...library.settings.session.queue,
-      panelOpen: !library.settings.session.queue.panelOpen,
-    });
-  }, [library.settings.session.queue, updatePlaybackQueue]);
-  const playQueueItem = useCallback(
-    (item: PlaybackQueueItem) => {
-      const track = library.tracks[item.trackId];
-      if (!track) return;
-      updatePlaybackQueue({ ...library.settings.session.queue, activeItemId: item.id });
-      setSelectedTrackIds([track.id]);
-      setScrollToTrackId(track.id);
-      void selectTrack(track, true, 0, false, "preserve", item.id);
-    },
-    [library.settings.session.queue, library.tracks, selectTrack, updatePlaybackQueue],
-  );
-  const reorderPlaybackQueueItems = useCallback(
-    (itemIds: string[], targetItemId: string, edge: QueueDropEdge) => {
-      updatePlaybackQueue(
-        reorderQueueItems(
-          library.settings.session.queue,
-          itemIds,
-          targetItemId,
-          edge,
-          shuffleEnabled,
-        ),
-      );
-    },
-    [library.settings.session.queue, shuffleEnabled, updatePlaybackQueue],
-  );
-  const addTracksToQueue = useCallback(
-    (trackIds: string[], targetItemId: string | null, edge: QueueDropEdge) => {
-      const validTrackIds = trackIds.filter((trackId) => library.tracks[trackId]);
-      if (validTrackIds.length === 0) return;
-      updatePlaybackQueue(
-        addTracksToPlaybackQueue(
-          library.settings.session.queue,
-          validTrackIds,
-          targetItemId,
-          edge,
-          shuffleEnabled,
-        ),
-      );
-      showSimpleActionToast(
-        validTrackIds.length === 1
-          ? "Track added to queue."
-          : `${validTrackIds.length} tracks added to queue.`,
-      );
-    },
-    [library.settings.session.queue, library.tracks, shuffleEnabled, updatePlaybackQueue],
-  );
-  const removeItemFromQueue = useCallback(
-    (item: PlaybackQueueItem) => {
-      updatePlaybackQueue(removeQueueItem(library.settings.session.queue, item.id));
-    },
-    [library.settings.session.queue, updatePlaybackQueue],
-  );
+  const playbackQueue = usePlaybackQueue({
+    library,
+    shuffleEnabled,
+    persistSessionSettings,
+    selectTrack,
+    setSelectedTrackIds,
+    setScrollToTrackId,
+  });
 
   const hasLovedTracks = (library.favoriteTrackIds || []).some(
     (trackId) => library.tracks[trackId],
@@ -2319,80 +1926,26 @@ export function App() {
             className="app-drag relative flex h-full min-h-0 shrink-0 transition-[width] duration-200"
             style={{ width: sidebarWidth }}
           >
-            {queuePanelOpen ? (
-              <aside className="app-drag relative flex size-full flex-col overflow-hidden rounded-[41px] bg-[rgba(0,0,0,0.2)] px-[18px] pb-[18px] pt-[54px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                <WindowControls />
-                {updateState.status === "ready" && (
-                  <Tooltip
-                    content={
-                      updateState.version ? `Install ${updateState.version}` : "Install update"
-                    }
-                    side="top"
-                    sideOffset={7}
-                  >
-                    <button
-                      type="button"
-                      className="absolute top-4.5 right-6 no-drag h-5 rounded-full bg-primary px-2 text-[11px] font-semibold leading-none text-primary-foreground transition hover:bg-primary/90 font-mono uppercase"
-                      aria-label="Install update and restart"
-                      onClick={() => {
-                        window.playhead.trackEvent("app_update_install_clicked", {
-                          version: updateState.version || "unknown",
-                        });
-                        void window.playhead.installUpdate();
-                      }}
-                    >
-                      Update
-                    </button>
-                  </Tooltip>
-                )}
-                <div className="relative flex min-h-[30px] shrink-0 items-center justify-between">
-                  <img className="h-[26px]" src={playheadLogo} alt="Playhead" draggable={false} />
-                  <div className="flex items-center gap-0 translate-y-0.5 -mr-2">
-                    <Tooltip content="Hide queue" side="top" sideOffset={7}>
-                      <button
-                        type="button"
-                        className="no-drag grid size-8 place-items-center rounded-full bg-primary/15 text-primary transition hover:bg-primary/20"
-                        aria-label="Hide queue"
-                        aria-pressed={queuePanelOpen}
-                        onClick={toggleQueuePanel}
-                      >
-                        <QueueIcon size={16} strokeWidth={1.8} />
-                      </button>
-                    </Tooltip>
-                    <Tooltip content={`${modifierLabel} K`} side="top" sideOffset={7}>
-                      <button
-                        type="button"
-                        className="no-drag grid size-8 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-                        aria-label="Search"
-                        onClick={() => setIsSearchOpen(true)}
-                      >
-                        <SearchIcon size={16} strokeWidth={1.8} />
-                      </button>
-                    </Tooltip>
-                    <Tooltip content={`${modifierLabel} ,`} side="top" sideOffset={7}>
-                      <button
-                        type="button"
-                        className="no-drag grid size-8 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-                        aria-label="Settings"
-                        onClick={() => setIsSettingsOpen(true)}
-                      >
-                        <SettingsIcon size={16} strokeWidth={1.8} />
-                      </button>
-                    </Tooltip>
-                  </div>
-                </div>
-                <div className="mt-[30px] flex min-h-0 flex-1 flex-col">
-                  <QueuePanel
-                    items={queueItems}
-                    tracksById={library.tracks}
-                    activeItemId={library.settings.session.queue.activeItemId}
-                    onPlayItem={playQueueItem}
-                    onReorderItems={reorderPlaybackQueueItems}
-                    onAddTracks={addTracksToQueue}
-                    onRemoveItem={removeItemFromQueue}
-                  />
-                </div>
-              </aside>
+            {playbackQueue.panelOpen ? (
+              <QueueSidebar
+                items={playbackQueue.items}
+                tracksById={library.tracks}
+                activeItemId={playbackQueue.activeItemId}
+                updateState={updateState}
+                onToggleQueue={playbackQueue.togglePanel}
+                onOpenSearch={() => setIsSearchOpen(true)}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onInstallUpdate={() => {
+                  window.playhead.trackEvent("app_update_install_clicked", {
+                    version: updateState.version || "unknown",
+                  });
+                  void window.playhead.installUpdate();
+                }}
+                onPlayItem={playbackQueue.playItem}
+                onReorderItems={playbackQueue.reorderItems}
+                onAddTracks={playbackQueue.addTracks}
+                onRemoveItem={playbackQueue.removeItem}
+              />
             ) : (
               <Sidebar
                 folders={library.folders}
@@ -2439,8 +1992,8 @@ export function App() {
                   }
                   setTagPendingDeletion(tag);
                 }}
-                queueOpen={queuePanelOpen}
-                onToggleQueue={toggleQueuePanel}
+                queueOpen={playbackQueue.panelOpen}
+                onToggleQueue={playbackQueue.togglePanel}
               />
             )}
           </div>
