@@ -5,6 +5,10 @@ const trackIdsMimeType = "application/x-playhead-track-ids";
 const queueItemIdMimeType = "application/x-playhead-queue-item-id";
 const queueItemIdsMimeType = "application/x-playhead-queue-item-ids";
 
+function hasType(dataTransfer: DataTransfer, mimeType: string) {
+  return Array.from(dataTransfer.types).includes(mimeType);
+}
+
 export function setDraggedTrackIds(
   dataTransfer: DataTransfer,
   trackIds: string[],
@@ -32,6 +36,10 @@ export function getDraggedTrackIds(dataTransfer: DataTransfer) {
   return fallbackTrackId ? [fallbackTrackId] : [];
 }
 
+export function hasDraggedTrackIds(dataTransfer: DataTransfer) {
+  return hasType(dataTransfer, trackIdsMimeType) || hasType(dataTransfer, trackIdMimeType);
+}
+
 export function setDraggedQueueItemIds(
   dataTransfer: DataTransfer,
   itemIds: string[],
@@ -57,6 +65,10 @@ export function getDraggedQueueItemIds(dataTransfer: DataTransfer) {
   }
 
   return fallbackItemId ? [fallbackItemId] : [];
+}
+
+export function hasDraggedQueueItemIds(dataTransfer: DataTransfer) {
+  return hasType(dataTransfer, queueItemIdsMimeType) || hasType(dataTransfer, queueItemIdMimeType);
 }
 
 export function createTrackStackDragImage(tracks: LibraryTrack[]) {

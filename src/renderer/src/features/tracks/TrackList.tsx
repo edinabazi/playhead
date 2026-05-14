@@ -151,7 +151,7 @@ export function TrackList({
                           .map((trackId) => tracks.find((item) => item.id === trackId))
                           .filter((item): item is LibraryTrack => Boolean(item));
                         setDraggedTrackIds(draggedIds);
-                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.effectAllowed = "copyMove";
                         setDraggedTrackIdsPayload(event.dataTransfer, draggedIds, dragTrack.id);
                         if (draggedTracks.length > 1) {
                           const dragImage = createTrackStackDragImage(draggedTracks);

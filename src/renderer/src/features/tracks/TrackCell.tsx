@@ -3,6 +3,7 @@ export function TrackCell({
   dragging = false,
   draggable = false,
   trackId,
+  dataQueueNowPlaying,
   children,
   onClick,
   onDoubleClick,
@@ -13,11 +14,14 @@ export function TrackCell({
   onDragOver,
   onDragLeave,
   onDrop,
+  className = "",
 }: {
   selected?: boolean;
   dragging?: boolean;
   draggable?: boolean;
   trackId?: string;
+  dataQueueNowPlaying?: boolean;
+  className?: string;
   children: React.ReactNode;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   onDoubleClick?: React.MouseEventHandler<HTMLDivElement>;
@@ -35,9 +39,10 @@ export function TrackCell({
       tabIndex={0}
       draggable={draggable}
       data-track-id={trackId}
+      data-queue-now-playing={dataQueueNowPlaying}
       className={`group flex w-full min-w-0 items-center justify-between rounded-[16px] px-[10px] py-[7px] text-left transition-[opacity,transform] duration-150 ${
         selected ? "bg-[var(--surface-track-active)]" : "hover:bg-[var(--surface-track-hover)]"
-      } ${dragging ? "scale-[0.99] opacity-35" : ""}`}
+      } ${dragging ? "scale-[0.99] opacity-35" : ""} ${className}`}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
