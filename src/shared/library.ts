@@ -95,6 +95,25 @@ export type SelectedSource = {
   id?: string;
 };
 
+export type PlaybackQueueSource = {
+  type: SourceType;
+  id?: string;
+  title?: string;
+};
+
+export type PlaybackQueueItem = {
+  id: string;
+  trackId: string;
+};
+
+export type PlaybackQueue = {
+  items: PlaybackQueueItem[];
+  shuffledItems: PlaybackQueueItem[];
+  activeItemId: string | null;
+  source: PlaybackQueueSource | null;
+  panelOpen: boolean;
+};
+
 export type LibraryState = {
   folders: LibraryFolder[];
   tracks: Record<string, LibraryTrack>;
@@ -149,6 +168,7 @@ export type SessionSettings = {
   trackPositions: Record<string, number>;
   shuffleEnabled: boolean;
   repeatMode: "off" | "all" | "one";
+  queue: PlaybackQueue;
 };
 
 export type ScannedFolder = {
@@ -304,6 +324,13 @@ export const defaultSessionSettings = (): SessionSettings => ({
   trackPositions: {},
   shuffleEnabled: false,
   repeatMode: "off",
+  queue: {
+    items: [],
+    shuffledItems: [],
+    activeItemId: null,
+    source: null,
+    panelOpen: false,
+  },
 });
 
 export const defaultAppSettings = (): AppSettings => ({

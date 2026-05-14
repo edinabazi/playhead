@@ -57,7 +57,19 @@ export function normalizeSettings(
       appearance: { ...defaults.appearance, ...(grouped.appearance || {}) },
       telemetry: { ...defaults.telemetry, ...(grouped.telemetry || {}) },
       lastfm: { ...defaults.lastfm, ...(grouped.lastfm || {}) },
-      session: { ...defaults.session, ...(grouped.session || {}) },
+      session: {
+        ...defaults.session,
+        ...(grouped.session || {}),
+        queue: {
+          ...defaults.session.queue,
+          ...(grouped.session?.queue || {}),
+          items: grouped.session?.queue?.items || [],
+          shuffledItems: grouped.session?.queue?.shuffledItems || [],
+          activeItemId: grouped.session?.queue?.activeItemId || null,
+          source: grouped.session?.queue?.source || null,
+          panelOpen: grouped.session?.queue?.panelOpen || false,
+        },
+      },
     };
   }
 

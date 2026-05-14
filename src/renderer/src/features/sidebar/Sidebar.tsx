@@ -43,6 +43,8 @@ export function Sidebar({
   onDeletePlaylist,
   onRenameTag,
   onDeleteTag,
+  queueOpen,
+  onToggleQueue,
 }: {
   folders: LibraryFolder[];
   libraryMode: LibraryMode;
@@ -69,6 +71,8 @@ export function Sidebar({
   onDeletePlaylist: (playlist: LibraryPlaylist) => void;
   onRenameTag: (tag: LibraryTag) => void;
   onDeleteTag: (tag: LibraryTag) => void;
+  queueOpen: boolean;
+  onToggleQueue: () => void;
 }) {
   const icons = useIcons();
   const [foldersCollapsed, setFoldersCollapsed] = useState(false);
@@ -76,6 +80,7 @@ export function Sidebar({
   const [tagsCollapsed, setTagsCollapsed] = useState(false);
   const [contextMenu, setContextMenu] = useState<SidebarContextMenuState>(null);
   const FolderPlusIcon = icons["folder-plus"];
+  const QueueIcon = icons["list-plus"];
   const SearchIcon = icons.search;
   const SettingsIcon = icons.settings;
   const modifierLabel = getPrimaryModifierLabel();
@@ -103,7 +108,22 @@ export function Sidebar({
       )}
       <div className="relative flex min-h-[30px] shrink-0 items-center justify-between">
         <img className="h-[26px]" src={playheadLogo} alt="Playhead" draggable={false} />
-        <div className="flex items-center gap-1 translate-y-0.5">
+        <div className="flex items-center gap-0 translate-y-0.5 -mr-2">
+          <Tooltip content={queueOpen ? "Hide queue" : "Queue"} side="top" sideOffset={7}>
+            <button
+              type="button"
+              className={`no-drag grid size-8 place-items-center rounded-full transition ${
+                queueOpen
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:bg-white/10 hover:text-foreground"
+              }`}
+              aria-label={queueOpen ? "Hide queue" : "Queue"}
+              aria-pressed={queueOpen}
+              onClick={onToggleQueue}
+            >
+              <QueueIcon size={16} strokeWidth={1.8} />
+            </button>
+          </Tooltip>
           <Tooltip content={`${modifierLabel} K`} side="top" sideOffset={7}>
             <button
               type="button"

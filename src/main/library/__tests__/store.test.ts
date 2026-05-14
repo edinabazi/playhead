@@ -32,6 +32,36 @@ describe("library store settings", () => {
       trackPositions: {},
       shuffleEnabled: false,
       repeatMode: "off",
+      queue: {
+        items: [],
+        shuffledItems: [],
+        activeItemId: null,
+        source: null,
+        panelOpen: false,
+      },
+    });
+  });
+
+  it("normalizes missing queue fields", () => {
+    const settings = normalizeSettings({
+      session: {
+        activeTrackId: "track-1",
+        selectedTrackIds: ["track-1"],
+        trackPositions: {},
+        shuffleEnabled: true,
+        repeatMode: "all",
+        queue: {
+          items: [{ id: "queue-1", trackId: "track-1" }],
+        },
+      },
+    } as unknown as Parameters<typeof normalizeSettings>[0]);
+
+    expect(settings.session.queue).toEqual({
+      items: [{ id: "queue-1", trackId: "track-1" }],
+      shuffledItems: [],
+      activeItemId: null,
+      source: null,
+      panelOpen: false,
     });
   });
 

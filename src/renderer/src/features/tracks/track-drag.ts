@@ -2,8 +2,14 @@ import type { LibraryTrack } from "../../../../shared/library";
 
 const trackIdMimeType = "application/x-playhead-track-id";
 const trackIdsMimeType = "application/x-playhead-track-ids";
+const queueItemIdMimeType = "application/x-playhead-queue-item-id";
+const queueItemIdsMimeType = "application/x-playhead-queue-item-ids";
 
-export function setDraggedTrackIds(dataTransfer: DataTransfer, trackIds: string[], fallbackId: string) {
+export function setDraggedTrackIds(
+  dataTransfer: DataTransfer,
+  trackIds: string[],
+  fallbackId: string,
+) {
   dataTransfer.setData(trackIdMimeType, fallbackId);
   dataTransfer.setData(trackIdsMimeType, JSON.stringify(trackIds));
 }
@@ -24,6 +30,33 @@ export function getDraggedTrackIds(dataTransfer: DataTransfer) {
   }
 
   return fallbackTrackId ? [fallbackTrackId] : [];
+}
+
+export function setDraggedQueueItemIds(
+  dataTransfer: DataTransfer,
+  itemIds: string[],
+  fallbackId: string,
+) {
+  dataTransfer.setData(queueItemIdMimeType, fallbackId);
+  dataTransfer.setData(queueItemIdsMimeType, JSON.stringify(itemIds));
+}
+
+export function getDraggedQueueItemIds(dataTransfer: DataTransfer) {
+  const itemIdsPayload = dataTransfer.getData(queueItemIdsMimeType);
+  const fallbackItemId = dataTransfer.getData(queueItemIdMimeType);
+
+  if (!itemIdsPayload) return fallbackItemId ? [fallbackItemId] : [];
+
+  try {
+    const parsedItemIds = JSON.parse(itemIdsPayload);
+    if (Array.isArray(parsedItemIds)) {
+      return parsedItemIds.filter((itemId): itemId is string => typeof itemId === "string");
+    }
+  } catch {
+    return fallbackItemId ? [fallbackItemId] : [];
+  }
+
+  return fallbackItemId ? [fallbackItemId] : [];
 }
 
 export function createTrackStackDragImage(tracks: LibraryTrack[]) {

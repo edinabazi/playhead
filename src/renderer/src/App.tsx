@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import WaveSurfer from "wavesurfer.js";
+import playheadLogo from "@/assets/playhead-logo.svg";
+import { WindowControls } from "@/components/WindowControls";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
   type AppearanceSettings,
   type AppUpdateState,
@@ -15,15 +18,30 @@ import {
   type LibraryState,
   type LibraryTag,
   type LibraryTrack,
+  type PlaybackQueueItem,
   type PlaybackSettings,
   type TelemetrySettings,
   defaultSessionSettings,
 } from "../../shared/library";
 import { getMediaArtworkSrc } from "@/lib/artwork";
 import { isEditableTarget } from "@/lib/dom";
+import { useIcons } from "@/lib/icon-context";
+import { getPrimaryModifierLabel } from "@/lib/platform";
 import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
+import { QueuePanel } from "@/features/player/QueuePanel";
+import {
+  addTracksToQueue as addTracksToPlaybackQueue,
+  buildQueueFromTracks,
+  getActiveQueueIndex,
+  getVisibleQueueItems,
+  removeQueueItem,
+  reorderQueueItems,
+  setQueueActiveTrack,
+  smartShuffleQueue,
+  type QueueDropEdge,
+} from "@/features/player/queue-model";
 import {
   createLastfmPlaybackSession,
   shouldScrobbleLastfmTrack,
@@ -41,10 +59,7 @@ import { RemoveFolderDialog } from "@/features/sidebar/RemoveFolderDialog";
 import { Sidebar } from "@/features/sidebar/Sidebar";
 import { TrackList } from "@/features/tracks/TrackList";
 import { RemoveTracksFromPlaylistDialog } from "@/features/tracks/RemoveTracksFromPlaylistDialog";
-import {
-  UpdateMessageDialog,
-  type UpdateMessage,
-} from "@/features/updates/UpdateMessageDialog";
+import { UpdateMessageDialog, type UpdateMessage } from "@/features/updates/UpdateMessageDialog";
 import { updateMessagesByVersion } from "@/features/updates/update-messages";
 import {
   showFolderActionToast,
@@ -80,6 +95,7 @@ import { useWindowDrag } from "@/hooks/use-window-drag";
 
 const waveformCachePeakRate = waveformAnalysisPeakRate;
 const waveformCacheMaxPeaks = waveformAnalysisMaxPeaks;
+const sidebarWidth = 260;
 
 type BatchAnalysisState = {
   status: "idle" | "running" | "complete";
@@ -116,6 +132,25 @@ async function runWithConcurrency<T>(
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function getQueueSourceTitle(library: LibraryState): string {
+  const source = library.selectedSource;
+  if (!source) return "Queue";
+  if (source.type === "library-tracks") return "Tracks";
+  if (source.type === "library-artists") return "Artists";
+  if (source.type === "library-albums") return "Albums";
+  if (source.type === "folder") {
+    return library.folders.find((folder) => folder.id === source.id)?.name || "Folder";
+  }
+  if (source.type === "playlist") {
+    return library.playlists.find((playlist) => playlist.id === source.id)?.name || "Playlist";
+  }
+  if (source.type === "tag") {
+    return (library.tags || []).find((tag) => tag.id === source.id)?.name || "Tag";
+  }
+  if (source.type === "loved") return "Loved";
+  return "Queue";
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -159,6 +194,11 @@ function dismissUpdateMessage(version: string): void {
 }
 
 export function App() {
+  const icons = useIcons();
+  const QueueIcon = icons["list-plus"];
+  const SearchIcon = icons.search;
+  const SettingsIcon = icons.settings;
+  const modifierLabel = getPrimaryModifierLabel();
   const topGapWindowDragHandlers = useWindowDrag<HTMLDivElement>();
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const playNextTrackOnEndRef = useRef<() => boolean>(() => false);
@@ -237,12 +277,14 @@ export function App() {
     queueSize: 0,
   });
   const [lastfmActionPending, setLastfmActionPending] = useState(false);
-  const [batchAnalysis, setBatchAnalysis] = useState<BatchAnalysisState>(
-    emptyBatchAnalysisState,
-  );
+  const [batchAnalysis, setBatchAnalysis] = useState<BatchAnalysisState>(emptyBatchAnalysisState);
 
   const tracks = useMemo(() => getSourceTracks(library), [library]);
   const allTracks = useMemo(() => Object.values(library.tracks), [library.tracks]);
+  const queueItems = useMemo(
+    () => getVisibleQueueItems(library.settings.session.queue, shuffleEnabled),
+    [library.settings.session.queue, shuffleEnabled],
+  );
   const libraryArtists = useMemo(() => getLibraryArtists(library), [library]);
   const libraryAlbums = useMemo(() => getLibraryAlbums(library), [library]);
   const libraryTrackCount = useMemo(() => getAllLibraryTracks(library).length, [library]);
@@ -363,28 +405,31 @@ export function App() {
     [saveAnalyzedBpm],
   );
 
-  const getBatchAnalysisCandidates = useCallback(async (tracksToCheck: LibraryTrack[]) => {
-    const candidates: LibraryTrack[] = [];
+  const getBatchAnalysisCandidates = useCallback(
+    async (tracksToCheck: LibraryTrack[]) => {
+      const candidates: LibraryTrack[] = [];
 
-    for (const track of tracksToCheck) {
-      const request = { trackId: track.id, path: track.path, duration: track.duration };
-      const [cachedWaveform, cachedBpm] = await Promise.all([
-        window.playhead.getWaveformCache(request),
-        shouldAnalyzeTrackBpm(track)
-          ? window.playhead.getBpmCache({ trackId: track.id, path: track.path })
-          : Promise.resolve(null),
-      ]);
+      for (const track of tracksToCheck) {
+        const request = { trackId: track.id, path: track.path, duration: track.duration };
+        const [cachedWaveform, cachedBpm] = await Promise.all([
+          window.playhead.getWaveformCache(request),
+          shouldAnalyzeTrackBpm(track)
+            ? window.playhead.getBpmCache({ trackId: track.id, path: track.path })
+            : Promise.resolve(null),
+        ]);
 
-      if (!cachedWaveform || (shouldAnalyzeTrackBpm(track) && !cachedBpm)) {
-        candidates.push(track);
-        continue;
+        if (!cachedWaveform || (shouldAnalyzeTrackBpm(track) && !cachedBpm)) {
+          candidates.push(track);
+          continue;
+        }
+
+        if (cachedBpm) saveAnalyzedBpm(track.id, Math.round(cachedBpm.bpm));
       }
 
-      if (cachedBpm) saveAnalyzedBpm(track.id, Math.round(cachedBpm.bpm));
-    }
-
-    return candidates;
-  }, [saveAnalyzedBpm]);
+      return candidates;
+    },
+    [saveAnalyzedBpm],
+  );
 
   const analyzeTrackAudioData = useCallback(
     async (track: LibraryTrack) => {
@@ -392,7 +437,9 @@ export function App() {
       const bpmRequest = { trackId: track.id, path: track.path };
       const [cachedWaveform, cachedBpm] = await Promise.all([
         window.playhead.getWaveformCache(waveformRequest),
-        shouldAnalyzeTrackBpm(track) ? window.playhead.getBpmCache(bpmRequest) : Promise.resolve(null),
+        shouldAnalyzeTrackBpm(track)
+          ? window.playhead.getBpmCache(bpmRequest)
+          : Promise.resolve(null),
       ]);
       const needsWaveform = !cachedWaveform;
       const needsBpm = shouldAnalyzeTrackBpm(track) && !cachedBpm;
@@ -428,7 +475,9 @@ export function App() {
   const analyzeMissingAudioData = useCallback(async () => {
     if (batchAnalysis.status === "running") return "Audio analysis is already running.";
 
-    const tracksToAnalyze = await getBatchAnalysisCandidates(Object.values(libraryRef.current.tracks));
+    const tracksToAnalyze = await getBatchAnalysisCandidates(
+      Object.values(libraryRef.current.tracks),
+    );
     if (tracksToAnalyze.length === 0) {
       setBatchAnalysis({
         status: "complete",
@@ -480,7 +529,14 @@ export function App() {
   }, [analyzeTrackAudioData, batchAnalysis.status, getBatchAnalysisCandidates]);
 
   const selectTrack = useCallback(
-    async (track: LibraryTrack, autoplay = true, startTime = 0, allowSkipUnavailable = true) => {
+    async (
+      track: LibraryTrack,
+      autoplay = true,
+      startTime = 0,
+      allowSkipUnavailable = true,
+      queueMode: "preserve" | "source" = "preserve",
+      activeQueueItemId?: string,
+    ) => {
       const wavesurfer = wavesurferRef.current;
       if (!wavesurfer) return;
       const requestId = trackLoadRequestIdRef.current + 1;
@@ -497,16 +553,33 @@ export function App() {
       setCurrentTime(0);
       setDuration(track.duration || 0);
       setIsPlaying(false);
-      if (
-        library.settings.playback.restoreLastSession ||
-        library.settings.playback.rememberTrackPositions
-      ) {
-        persistSessionSettings({
-          ...library.settings.session,
-          activeTrackId: track.id,
-          selectedTrackIds: [track.id],
-        });
-      }
+      const nextQueue =
+        queueMode === "source"
+          ? {
+              ...buildQueueFromTracks(
+                tracks,
+                track.id,
+                library.selectedSource
+                  ? {
+                      ...library.selectedSource,
+                      title: getQueueSourceTitle(library),
+                    }
+                  : null,
+                library.tracks,
+                shuffleEnabled,
+              ),
+              panelOpen: library.settings.session.queue.panelOpen,
+            }
+          : activeQueueItemId
+            ? { ...library.settings.session.queue, activeItemId: activeQueueItemId }
+            : setQueueActiveTrack(library.settings.session.queue, track.id);
+
+      persistSessionSettings({
+        ...library.settings.session,
+        activeTrackId: track.id,
+        selectedTrackIds: [track.id],
+        queue: nextQueue,
+      });
 
       try {
         const audioUrl = await window.playhead.getAudioFileUrl(track.path);
@@ -589,14 +662,7 @@ export function App() {
         if (requestId === trackLoadRequestIdRef.current) setIsLoadingTrack(false);
       }
     },
-    [
-      library.settings.playback.rememberTrackPositions,
-      library.settings.playback.restoreLastSession,
-      library.settings.playback.skipUnavailableTracks,
-      library.settings.session,
-      analyzeTrackBpm,
-      persistSessionSettings,
-    ],
+    [library, analyzeTrackBpm, persistSessionSettings, shuffleEnabled, tracks],
   );
 
   const playSearchResult = useCallback(
@@ -1229,9 +1295,10 @@ export function App() {
       window.playhead.trackEvent(wasFavorite ? "track_unfavorited" : "track_favorited");
       const lastfmPayload = track ? toLastfmTrackPayload(track) : null;
       if (lastfmPayload && library.settings.lastfm.loveSyncEnabled) {
-        void (wasFavorite
-          ? window.playhead.unloveLastfmTrack(lastfmPayload)
-          : window.playhead.loveLastfmTrack(lastfmPayload)
+        void (
+          wasFavorite
+            ? window.playhead.unloveLastfmTrack(lastfmPayload)
+            : window.playhead.loveLastfmTrack(lastfmPayload)
         ).then(setLastfmState);
       }
 
@@ -1564,7 +1631,7 @@ export function App() {
 
   const playSelectedTrack = useCallback(() => {
     const selectedTrack = selectedTrackIds[0] ? library.tracks[selectedTrackIds[0]] : null;
-    if (selectedTrack) void selectTrack(selectedTrack, true);
+    if (selectedTrack) void selectTrack(selectedTrack, true, 0, true, "source");
   }, [library.tracks, selectTrack, selectedTrackIds]);
 
   const selectLibrarySource = useCallback(
@@ -1583,9 +1650,7 @@ export function App() {
 
       if (isRangeSelection) {
         const anchorItemId =
-          libraryBrowserSelectionAnchorIdRef.current ||
-          selectedLibraryBrowserItemIds[0] ||
-          itemId;
+          libraryBrowserSelectionAnchorIdRef.current || selectedLibraryBrowserItemIds[0] || itemId;
         const anchorIndex = orderedItemIds.indexOf(anchorItemId);
         const targetIndex = orderedItemIds.indexOf(itemId);
 
@@ -1710,6 +1775,35 @@ export function App() {
 
   const playAdjacentTrack = useCallback(
     (direction: 1 | -1) => {
+      const visibleQueueItems = getVisibleQueueItems(
+        library.settings.session.queue,
+        shuffleEnabled,
+      );
+      if (visibleQueueItems.length > 0) {
+        let currentIndex = getActiveQueueIndex(library.settings.session.queue, shuffleEnabled);
+        if (currentIndex === -1 && activeTrackId) {
+          currentIndex = visibleQueueItems.findIndex((item) => item.trackId === activeTrackId);
+        }
+
+        const nextIndex =
+          currentIndex === -1
+            ? direction === -1
+              ? visibleQueueItems.length - 1
+              : 0
+            : (currentIndex + direction + visibleQueueItems.length) % visibleQueueItems.length;
+        const nextItem = visibleQueueItems[nextIndex];
+        const nextTrack = nextItem ? library.tracks[nextItem.trackId] : null;
+        if (!nextTrack) return;
+
+        persistSessionSettings({
+          ...library.settings.session,
+          queue: { ...library.settings.session.queue, activeItemId: nextItem.id },
+        });
+        setScrollToTrackId(nextTrack.id);
+        void selectTrack(nextTrack, true, 0, false, "preserve", nextItem.id);
+        return;
+      }
+
       if (tracks.length === 0) return;
 
       const selectedTrackId = selectedTrackIds[0] || null;
@@ -1719,16 +1813,6 @@ export function App() {
 
       if (currentIndex === -1 && selectedTrackId) {
         currentIndex = tracks.findIndex((track) => track.id === selectedTrackId);
-      }
-
-      if (shuffleEnabled && tracks.length > 1) {
-        const candidates =
-          currentIndex === -1 ? tracks : tracks.filter((_, index) => index !== currentIndex);
-        const randomIndex = Math.floor(Math.random() * candidates.length);
-        const nextTrack = candidates[randomIndex];
-        setScrollToTrackId(nextTrack.id);
-        void selectTrack(nextTrack, true, 0, false);
-        return;
       }
 
       const nextIndex =
@@ -1742,7 +1826,16 @@ export function App() {
       setScrollToTrackId(nextTrack.id);
       void selectTrack(nextTrack, true, 0, false);
     },
-    [activeTrackId, selectTrack, selectedTrackIds, shuffleEnabled, tracks],
+    [
+      activeTrackId,
+      library.settings.session,
+      library.tracks,
+      persistSessionSettings,
+      selectTrack,
+      selectedTrackIds,
+      shuffleEnabled,
+      tracks,
+    ],
   );
 
   const playNextTrackOnEnd = useCallback(() => {
@@ -1756,17 +1849,27 @@ export function App() {
       return true;
     }
 
-    const currentIndex = tracks.findIndex((track) => track.id === activeTrackId);
-    if (shuffleEnabled && tracks.length > 1) {
-      const candidates =
-        currentIndex === -1 ? tracks : tracks.filter((_, index) => index !== currentIndex);
-      const randomIndex = Math.floor(Math.random() * candidates.length);
-      const nextTrack = candidates[randomIndex];
+    const visibleQueueItems = getVisibleQueueItems(library.settings.session.queue, shuffleEnabled);
+    if (visibleQueueItems.length > 0) {
+      const currentIndex = getActiveQueueIndex(library.settings.session.queue, shuffleEnabled);
+      const nextItem =
+        currentIndex >= 0
+          ? visibleQueueItems[currentIndex + 1] ||
+            (repeatMode === "all" ? visibleQueueItems[0] : null)
+          : visibleQueueItems[0] || null;
+      const nextTrack = nextItem ? library.tracks[nextItem.trackId] : null;
+      if (!nextTrack || !nextItem) return false;
+
+      persistSessionSettings({
+        ...library.settings.session,
+        queue: { ...library.settings.session.queue, activeItemId: nextItem.id },
+      });
       setScrollToTrackId(nextTrack.id);
-      void selectTrack(nextTrack, true);
+      void selectTrack(nextTrack, true, 0, true, "preserve", nextItem.id);
       return true;
     }
 
+    const currentIndex = tracks.findIndex((track) => track.id === activeTrackId);
     let nextTrack = currentIndex >= 0 ? tracks[currentIndex + 1] : null;
     if (!nextTrack && repeatMode === "all") nextTrack = tracks[0] || null;
     if (!nextTrack) return false;
@@ -1774,7 +1877,16 @@ export function App() {
     setScrollToTrackId(nextTrack.id);
     void selectTrack(nextTrack, true);
     return true;
-  }, [activeTrackId, repeatMode, selectTrack, shuffleEnabled, tracks]);
+  }, [
+    activeTrackId,
+    library.settings.session,
+    library.tracks,
+    persistSessionSettings,
+    repeatMode,
+    selectTrack,
+    shuffleEnabled,
+    tracks,
+  ]);
 
   useEffect(() => {
     libraryRef.current = library;
@@ -2117,6 +2229,75 @@ export function App() {
     selectedSource?.type === "tag"
       ? (library.tags || []).find((tag) => tag.id === selectedSource.id) || null
       : null;
+  const queuePanelOpen = library.settings.session.queue.panelOpen;
+  const updatePlaybackQueue = useCallback(
+    (queue: LibraryState["settings"]["session"]["queue"]) => {
+      persistSessionSettings({
+        ...library.settings.session,
+        queue,
+      });
+    },
+    [library.settings.session, persistSessionSettings],
+  );
+  const toggleQueuePanel = useCallback(() => {
+    updatePlaybackQueue({
+      ...library.settings.session.queue,
+      panelOpen: !library.settings.session.queue.panelOpen,
+    });
+  }, [library.settings.session.queue, updatePlaybackQueue]);
+  const playQueueItem = useCallback(
+    (item: PlaybackQueueItem) => {
+      const track = library.tracks[item.trackId];
+      if (!track) return;
+      updatePlaybackQueue({ ...library.settings.session.queue, activeItemId: item.id });
+      setSelectedTrackIds([track.id]);
+      setScrollToTrackId(track.id);
+      void selectTrack(track, true, 0, false, "preserve", item.id);
+    },
+    [library.settings.session.queue, library.tracks, selectTrack, updatePlaybackQueue],
+  );
+  const reorderPlaybackQueueItems = useCallback(
+    (itemIds: string[], targetItemId: string, edge: QueueDropEdge) => {
+      updatePlaybackQueue(
+        reorderQueueItems(
+          library.settings.session.queue,
+          itemIds,
+          targetItemId,
+          edge,
+          shuffleEnabled,
+        ),
+      );
+    },
+    [library.settings.session.queue, shuffleEnabled, updatePlaybackQueue],
+  );
+  const addTracksToQueue = useCallback(
+    (trackIds: string[], targetItemId: string | null, edge: QueueDropEdge) => {
+      const validTrackIds = trackIds.filter((trackId) => library.tracks[trackId]);
+      if (validTrackIds.length === 0) return;
+      updatePlaybackQueue(
+        addTracksToPlaybackQueue(
+          library.settings.session.queue,
+          validTrackIds,
+          targetItemId,
+          edge,
+          shuffleEnabled,
+        ),
+      );
+      showSimpleActionToast(
+        validTrackIds.length === 1
+          ? "Track added to queue."
+          : `${validTrackIds.length} tracks added to queue.`,
+      );
+    },
+    [library.settings.session.queue, library.tracks, shuffleEnabled, updatePlaybackQueue],
+  );
+  const removeItemFromQueue = useCallback(
+    (item: PlaybackQueueItem) => {
+      updatePlaybackQueue(removeQueueItem(library.settings.session.queue, item.id));
+    },
+    [library.settings.session.queue, updatePlaybackQueue],
+  );
+
   const hasLovedTracks = (library.favoriteTrackIds || []).some(
     (trackId) => library.tracks[trackId],
   );
@@ -2131,55 +2312,138 @@ export function App() {
         }`}
       >
         <section
-          className="app-shell app-drag flex size-full gap-4 overflow-hidden p-4"
+          className="app-shell app-drag relative flex size-full gap-4 overflow-hidden p-4"
           style={{ "--app-transparency": appTransparency } as React.CSSProperties}
         >
-          <Sidebar
-            folders={library.folders}
-            libraryMode={library.settings.library.mode}
-            artistCount={libraryArtists.length}
-            albumCount={libraryAlbums.length}
-            trackCount={libraryTrackCount}
-            playlists={library.playlists}
-            tags={library.tags || []}
-            lovedCount={hasLovedTracks ? library.favoriteTrackIds.length : 0}
-            selectedSource={library.selectedSource}
-            isScanning={isScanning}
-            updateState={updateState}
-            onAddFolder={addFolder}
-            onOpenSearch={() => setIsSearchOpen(true)}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            onInstallUpdate={() => {
-              window.playhead.trackEvent("app_update_install_clicked", {
-                version: updateState.version || "unknown",
-              });
-              void window.playhead.installUpdate();
-            }}
-            onCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
-            onCreateTag={() => setIsCreateTagOpen(true)}
-            onSelectSource={selectLibrarySource}
-            onDropTrackToPlaylist={(trackIds, playlist) =>
-              void addTracksToPlaylist(trackIds, playlist)
-            }
-            onDropTrackToTag={(trackIds, tag) => void addTracksToTag(trackIds, tag)}
-            onRemoveFolder={(folder) => setFolderPendingRemoval(folder)}
-            onRenamePlaylist={(playlist) => setRenamingPlaylistId(playlist.id)}
-            onDeletePlaylist={(playlist) => {
-              if (playlist.trackIds.length === 0) {
-                void deletePlaylist(playlist.id);
-                return;
-              }
-              setPlaylistPendingDeletion(playlist);
-            }}
-            onRenameTag={(tag) => setRenamingTagId(tag.id)}
-            onDeleteTag={(tag) => {
-              if (tag.trackIds.length === 0) {
-                void deleteTag(tag.id);
-                return;
-              }
-              setTagPendingDeletion(tag);
-            }}
-          />
+          <div
+            className="app-drag relative flex h-full min-h-0 shrink-0 transition-[width] duration-200"
+            style={{ width: sidebarWidth }}
+          >
+            {queuePanelOpen ? (
+              <aside className="app-drag relative flex size-full flex-col overflow-hidden rounded-[41px] bg-[rgba(0,0,0,0.2)] px-[18px] pb-[18px] pt-[54px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                <WindowControls />
+                {updateState.status === "ready" && (
+                  <Tooltip
+                    content={
+                      updateState.version ? `Install ${updateState.version}` : "Install update"
+                    }
+                    side="top"
+                    sideOffset={7}
+                  >
+                    <button
+                      type="button"
+                      className="absolute top-4.5 right-6 no-drag h-5 rounded-full bg-primary px-2 text-[11px] font-semibold leading-none text-primary-foreground transition hover:bg-primary/90 font-mono uppercase"
+                      aria-label="Install update and restart"
+                      onClick={() => {
+                        window.playhead.trackEvent("app_update_install_clicked", {
+                          version: updateState.version || "unknown",
+                        });
+                        void window.playhead.installUpdate();
+                      }}
+                    >
+                      Update
+                    </button>
+                  </Tooltip>
+                )}
+                <div className="relative flex min-h-[30px] shrink-0 items-center justify-between">
+                  <img className="h-[26px]" src={playheadLogo} alt="Playhead" draggable={false} />
+                  <div className="flex items-center gap-0 translate-y-0.5 -mr-2">
+                    <Tooltip content="Hide queue" side="top" sideOffset={7}>
+                      <button
+                        type="button"
+                        className="no-drag grid size-8 place-items-center rounded-full bg-primary/15 text-primary transition hover:bg-primary/20"
+                        aria-label="Hide queue"
+                        aria-pressed={queuePanelOpen}
+                        onClick={toggleQueuePanel}
+                      >
+                        <QueueIcon size={16} strokeWidth={1.8} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip content={`${modifierLabel} K`} side="top" sideOffset={7}>
+                      <button
+                        type="button"
+                        className="no-drag grid size-8 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+                        aria-label="Search"
+                        onClick={() => setIsSearchOpen(true)}
+                      >
+                        <SearchIcon size={16} strokeWidth={1.8} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip content={`${modifierLabel} ,`} side="top" sideOffset={7}>
+                      <button
+                        type="button"
+                        className="no-drag grid size-8 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+                        aria-label="Settings"
+                        onClick={() => setIsSettingsOpen(true)}
+                      >
+                        <SettingsIcon size={16} strokeWidth={1.8} />
+                      </button>
+                    </Tooltip>
+                  </div>
+                </div>
+                <div className="mt-[30px] flex min-h-0 flex-1 flex-col">
+                  <QueuePanel
+                    items={queueItems}
+                    tracksById={library.tracks}
+                    activeItemId={library.settings.session.queue.activeItemId}
+                    onPlayItem={playQueueItem}
+                    onReorderItems={reorderPlaybackQueueItems}
+                    onAddTracks={addTracksToQueue}
+                    onRemoveItem={removeItemFromQueue}
+                  />
+                </div>
+              </aside>
+            ) : (
+              <Sidebar
+                folders={library.folders}
+                libraryMode={library.settings.library.mode}
+                artistCount={libraryArtists.length}
+                albumCount={libraryAlbums.length}
+                trackCount={libraryTrackCount}
+                playlists={library.playlists}
+                tags={library.tags || []}
+                lovedCount={hasLovedTracks ? library.favoriteTrackIds.length : 0}
+                selectedSource={library.selectedSource}
+                isScanning={isScanning}
+                updateState={updateState}
+                onAddFolder={addFolder}
+                onOpenSearch={() => setIsSearchOpen(true)}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onInstallUpdate={() => {
+                  window.playhead.trackEvent("app_update_install_clicked", {
+                    version: updateState.version || "unknown",
+                  });
+                  void window.playhead.installUpdate();
+                }}
+                onCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+                onCreateTag={() => setIsCreateTagOpen(true)}
+                onSelectSource={selectLibrarySource}
+                onDropTrackToPlaylist={(trackIds, playlist) =>
+                  void addTracksToPlaylist(trackIds, playlist)
+                }
+                onDropTrackToTag={(trackIds, tag) => void addTracksToTag(trackIds, tag)}
+                onRemoveFolder={(folder) => setFolderPendingRemoval(folder)}
+                onRenamePlaylist={(playlist) => setRenamingPlaylistId(playlist.id)}
+                onDeletePlaylist={(playlist) => {
+                  if (playlist.trackIds.length === 0) {
+                    void deletePlaylist(playlist.id);
+                    return;
+                  }
+                  setPlaylistPendingDeletion(playlist);
+                }}
+                onRenameTag={(tag) => setRenamingTagId(tag.id)}
+                onDeleteTag={(tag) => {
+                  if (tag.trackIds.length === 0) {
+                    void deleteTag(tag.id);
+                    return;
+                  }
+                  setTagPendingDeletion(tag);
+                }}
+                queueOpen={queuePanelOpen}
+                onToggleQueue={toggleQueuePanel}
+              />
+            )}
+          </div>
 
           <main className="app-drag relative flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
             <div
@@ -2223,11 +2487,22 @@ export function App() {
                   volume={volume}
                   onToggleShuffle={() => {
                     const nextShuffleEnabled = !shuffleEnabled;
+                    const nextQueue = nextShuffleEnabled
+                      ? {
+                          ...library.settings.session.queue,
+                          shuffledItems: smartShuffleQueue(
+                            library.settings.session.queue.items,
+                            library.settings.session.queue.activeItemId,
+                            library.tracks,
+                          ),
+                        }
+                      : library.settings.session.queue;
                     setShuffleEnabled(nextShuffleEnabled);
                     persistSessionSettings({
                       ...library.settings.session,
                       shuffleEnabled: nextShuffleEnabled,
                       repeatMode,
+                      queue: nextQueue,
                     });
                   }}
                   onCycleRepeat={() => {
@@ -2306,7 +2581,7 @@ export function App() {
                       tags={library.tags || []}
                       favoriteTrackIds={library.favoriteTrackIds || []}
                       onSelectTrack={selectTrackInList}
-                      onPlayTrack={(track) => selectTrack(track, true)}
+                      onPlayTrack={(track) => selectTrack(track, true, 0, true, "source")}
                       onAddToPlaylist={(track, playlist) => addTrackToPlaylist(track.id, playlist)}
                       onAddTracksToPlaylist={(tracks, playlist) =>
                         addTracksToPlaylist(
@@ -2507,7 +2782,7 @@ export function App() {
                   ? `Name the playlist. ${tracksPendingPlaylistCreation[0].title} will be added to it.`
                   : tracksPendingPlaylistCreation.length > 1
                     ? `Name the playlist. ${tracksPendingPlaylistCreation.length} tracks will be added to it.`
-                  : undefined
+                    : undefined
               }
               onCreate={(name) => void createNewPlaylist(name, tracksPendingPlaylistCreation)}
               onClose={() => {

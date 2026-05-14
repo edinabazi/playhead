@@ -95,7 +95,7 @@ export function TrackRowMenu({
   }, [onOpenChange, open]);
 
   const menuPoint = anchorPoint || getMenuPointFromElement(buttonRef.current);
-  const clampedMenuPoint = menuPoint ? clampMenuPoint(menuPoint) : null;
+  const clampedMenuPoint = menuPoint ? clampMenuPoint(menuPoint, 224, 224) : null;
 
   return (
     <div className="relative" ref={containerRef} onClick={(event) => event.stopPropagation()}>

@@ -18,6 +18,7 @@ import {
   useTransform,
   animate,
   AnimatePresence,
+  useReducedMotion,
   type MotionValue,
 } from "framer-motion";
 import * as SliderPrimitive from "@radix-ui/react-slider";
@@ -314,6 +315,7 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
     const isRange = Array.isArray(value);
     const values = toRadixValue(value);
     const shape = useShape();
+    const reduceMotion = useReducedMotion();
 
     // --- Refs ---
     const trackRef = useRef<HTMLDivElement>(null);
@@ -356,6 +358,17 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
     // --- Motion values ---
     const motionX0 = useMotionValue(0);
     const motionX1 = useMotionValue(0);
+    const moveThumbTo = useCallback(
+      (motionX: MotionValue<number>, x: number) => {
+        if (reduceMotion) {
+          motionX.set(x);
+          return;
+        }
+
+        animate(motionX, x, springs.moderate);
+      },
+      [reduceMotion],
+    );
 
     // --- Derived motion values for fill ---
     const fillLeft = useTransform(motionX0, (x) =>
@@ -449,16 +462,16 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
           const mn = minRef.current;
           const mx = maxRef.current;
           const px0 = valueToPixel(v[0], mn, mx, w);
-          animate(motionX0, px0, springs.moderate);
+          moveThumbTo(motionX0, px0);
           if (isRange && v[1] !== undefined) {
             const px1 = valueToPixel(v[1], mn, mx, w);
-            animate(motionX1, px1, springs.moderate);
+            moveThumbTo(motionX1, px1);
           }
         }
       });
       ro.observe(el);
       return () => ro.disconnect();
-    }, [isRange, motionX0, motionX1]);
+    }, [isRange, motionX0, motionX1, moveThumbTo]);
 
     // --- Sync motion values on value change (keyboard, programmatic) ---
     useEffect(() => {
@@ -467,12 +480,12 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
       const tw = trackWidthRef.current;
       if (tw <= 0) return;
       const px0 = valueToPixel(values[0], min, max, tw);
-      animate(motionX0, px0, springs.moderate);
+      moveThumbTo(motionX0, px0);
       if (isRange && values[1] !== undefined) {
         const px1 = valueToPixel(values[1], min, max, tw);
-        animate(motionX1, px1, springs.moderate);
+        moveThumbTo(motionX1, px1);
       }
-    }, [values, min, max, isRange, motionX0, motionX1]);
+    }, [values, min, max, isRange, motionX0, motionX1, moveThumbTo]);
 
     // --- Range crossing prevention ---
     const clampForRange = useCallback(
@@ -537,7 +550,7 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
         // Clamp for range crossing
         const finalPx = clampForRange(snappedPx, activeDragThumb.current);
         // Spring-animate thumb to clicked position
-        animate(motionX, finalPx, springs.moderate);
+        moveThumbTo(motionX, finalPx);
 
         // Update value
         const finalValue = pixelToValue(finalPx, min, max, step, trackRect.width);
@@ -555,6 +568,7 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
         motionX1,
         clampForRange,
         emitChange,
+        moveThumbTo,
         onInteractionStart,
       ],
     );
@@ -596,8 +610,8 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
       const currentPx = motionX.get();
       const snapped = pixelToValue(currentPx, min, max, step, tw);
       const snappedPx = valueToPixel(snapped, min, max, tw);
-      animate(motionX, snappedPx, springs.moderate);
-    }, [min, max, step, motionX0, motionX1, onInteractionEnd]);
+      moveThumbTo(motionX, snappedPx);
+    }, [min, max, step, motionX0, motionX1, moveThumbTo, onInteractionEnd]);
 
     // --- Radix keyboard handler ---
     const handleRadixChange = useCallback(
@@ -991,6 +1005,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const dragging = useRef(false);
     const handleDragging = useRef(false);
+    const reduceMotion = useReducedMotion();
     const [isHovered, setIsHovered] = useState(false);
     const [isPressed, setIsPressed] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
@@ -1039,6 +1054,17 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
     // Small offset when value is at min so the handle stays reachable.
     const zeroTarget = variant === "pips" ? 8 : 17;
     const zeroOffset = useMotionValue(value === min ? zeroTarget : 0);
+    const moveValueTo = useCallback(
+      (motionValue: MotionValue<number>, nextValue: number) => {
+        if (reduceMotion) {
+          motionValue.set(nextValue);
+          return;
+        }
+
+        animate(motionValue, nextValue, springs.fast);
+      },
+      [reduceMotion],
+    );
 
     const fillWidthStyle = useTransform(fillPercent, (p) => `${p * 100}%`);
     const handleLeftStyle = useTransform(
@@ -1114,9 +1140,9 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
     useEffect(() => {
       if (dragging.current || handleDragging.current) return;
       const percent = max === min ? 0 : Math.max(0, Math.min(1, (value - min) / (max - min)));
-      animate(fillPercent, percent, springs.fast);
-      animate(zeroOffset, value === min ? zeroTarget : 0, springs.fast);
-    }, [value, min, max, variant, fillPercent, zeroOffset, zeroTarget]);
+      moveValueTo(fillPercent, percent);
+      moveValueTo(zeroOffset, value === min ? zeroTarget : 0);
+    }, [value, min, max, variant, fillPercent, zeroOffset, zeroTarget, moveValueTo]);
 
     const getValueFromX = useCallback(
       (clientX: number) => {
@@ -1151,8 +1177,8 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         const newVal = getValueFromX(e.clientX);
         onChange(newVal);
         const newPercent = Math.max(0, Math.min(1, (newVal - min) / (max - min)));
-        animate(fillPercent, newPercent, springs.fast);
-        animate(zeroOffset, newVal === min ? zeroTarget : 0, springs.fast);
+        moveValueTo(fillPercent, newPercent);
+        moveValueTo(zeroOffset, newVal === min ? zeroTarget : 0);
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
       [
@@ -1163,6 +1189,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         fillPercent,
         zeroOffset,
         zeroTarget,
+        moveValueTo,
         min,
         max,
       ],
@@ -1177,11 +1204,11 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         if (variant === "scrubber") {
           fillPercent.set(newPercent);
         } else {
-          animate(fillPercent, newPercent, springs.fast);
+          moveValueTo(fillPercent, newPercent);
         }
-        animate(zeroOffset, newVal === min ? zeroTarget : 0, springs.fast);
+        moveValueTo(zeroOffset, newVal === min ? zeroTarget : 0);
       },
-      [getValueFromX, onChange, variant, fillPercent, zeroOffset, zeroTarget, min, max],
+      [getValueFromX, onChange, variant, fillPercent, zeroOffset, zeroTarget, moveValueTo, min, max],
     );
 
     const handlePointerUp = useCallback(() => {
@@ -1204,7 +1231,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         const newVal = getValueFromX(e.clientX);
         onChange(newVal);
         fillPercent.set(Math.max(0, Math.min(1, (newVal - min) / (max - min))));
-        animate(zeroOffset, newVal === min ? zeroTarget : 0, springs.fast);
+        moveValueTo(zeroOffset, newVal === min ? zeroTarget : 0);
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
       [
@@ -1215,6 +1242,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         fillPercent,
         zeroOffset,
         zeroTarget,
+        moveValueTo,
         min,
         max,
       ],
@@ -1226,9 +1254,9 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         const newVal = getValueFromX(e.clientX);
         onChange(newVal);
         fillPercent.set(Math.max(0, Math.min(1, (newVal - min) / (max - min))));
-        animate(zeroOffset, newVal === min ? zeroTarget : 0, springs.fast);
+        moveValueTo(zeroOffset, newVal === min ? zeroTarget : 0);
       },
-      [getValueFromX, onChange, fillPercent, zeroOffset, zeroTarget, min, max],
+      [getValueFromX, onChange, fillPercent, zeroOffset, zeroTarget, moveValueTo, min, max],
     );
 
     const handleResizePointerUp = useCallback(() => {

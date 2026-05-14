@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
 
@@ -14,6 +14,7 @@ export function FavoriteHeartButton({
   onClick: React.MouseEventHandler<HTMLButtonElement>;
 }) {
   const icons = useIcons();
+  const reduceMotion = useReducedMotion();
   const HeartIcon = icons.heart;
   const label = active ? "Remove from Loved" : "Add to Loved";
   const sparks = [
@@ -36,7 +37,7 @@ export function FavoriteHeartButton({
         onClick={onClick}
       >
         <AnimatePresence>
-          {active && (
+          {active && !reduceMotion && (
             <motion.span
               key="favorite-burst"
               className="pointer-events-none absolute inset-0 rounded-full border border-primary/70"
@@ -50,16 +51,18 @@ export function FavoriteHeartButton({
         <motion.span
           className="relative grid place-items-center"
           animate={
-            active
-              ? { scale: [1, 0.88, 1.2, 0.98, 1.04, 1] }
-              : { scale: [1, 0.9, 1] }
+            reduceMotion
+              ? { scale: 1 }
+              : active
+                ? { scale: [1, 0.88, 1.2, 0.98, 1.04, 1] }
+                : { scale: [1, 0.9, 1] }
           }
           transition={{ duration: active ? 0.62 : 0.24, ease: [0.18, 0.9, 0.26, 1] }}
         >
           <HeartIcon size={18} strokeWidth={1.7} fill={active ? "currentColor" : "none"} />
         </motion.span>
         <AnimatePresence>
-          {active && (
+          {active && !reduceMotion && (
             <motion.span
               key="favorite-sparks"
               className="pointer-events-none absolute inset-0"

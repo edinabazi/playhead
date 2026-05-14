@@ -1,5 +1,5 @@
 import type { SVGProps } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 type MediaIconProps = SVGProps<SVGSVGElement> & {
   size?: number;
@@ -36,27 +36,35 @@ export function PlayPauseMorphIcon({
   size = 24,
   ...props
 }: MediaIconProps & { playing: boolean }) {
+  const reduceMotion = useReducedMotion();
   const transition = { duration: 0.18, ease: [0.22, 1, 0.36, 1] } as const;
+  const leftPath = playing ? "M5 4 L10 4 L10 20 L5 20 Z" : "M5 5 L12 8.7 L12 15.3 L5 19 Z";
+  const rightPath = playing
+    ? "M14 4 L19 4 L19 20 L14 20 Z"
+    : "M12 8.7 L20 12 L12 15.3 L12 8.7 Z";
+
+  if (reduceMotion) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+        <path d={leftPath} fill="currentColor" />
+        <path d={rightPath} fill="currentColor" />
+      </svg>
+    );
+  }
 
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
       <motion.path
         d="M5 5 L12 8.7 L12 15.3 L5 19 Z"
         fill="currentColor"
-        animate={{
-          d: playing ? "M5 4 L10 4 L10 20 L5 20 Z" : "M5 5 L12 8.7 L12 15.3 L5 19 Z",
-        }}
+        animate={{ d: leftPath }}
         initial={false}
         transition={transition}
       />
       <motion.path
         d="M12 8.7 L20 12 L12 15.3 L12 8.7 Z"
         fill="currentColor"
-        animate={{
-          d: playing
-            ? "M14 4 L19 4 L19 20 L14 20 Z"
-            : "M12 8.7 L20 12 L12 15.3 L12 8.7 Z",
-        }}
+        animate={{ d: rightPath }}
         initial={false}
         transition={transition}
       />
