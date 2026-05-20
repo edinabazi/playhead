@@ -21,15 +21,18 @@ export async function readLibraryState(): Promise<LibraryState> {
   try {
     const raw = await readFile(libraryPath(), "utf8");
     const parsed = JSON.parse(raw) as Partial<LibraryState>;
-    return normalizeLibraryState(parsed);
+    const normalized = await normalizeLibraryState(parsed);
+    if (raw.includes('"dataUrl"')) await writeLibraryState(normalized);
+    return normalized;
   } catch {
     return emptyLibraryState();
   }
 }
 
 export async function writeLibraryState(state: LibraryState): Promise<LibraryState> {
-  await writeFile(libraryPath(), `${JSON.stringify(state, null, 2)}\n`, "utf8");
-  return state;
+  const nextState = stripEmbeddedArtwork(state);
+  await writeFile(libraryPath(), `${JSON.stringify(nextState)}\n`, "utf8");
+  return nextState;
 }
 
 export async function normalizeLibraryState(state: Partial<LibraryState>): Promise<LibraryState> {
@@ -80,4 +83,26 @@ export function normalizeSettings(
       ...(settings as Partial<LibrarySettings>),
     },
   };
+}
+
+function stripEmbeddedArtwork(state: LibraryState): LibraryState {
+  let changed = false;
+  const tracks: LibraryState["tracks"] = {};
+
+  for (const [trackId, track] of Object.entries(state.tracks)) {
+    if (!track.artwork?.dataUrl) {
+      tracks[trackId] = track;
+      continue;
+    }
+
+    changed = true;
+    tracks[trackId] = {
+      ...track,
+      artwork: track.artwork.src
+        ? { mimeType: track.artwork.mimeType, src: track.artwork.src }
+        : undefined,
+    };
+  }
+
+  return changed ? { ...state, tracks } : state;
 }

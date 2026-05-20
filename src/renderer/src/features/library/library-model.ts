@@ -30,6 +30,16 @@ export type LibraryAlbum = {
   year?: number;
 };
 
+export type LibraryCollections = {
+  artists: LibraryArtist[];
+  albums: LibraryAlbum[];
+};
+
+export type LibrarySourceParts = Pick<
+  LibraryState,
+  "favoriteTrackIds" | "folders" | "playlists" | "selectedSource" | "tags" | "tracks"
+>;
+
 export function getLibraryKey(value: string): string {
   return value.trim().toLowerCase() || "unknown";
 }
@@ -81,7 +91,7 @@ export function mergeScannedFolder(state: LibraryState, scanned: ScannedFolder):
     scanned.folder,
   ];
 
-  const validTrackIds = new Set(Object.values(tracks).map((track) => track.id));
+  const validTrackIds = new Set(Object.keys(tracks));
   const playlists = state.playlists.map((playlist) => ({
     ...playlist,
     trackIds: playlist.trackIds.filter((trackId) => validTrackIds.has(trackId)),
@@ -105,11 +115,14 @@ export function getAllLibraryTracks(state: LibraryState): LibraryTrack[] {
   return sortTracksByTitle(Object.values(state.tracks));
 }
 
-export function getLibraryArtists(state: LibraryState): LibraryArtist[] {
+export function getLibraryCollectionsFromTracks(
+  tracksById: LibraryState["tracks"],
+): LibraryCollections {
   const artists = new Map<string, LibraryArtist>();
   const artworkSourcesByArtist = new Map<string, Set<string>>();
+  const albums = new Map<string, LibraryAlbum>();
 
-  for (const track of Object.values(state.tracks)) {
+  for (const track of Object.values(tracksById)) {
     const name = getTrackArtist(track);
     const id = getLibraryKey(name);
     const artist = artists.get(id) || { id, name, artworkSet: [], trackIds: [] };
@@ -126,18 +139,10 @@ export function getLibraryArtists(state: LibraryState): LibraryArtist[] {
     }
 
     artists.set(id, artist);
-  }
 
-  return Array.from(artists.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-export function getLibraryAlbums(state: LibraryState): LibraryAlbum[] {
-  const albums = new Map<string, LibraryAlbum>();
-
-  for (const track of Object.values(state.tracks)) {
-    const id = getTrackAlbumId(track);
-    const album = albums.get(id) || {
-      id,
+    const albumId = getTrackAlbumId(track);
+    const album = albums.get(albumId) || {
+      id: albumId,
       title: getTrackAlbum(track),
       artist: getTrackArtist(track),
       artwork: track.artwork,
@@ -147,23 +152,36 @@ export function getLibraryAlbums(state: LibraryState): LibraryAlbum[] {
     album.trackIds.push(track.id);
     if (!album.artwork && track.artwork) album.artwork = track.artwork;
     if (!album.year && track.year) album.year = track.year;
-    albums.set(id, album);
+    albums.set(albumId, album);
   }
 
-  return Array.from(albums.values()).sort((a, b) => a.title.localeCompare(b.title));
+  return {
+    artists: Array.from(artists.values()).sort((a, b) => a.name.localeCompare(b.name)),
+    albums: Array.from(albums.values()).sort((a, b) => a.title.localeCompare(b.title)),
+  };
 }
 
-export function getSourceTracks(state: LibraryState): LibraryTrack[] {
+export function getLibraryCollections(state: LibraryState): LibraryCollections {
+  return getLibraryCollectionsFromTracks(state.tracks);
+}
+
+export function getLibraryArtists(state: LibraryState): LibraryArtist[] {
+  return getLibraryCollections(state).artists;
+}
+
+export function getLibraryAlbums(state: LibraryState): LibraryAlbum[] {
+  return getLibraryCollections(state).albums;
+}
+
+export function getSourceTracksFromParts(state: LibrarySourceParts): LibraryTrack[] {
   const source = state.selectedSource;
   if (!source) return [];
 
-  if (source.type === "library-tracks") return getAllLibraryTracks(state);
+  if (source.type === "library-tracks") return sortTracksByTitle(Object.values(state.tracks));
 
   if (source.type === "library-artist") {
     return sortTracksByTitle(
-      Object.values(state.tracks).filter(
-        (track) => getTrackArtistId(track) === source.id,
-      ),
+      Object.values(state.tracks).filter((track) => getTrackArtistId(track) === source.id),
     );
   }
 
@@ -198,6 +216,10 @@ export function getSourceTracks(state: LibraryState): LibraryTrack[] {
   return (sourceIds || [])
     .map((trackId) => state.tracks[trackId])
     .filter((track): track is LibraryTrack => Boolean(track));
+}
+
+export function getSourceTracks(state: LibraryState): LibraryTrack[] {
+  return getSourceTracksFromParts(state);
 }
 
 export function createPlaylist(existing: LibraryPlaylist[], name?: string): LibraryPlaylist {

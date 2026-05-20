@@ -64,8 +64,9 @@ export function smartShuffleQueue(
     const recent = next.slice(-recentWindowSize);
     let bestIndex = 0;
     let bestScore = Number.POSITIVE_INFINITY;
+    const candidateCount = Math.min(remaining.length, 64);
 
-    for (let index = 0; index < remaining.length; index += 1) {
+    for (let index = 0; index < candidateCount; index += 1) {
       const score = recentPenalty(remaining[index], recent, tracksById);
       if (score < bestScore) {
         bestIndex = index;
@@ -129,12 +130,11 @@ export function reorderQueueItems(
   edge: QueueDropEdge,
   shuffleEnabled: boolean,
 ): PlaybackQueue {
-  const uniqueItemIds = itemIds.filter((itemId, index) => itemIds.indexOf(itemId) === index);
+  const uniqueItemIds = Array.from(new Set(itemIds));
+  const uniqueItemIdSet = new Set(uniqueItemIds);
   const key = shuffleEnabled ? "shuffledItems" : "items";
   const items = queue[key];
-  const itemIdsToMove = items
-    .filter((item) => uniqueItemIds.includes(item.id))
-    .map((item) => item.id);
+  const itemIdsToMove = items.filter((item) => uniqueItemIdSet.has(item.id)).map((item) => item.id);
   if (itemIdsToMove.length === 0 || itemIdsToMove.includes(targetItemId)) return queue;
 
   const nextIds = moveItemsBeforeOrAfter(

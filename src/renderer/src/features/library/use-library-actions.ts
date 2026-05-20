@@ -8,6 +8,23 @@ import type {
 import { showSimpleActionToast, showTrackActionToast } from "@/features/toasts/action-toasts";
 import { createPlaylist, createTag } from "./library-model";
 
+function uniqueValidTrackIds(
+  trackIds: string[],
+  tracks: LibraryState["tracks"],
+  blockedTrackIds = new Set<string>(),
+): string[] {
+  const seen = new Set<string>();
+  const nextTrackIds: string[] = [];
+
+  for (const trackId of trackIds) {
+    if (!tracks[trackId] || blockedTrackIds.has(trackId) || seen.has(trackId)) continue;
+    seen.add(trackId);
+    nextTrackIds.push(trackId);
+  }
+
+  return nextTrackIds;
+}
+
 export function useLibraryActions({
   library,
   persistLibrary,
@@ -32,13 +49,10 @@ export function useLibraryActions({
   const createNewPlaylist = useCallback(
     async (name: string, tracksToAdd: LibraryTrack[] = []) => {
       const playlist = createPlaylist(library.playlists, name);
-      const trackIdsToAdd = tracksToAdd
-        .filter(
-          (track, index) =>
-            library.tracks[track.id] &&
-            tracksToAdd.findIndex((item) => item.id === track.id) === index,
-        )
-        .map((track) => track.id);
+      const trackIdsToAdd = uniqueValidTrackIds(
+        tracksToAdd.map((track) => track.id),
+        library.tracks,
+      );
       const now = new Date().toISOString();
 
       await persistLibrary({
@@ -89,13 +103,10 @@ export function useLibraryActions({
       }
 
       const tag = createTag(library.tags || [], trimmedName);
-      const trackIdsToAdd = tracksToAdd
-        .filter(
-          (track, index) =>
-            library.tracks[track.id] &&
-            tracksToAdd.findIndex((item) => item.id === track.id) === index,
-        )
-        .map((track) => track.id);
+      const trackIdsToAdd = uniqueValidTrackIds(
+        tracksToAdd.map((track) => track.id),
+        library.tracks,
+      );
       const now = new Date().toISOString();
 
       await persistLibrary({
@@ -280,11 +291,10 @@ export function useLibraryActions({
 
   const addTracksToPlaylist = useCallback(
     async (trackIds: string[], playlist: LibraryPlaylist) => {
-      const trackIdsToAdd = trackIds.filter(
-        (trackId, index) =>
-          library.tracks[trackId] &&
-          !playlist.trackIds.includes(trackId) &&
-          trackIds.indexOf(trackId) === index,
+      const trackIdsToAdd = uniqueValidTrackIds(
+        trackIds,
+        library.tracks,
+        new Set(playlist.trackIds),
       );
       if (trackIdsToAdd.length === 0) return;
 
@@ -315,12 +325,7 @@ export function useLibraryActions({
 
   const addTracksToTag = useCallback(
     async (trackIds: string[], tag: LibraryTag) => {
-      const trackIdsToAdd = trackIds.filter(
-        (trackId, index) =>
-          library.tracks[trackId] &&
-          !tag.trackIds.includes(trackId) &&
-          trackIds.indexOf(trackId) === index,
-      );
+      const trackIdsToAdd = uniqueValidTrackIds(trackIds, library.tracks, new Set(tag.trackIds));
       if (trackIdsToAdd.length === 0) return;
 
       const now = new Date().toISOString();

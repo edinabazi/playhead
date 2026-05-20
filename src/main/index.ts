@@ -31,6 +31,15 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: true,
     },
   },
+  {
+    scheme: "playhead-artwork",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
 ]);
 
 app.whenReady().then(() => {

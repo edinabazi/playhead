@@ -1,17 +1,19 @@
 import { createReadStream } from "node:fs";
 import { readFile, rm, stat, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import type {
   EditableTrackMetadata,
   LibraryFolder,
   LibraryState,
+  ScannedFolder,
   WaveformCacheRequest,
   WaveformCacheWrite,
   BpmCacheRequest,
   BpmCacheWrite,
 } from "../../shared/library";
 import { electron } from "../electron";
+import { decodeArtworkPath } from "../artwork";
 import { readTrackMetadata, saveTrackMetadata } from "../metadata/metadata";
 import { watchLibraryFolders } from "./folder-watcher";
 import { scanFolderPath } from "./scanner";
@@ -49,6 +51,12 @@ function getAudioMimeType(filePath: string): string {
 const mediaHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Accept-Ranges": "bytes",
+};
+
+const artworkHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Cache-Control": "public, max-age=31536000, immutable",
+  "Content-Type": "image/png",
 };
 
 async function handleMediaRequest(request: Request): Promise<Response> {
@@ -98,18 +106,44 @@ async function handleMediaRequest(request: Request): Promise<Response> {
   }
 
   const end = Math.min(requestedEnd, fileSize - 1);
-  return new Response(
-    Readable.toWeb(createReadStream(filePath, { start, end })) as BodyInit,
-    {
-      status: 206,
-      headers: {
-        ...mediaHeaders,
-        "Content-Length": String(end - start + 1),
-        "Content-Range": `bytes ${start}-${end}/${fileSize}`,
-        "Content-Type": contentType,
-      },
+  return new Response(Readable.toWeb(createReadStream(filePath, { start, end })) as BodyInit, {
+    status: 206,
+    headers: {
+      ...mediaHeaders,
+      "Content-Length": String(end - start + 1),
+      "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+      "Content-Type": contentType,
     },
-  );
+  });
+}
+
+function getArtworkDirectory(): string {
+  return join(app.getPath("userData"), "artwork");
+}
+
+function isArtworkPathAllowed(filePath: string): boolean {
+  const artworkDirectory = resolve(getArtworkDirectory());
+  const resolvedPath = resolve(filePath);
+  return resolvedPath === artworkDirectory || resolvedPath.startsWith(`${artworkDirectory}${sep}`);
+}
+
+async function handleArtworkRequest(request: Request): Promise<Response> {
+  try {
+    const filePath = decodeArtworkPath(request.url);
+    if (!isArtworkPathAllowed(filePath)) return new Response(null, { status: 403 });
+
+    const fileInfo = await stat(filePath);
+    if (!fileInfo.isFile()) return new Response(null, { status: 404 });
+
+    return new Response(Readable.toWeb(createReadStream(filePath)) as BodyInit, {
+      headers: {
+        ...artworkHeaders,
+        "Content-Length": String(fileInfo.size),
+      },
+    });
+  } catch {
+    return new Response(null, { status: 404 });
+  }
 }
 
 export function registerLibraryIpc(): void {
@@ -117,6 +151,10 @@ export function registerLibraryIpc(): void {
     protocol.unhandle("playhead-media");
   }
   protocol.handle("playhead-media", handleMediaRequest);
+  if (protocol.isProtocolHandled("playhead-artwork")) {
+    protocol.unhandle("playhead-artwork");
+  }
+  protocol.handle("playhead-artwork", handleArtworkRequest);
 
   ipcMain.handle("library:get-state", () => readLibraryState());
 
@@ -132,20 +170,27 @@ export function registerLibraryIpc(): void {
 
     if (result.canceled || result.filePaths.length === 0) return [];
 
-    return Promise.all(result.filePaths.map((folderPath) => scanFolderPath(folderPath, extensions)));
+    const existingState = await readLibraryState();
+    const scannedFolders: ScannedFolder[] = [];
+    for (const folderPath of result.filePaths) {
+      scannedFolders.push(await scanFolderPath(folderPath, extensions, existingState.tracks));
+    }
+    return scannedFolders;
   });
 
   ipcMain.handle(
     "library:scan-folder",
     async (_event, folder: LibraryFolder, extensions?: string[]) => {
-      return scanFolderPath(folder.path, extensions);
+      const existingState = await readLibraryState();
+      return scanFolderPath(folder.path, extensions, existingState.tracks);
     },
   );
 
   ipcMain.handle(
     "library:scan-folder-path",
     async (_event, folderPath: string, extensions?: string[]) => {
-      return scanFolderPath(folderPath, extensions);
+      const existingState = await readLibraryState();
+      return scanFolderPath(folderPath, extensions, existingState.tracks);
     },
   );
 

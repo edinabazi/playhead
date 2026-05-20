@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useIcons } from "@/lib/icon-context";
+import { useVirtualList } from "@/lib/virtual-list";
 import {
   panelContentVariants,
   panelItemVariants,
@@ -17,6 +18,8 @@ import {
   setDraggedQueueItemIds,
 } from "@/features/tracks/track-drag";
 import type { QueueDropEdge } from "./queue-model";
+
+const queueRowHeight = 56;
 
 export function QueuePanel({
   items,
@@ -43,38 +46,56 @@ export function QueuePanel({
     itemId: string;
     edge: QueueDropEdge;
   } | null>(null);
-  const validItems = items.filter((item) => tracksById[item.trackId]);
-  const activeIndex = validItems.findIndex((item) => item.id === activeItemId);
+  const validItems = useMemo(
+    () => items.filter((item) => tracksById[item.trackId]),
+    [items, tracksById],
+  );
+  const draggedItemSet = useMemo(() => new Set(draggedItemIds), [draggedItemIds]);
+  const activeIndex = useMemo(
+    () => validItems.findIndex((item) => item.id === activeItemId),
+    [activeItemId, validItems],
+  );
   const activeItem = activeIndex >= 0 ? validItems[activeIndex] : validItems[0] || null;
-  const upcomingItems = activeIndex >= 0 ? validItems.slice(activeIndex + 1) : validItems.slice(1);
+  const upcomingItems = useMemo(
+    () => (activeIndex >= 0 ? validItems.slice(activeIndex + 1) : validItems.slice(1)),
+    [activeIndex, validItems],
+  );
   const activeTrack = activeItem ? tracksById[activeItem.trackId] : null;
+  const upcomingList = useVirtualList({
+    itemCount: upcomingItems.length,
+    itemHeight: queueRowHeight,
+  });
+  const appendDroppedItems = (event: React.DragEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement | null)?.closest("[data-queue-now-playing='true']")) {
+      return;
+    }
+
+    const queueItemIds = getDraggedQueueItemIds(event.dataTransfer);
+    const trackIds = getDraggedTrackIds(event.dataTransfer);
+    if (trackIds.length === 0 && queueItemIds.length === 0) return;
+
+    event.preventDefault();
+    const lastItem = validItems[validItems.length - 1] || null;
+    if (queueItemIds.length > 0 && lastItem) {
+      onReorderItems(queueItemIds, lastItem.id, "after");
+      return;
+    }
+    if (trackIds.length > 0) onAddTracks(trackIds, lastItem?.id || null, "after");
+  };
+  const allowDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    const hasTracks = hasDraggedTrackIds(event.dataTransfer);
+    const hasQueueItems = hasDraggedQueueItemIds(event.dataTransfer);
+    if (!hasTracks && !hasQueueItems) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = hasQueueItems ? "move" : "copy";
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col no-drag">
       <div
-        className="thin-scrollbar -mx-2 min-h-0 flex-1 overflow-y-auto px-2"
-        onDragOver={(event) => {
-          const hasTracks = hasDraggedTrackIds(event.dataTransfer);
-          const hasQueueItems = hasDraggedQueueItemIds(event.dataTransfer);
-          if (!hasTracks && !hasQueueItems) return;
-          event.preventDefault();
-          event.dataTransfer.dropEffect = hasQueueItems ? "move" : "copy";
-        }}
-        onDrop={(event) => {
-          if ((event.target as HTMLElement | null)?.closest("[data-queue-now-playing='true']")) {
-            return;
-          }
-          const queueItemIds = getDraggedQueueItemIds(event.dataTransfer);
-          const trackIds = getDraggedTrackIds(event.dataTransfer);
-          if (trackIds.length === 0 && queueItemIds.length === 0) return;
-          event.preventDefault();
-          const lastItem = validItems[validItems.length - 1] || null;
-          if (queueItemIds.length > 0 && lastItem) {
-            onReorderItems(queueItemIds, lastItem.id, "after");
-            return;
-          }
-          if (trackIds.length > 0) onAddTracks(trackIds, lastItem?.id || null, "after");
-        }}
+        className="flex min-h-0 flex-1 flex-col"
+        onDragOver={allowDrop}
+        onDrop={appendDroppedItems}
       >
         {validItems.length === 0 || !activeItem || !activeTrack ? (
           <motion.div
@@ -94,7 +115,7 @@ export function QueuePanel({
           </motion.div>
         ) : (
           <motion.div
-            className="flex flex-col gap-4 pb-4"
+            className="flex min-h-0 flex-1 flex-col gap-4 pb-4"
             variants={panelContentVariants}
             initial="hidden"
             animate="show"
@@ -109,7 +130,6 @@ export function QueuePanel({
                 track={activeTrack}
                 fallbackIcon={MusicIcon}
                 removeIcon={XIcon}
-                dragging={draggedItemIds.includes(activeItem.id)}
                 showBeforeLine={false}
                 showAfterLine={false}
                 onPlayItem={onPlayItem}
@@ -118,10 +138,14 @@ export function QueuePanel({
                 onAddTracks={onAddTracks}
                 setDraggedItemIds={setDraggedItemIds}
                 setDropIndicator={setDropIndicator}
+                dragging={draggedItemSet.has(activeItem.id)}
               />
             </motion.div>
 
-            <motion.div className="flex flex-col gap-0.5" variants={panelSectionVariants}>
+            <motion.div
+              className="flex min-h-0 flex-1 flex-col gap-0.5"
+              variants={panelSectionVariants}
+            >
               <SectionLabel>Up Next</SectionLabel>
               {upcomingItems.length === 0 ? (
                 <motion.div
@@ -131,34 +155,48 @@ export function QueuePanel({
                   No upcoming tracks.
                 </motion.div>
               ) : (
-                upcomingItems.map((item) => {
-                  const track = tracksById[item.trackId];
-                  const showBeforeLine =
-                    dropIndicator?.itemId === item.id && dropIndicator.edge === "before";
-                  const showAfterLine =
-                    dropIndicator?.itemId === item.id && dropIndicator.edge === "after";
+                <div
+                  ref={upcomingList.containerRef}
+                  className="thin-scrollbar -mx-2 min-h-0 flex-1 overflow-y-auto px-2"
+                  onScroll={upcomingList.onScroll}
+                  onDragOver={allowDrop}
+                  onDrop={appendDroppedItems}
+                >
+                  <div className="relative" style={{ height: upcomingList.totalHeight }}>
+                    {upcomingList.rows.map(({ index, start }) => {
+                      const item = upcomingItems[index];
+                      const track = item ? tracksById[item.trackId] : null;
+                      if (!item || !track) return null;
 
-                  return (
-                    <QueueRow
-                      key={item.id}
-                      item={item}
-                      selected={false}
-                      removable
-                      track={track}
-                      fallbackIcon={MusicIcon}
-                      removeIcon={XIcon}
-                      dragging={draggedItemIds.includes(item.id)}
-                      showBeforeLine={showBeforeLine}
-                      showAfterLine={showAfterLine}
-                      onPlayItem={onPlayItem}
-                      onRemoveItem={onRemoveItem}
-                      onReorderItems={onReorderItems}
-                      onAddTracks={onAddTracks}
-                      setDraggedItemIds={setDraggedItemIds}
-                      setDropIndicator={setDropIndicator}
-                    />
-                  );
-                })
+                      const showBeforeLine =
+                        dropIndicator?.itemId === item.id && dropIndicator.edge === "before";
+                      const showAfterLine =
+                        dropIndicator?.itemId === item.id && dropIndicator.edge === "after";
+
+                      return (
+                        <div key={item.id} className="absolute inset-x-0" style={{ top: start }}>
+                          <QueueRow
+                            item={item}
+                            selected={false}
+                            removable
+                            track={track}
+                            fallbackIcon={MusicIcon}
+                            removeIcon={XIcon}
+                            dragging={draggedItemSet.has(item.id)}
+                            showBeforeLine={showBeforeLine}
+                            showAfterLine={showAfterLine}
+                            onPlayItem={onPlayItem}
+                            onRemoveItem={onRemoveItem}
+                            onReorderItems={onReorderItems}
+                            onAddTracks={onAddTracks}
+                            setDraggedItemIds={setDraggedItemIds}
+                            setDropIndicator={setDropIndicator}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </motion.div>
           </motion.div>

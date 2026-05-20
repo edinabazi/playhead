@@ -67,10 +67,8 @@ import {
 } from "@/features/audio/audio-analysis";
 import {
   emptyLibraryState,
-  getLibraryAlbums,
-  getLibraryArtists,
-  getAllLibraryTracks,
-  getSourceTracks,
+  getLibraryCollectionsFromTracks,
+  getSourceTracksFromParts,
   getTrackAlbumId,
   getTrackArtistId,
   mergeScannedFolder,
@@ -264,12 +262,45 @@ export function App() {
   const [lastfmActionPending, setLastfmActionPending] = useState(false);
   const [batchAnalysis, setBatchAnalysis] = useState<BatchAnalysisState>(emptyBatchAnalysisState);
 
-  const tracks = useMemo(() => getSourceTracks(library), [library]);
   const allTracks = useMemo(() => Object.values(library.tracks), [library.tracks]);
-  const libraryArtists = useMemo(() => getLibraryArtists(library), [library]);
-  const libraryAlbums = useMemo(() => getLibraryAlbums(library), [library]);
-  const libraryTrackCount = useMemo(() => getAllLibraryTracks(library).length, [library]);
+  const libraryCollections = useMemo(
+    () => getLibraryCollectionsFromTracks(library.tracks),
+    [library.tracks],
+  );
+  const libraryArtists = libraryCollections.artists;
+  const libraryAlbums = libraryCollections.albums;
+  const tracks = useMemo(
+    () =>
+      getSourceTracksFromParts({
+        favoriteTrackIds: library.favoriteTrackIds,
+        folders: library.folders,
+        playlists: library.playlists,
+        selectedSource: library.selectedSource,
+        tags: library.tags,
+        tracks: library.tracks,
+      }),
+    [
+      library.favoriteTrackIds,
+      library.folders,
+      library.playlists,
+      library.selectedSource,
+      library.tags,
+      library.tracks,
+    ],
+  );
+  const libraryTrackCount = useMemo(() => Object.keys(library.tracks).length, [library.tracks]);
   const activeTrack = activeTrackId ? library.tracks[activeTrackId] : null;
+  const favoriteTrackSet = useMemo(
+    () => new Set(library.favoriteTrackIds || []),
+    [library.favoriteTrackIds],
+  );
+  const activeTags = useMemo(
+    () =>
+      activeTrack
+        ? (library.tags || []).filter((tag) => tag.trackIds.includes(activeTrack.id))
+        : [],
+    [activeTrack, library.tags],
+  );
   const selectedLibraryArtist =
     library.selectedSource?.type === "library-artist"
       ? libraryArtists.find((artist) => artist.id === library.selectedSource?.id) || null
@@ -299,7 +330,14 @@ export function App() {
       return (library.tags || []).find((tag) => tag.id === source.id)?.name || "Tag";
     }
     return library.playlists.find((playlist) => playlist.id === source.id)?.name || "Playlist";
-  }, [library, libraryAlbums, libraryArtists]);
+  }, [
+    library.folders,
+    library.playlists,
+    library.selectedSource,
+    library.tags,
+    libraryAlbums,
+    libraryArtists,
+  ]);
   const appTransparency =
     (previewAppTransparency ?? library.settings.appearance.appTransparency) / 100;
   const reduceMotion = library.settings.appearance.reduceMotion;
@@ -1127,17 +1165,14 @@ export function App() {
 
       const source = library.selectedSource;
       if (!source) return;
-      const uniqueTrackIds = trackIds.filter(
-        (trackId, index) => trackIds.indexOf(trackId) === index,
-      );
+      const uniqueTrackIds = Array.from(new Set(trackIds));
+      const uniqueTrackIdSet = new Set(uniqueTrackIds);
       if (uniqueTrackIds.length === 0) return;
 
       if (source.type === "folder") {
         const folder = library.folders.find((item) => item.id === source.id);
         if (!folder) return;
-        const trackIdsToMove = folder.trackIds.filter((trackId) =>
-          uniqueTrackIds.includes(trackId),
-        );
+        const trackIdsToMove = folder.trackIds.filter((trackId) => uniqueTrackIdSet.has(trackId));
         if (trackIdsToMove.length === 0) return;
         const targetIndex = folder.trackIds.indexOf(targetTrackId);
         if (targetIndex === -1) return;
@@ -1161,9 +1196,7 @@ export function App() {
 
       const playlist = library.playlists.find((item) => item.id === source.id);
       if (!playlist) return;
-      const trackIdsToMove = playlist.trackIds.filter((trackId) =>
-        uniqueTrackIds.includes(trackId),
-      );
+      const trackIdsToMove = playlist.trackIds.filter((trackId) => uniqueTrackIdSet.has(trackId));
       if (trackIdsToMove.length === 0) return;
       const targetIndex = playlist.trackIds.indexOf(targetTrackId);
       if (targetIndex === -1) return;
@@ -2018,19 +2051,13 @@ export function App() {
               <>
                 <Player
                   activeTrack={activeTrack}
-                  activeTags={
-                    activeTrack
-                      ? (library.tags || []).filter((tag) => tag.trackIds.includes(activeTrack.id))
-                      : []
-                  }
+                  activeTags={activeTags}
                   isPlaying={isPlaying}
                   isLoading={isLoadingTrack}
                   hasWaveform={hasWaveform}
                   shouldAnimateWaveform={shouldAnimateWaveform}
                   reduceMotion={reduceMotion}
-                  isFavorite={
-                    activeTrack ? (library.favoriteTrackIds || []).includes(activeTrack.id) : false
-                  }
+                  isFavorite={activeTrack ? favoriteTrackSet.has(activeTrack.id) : false}
                   currentTime={currentTime}
                   duration={duration}
                   waveformRef={setWaveformElement}

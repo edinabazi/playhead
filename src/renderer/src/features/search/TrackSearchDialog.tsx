@@ -25,14 +25,28 @@ type SearchResult =
   | { type: "album"; album: LibraryAlbum }
   | { type: "track"; track: LibraryTrack };
 
-function scoreText(value: string, query: string): number {
-  const text = value.trim().toLowerCase();
+type ScoredSearchResult = {
+  result: SearchResult;
+  label: string;
+  score: number;
+};
+
+function normalizeSearchText(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function scoreText(text: string, query: string): number {
   if (!text) return Number.POSITIVE_INFINITY;
   if (text === query) return 0;
   if (text.startsWith(query)) return 1;
 
-  const wordIndex = text.split(/\s+/).findIndex((word) => word.startsWith(query));
-  if (wordIndex >= 0) return 2 + wordIndex / 10;
+  let wordIndex = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] !== " ") continue;
+    while (text[index + 1] === " ") index += 1;
+    wordIndex += 1;
+    if (text.startsWith(query, index + 1)) return 2 + wordIndex / 10;
+  }
 
   const index = text.indexOf(query);
   return index >= 0 ? 4 + index / 100 : Number.POSITIVE_INFINITY;
@@ -43,6 +57,14 @@ function bestFieldScore(fields: Array<{ value: string; weight: number }>, query:
     (best, field) => Math.min(best, scoreText(field.value, query) + field.weight),
     Number.POSITIVE_INFINITY,
   );
+}
+
+function bestResults(results: ScoredSearchResult[], limit: number): SearchResult[] {
+  return results
+    .filter((result) => Number.isFinite(result.score))
+    .sort((a, b) => a.score - b.score || a.label.localeCompare(b.label))
+    .slice(0, limit)
+    .map(({ result }) => result);
 }
 
 export function TrackSearchDialog({
@@ -102,64 +124,86 @@ export function TrackSearchDialog({
     () => new Map(folders.map((folder) => [folder.id, folder.name])),
     [folders],
   );
+  const searchableTracks = useMemo(
+    () =>
+      tracks
+        .slice()
+        .sort((a, b) => a.title.localeCompare(b.title))
+        .map((track) => ({
+          track,
+          label: track.title,
+          title: normalizeSearchText(track.title),
+          artist: normalizeSearchText(track.artist),
+          album: normalizeSearchText(track.album || ""),
+          fileName: normalizeSearchText(track.fileName),
+          folderName: normalizeSearchText(folderNames.get(track.folderId) || ""),
+        })),
+    [folderNames, tracks],
+  );
+  const searchableArtists = useMemo(
+    () =>
+      artists.map((artist) => ({
+        artist,
+        label: artist.name,
+        name: normalizeSearchText(artist.name),
+      })),
+    [artists],
+  );
+  const searchableAlbums = useMemo(
+    () =>
+      albums.map((album) => ({
+        album,
+        label: album.title,
+        title: normalizeSearchText(album.title),
+        artist: normalizeSearchText(album.artist),
+      })),
+    [albums],
+  );
   const results = useMemo<SearchResult[]>(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const searchableTracks = tracks.slice().sort((a, b) => a.title.localeCompare(b.title));
+    const normalizedQuery = normalizeSearchText(query);
     if (!normalizedQuery) {
-      return searchableTracks.slice(0, 24).map((track) => ({ type: "track", track }));
+      return searchableTracks.slice(0, 24).map(({ track }) => ({ type: "track" as const, track }));
     }
 
-    const trackResults = searchableTracks
-      .map((track) => ({
-        result: { type: "track" as const, track },
-        label: track.title,
-        score: bestFieldScore(
-          [
-            { value: track.title, weight: 0 },
-            { value: track.artist, weight: 3 },
-            { value: track.album || "", weight: 4 },
-            { value: track.fileName, weight: 5 },
-            { value: folderNames.get(track.folderId) || "", weight: 6 },
-          ],
-          normalizedQuery,
-        ),
-      }))
-      .filter((result) => Number.isFinite(result.score));
+    const trackResults = searchableTracks.map((entry) => ({
+      result: { type: "track" as const, track: entry.track },
+      label: entry.label,
+      score: bestFieldScore(
+        [
+          { value: entry.title, weight: 0 },
+          { value: entry.artist, weight: 3 },
+          { value: entry.album, weight: 4 },
+          { value: entry.fileName, weight: 5 },
+          { value: entry.folderName, weight: 6 },
+        ],
+        normalizedQuery,
+      ),
+    }));
 
     if (libraryMode !== "library") {
-      return trackResults
-        .sort((a, b) => a.score - b.score || a.label.localeCompare(b.label))
-        .slice(0, 24)
-        .map(({ result }) => result);
+      return bestResults(trackResults, 24);
     }
 
-    const artistResults = artists
-      .map((artist) => ({
-        result: { type: "artist" as const, artist },
-        label: artist.name,
-        score: bestFieldScore([{ value: artist.name, weight: 0 }], normalizedQuery),
-      }))
-      .filter((result) => Number.isFinite(result.score));
+    const artistResults = searchableArtists.map((entry) => ({
+      result: { type: "artist" as const, artist: entry.artist },
+      label: entry.label,
+      score: bestFieldScore([{ value: entry.name, weight: 0 }], normalizedQuery),
+    }));
 
-    const albumResults = albums
-      .map((album) => ({
-        result: { type: "album" as const, album },
-        label: album.title,
-        score: bestFieldScore(
-          [
-            { value: album.title, weight: 0 },
-            { value: album.artist, weight: 2 },
-          ],
-          normalizedQuery,
-        ),
-      }))
-      .filter((result) => Number.isFinite(result.score));
+    const albumResults = searchableAlbums.map((entry) => ({
+      result: { type: "album" as const, album: entry.album },
+      label: entry.label,
+      score: bestFieldScore(
+        [
+          { value: entry.title, weight: 0 },
+          { value: entry.artist, weight: 2 },
+        ],
+        normalizedQuery,
+      ),
+    }));
 
-    return [...trackResults, ...artistResults, ...albumResults]
-      .sort((a, b) => a.score - b.score || a.label.localeCompare(b.label))
-      .slice(0, 24)
-      .map(({ result }) => result);
-  }, [albums, artists, folderNames, libraryMode, query, tracks]);
+    return bestResults([...trackResults, ...artistResults, ...albumResults], 24);
+  }, [libraryMode, query, searchableAlbums, searchableArtists, searchableTracks]);
 
   useEffect(() => {
     inputRef.current?.focus();

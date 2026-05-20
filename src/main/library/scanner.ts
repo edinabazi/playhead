@@ -1,8 +1,19 @@
 import { readdir, stat } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { parseFile } from "music-metadata";
-import type { LibraryFolder, LibraryTrack, ScannedFolder } from "../../shared/library";
-import { getArtwork } from "../artwork";
+import type {
+  LibraryArtwork,
+  LibraryFolder,
+  LibraryState,
+  LibraryTrack,
+  ScannedFolder,
+} from "../../shared/library";
+import {
+  getArtwork,
+  getAvailableArtwork,
+  getContentAddressedArtwork,
+  getStoredArtwork,
+} from "../artwork";
 import { audioExtensions } from "./constants";
 import { cleanTitle, makeId } from "./ids";
 
@@ -45,6 +56,13 @@ const blockedFileNames = new Set([
 ]);
 const maxVisitedDirectories = 5_000;
 const maxVisitedEntries = 75_000;
+const metadataParseConcurrency = 4;
+
+type BuildTrackOptions = {
+  reuseStoredArtwork?: boolean;
+  existingTracks?: LibraryState["tracks"];
+  artworkCache?: Map<string, Promise<LibraryArtwork | undefined>>;
+};
 
 function normalizeExtensions(extensions?: string[]): Set<string> {
   if (!extensions || extensions.length === 0) return audioExtensions;
@@ -63,9 +81,7 @@ async function findAudioFiles(folderPath: string, extensions = audioExtensions):
 
     visitedDirectories += 1;
     if (visitedDirectories > maxVisitedDirectories) {
-      throw new Error(
-        "That folder is too broad to scan. Choose a dedicated music folder instead.",
-      );
+      throw new Error("That folder is too broad to scan. Choose a dedicated music folder instead.");
     }
 
     let entries;
@@ -110,14 +126,52 @@ async function findAudioFiles(folderPath: string, extensions = audioExtensions):
   return audioFiles.sort((a, b) => a.localeCompare(b));
 }
 
-export async function buildTrack(filePath: string, folderId: string): Promise<LibraryTrack> {
+async function buildTracksWithConcurrency(
+  filePaths: string[],
+  folderId: string,
+  options: BuildTrackOptions = {},
+): Promise<LibraryTrack[]> {
+  const tracks = new Array<LibraryTrack>(filePaths.length);
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(metadataParseConcurrency, filePaths.length) },
+    async () => {
+      while (nextIndex < filePaths.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        tracks[index] = await buildTrack(filePaths[index], folderId, options);
+      }
+    },
+  );
+
+  await Promise.all(workers);
+  return tracks;
+}
+
+export async function buildTrack(
+  filePath: string,
+  folderId: string,
+  options: BuildTrackOptions = {},
+): Promise<LibraryTrack> {
   const fileName = basename(filePath);
 
   try {
     const trackId = makeId(filePath);
-    const metadata = await parseFile(filePath, { duration: true });
+    const storedArtwork = options.reuseStoredArtwork
+      ? (await getAvailableArtwork(options.existingTracks?.[trackId]?.artwork)) ||
+        (await getStoredArtwork(trackId))
+      : undefined;
+    const metadata = await parseFile(filePath, {
+      duration: true,
+      skipCovers: Boolean(storedArtwork),
+    });
 
     const bpm = metadata.common.bpm;
+    const artwork =
+      storedArtwork ||
+      (options.artworkCache
+        ? await getContentAddressedArtwork(metadata.common.picture, options.artworkCache)
+        : await getArtwork(trackId, metadata.common.picture));
 
     return {
       id: trackId,
@@ -130,7 +184,7 @@ export async function buildTrack(filePath: string, folderId: string): Promise<Li
       trackNumber: metadata.common.track.no || undefined,
       diskNumber: metadata.common.disk.no || undefined,
       year: metadata.common.year,
-      artwork: await getArtwork(trackId, metadata.common.picture),
+      artwork,
       duration: metadata.format.duration || 0,
       audioFormat: metadata.format.container || extname(filePath).slice(1).toUpperCase(),
       sampleRate: metadata.format.sampleRate,
@@ -155,6 +209,7 @@ export async function buildTrack(filePath: string, folderId: string): Promise<Li
 export async function scanFolderPath(
   folderPath: string,
   extensions?: string[],
+  existingTracks: LibraryState["tracks"] = {},
 ): Promise<ScannedFolder> {
   const folderInfo = await stat(folderPath);
   if (!folderInfo.isDirectory()) throw new Error("Selected path is not a folder.");
@@ -167,7 +222,11 @@ export async function scanFolderPath(
   };
 
   const audioFiles = await findAudioFiles(folderPath, normalizeExtensions(extensions));
-  const tracks = await Promise.all(audioFiles.map((filePath) => buildTrack(filePath, folder.id)));
+  const tracks = await buildTracksWithConcurrency(audioFiles, folder.id, {
+    reuseStoredArtwork: true,
+    existingTracks,
+    artworkCache: new Map(),
+  });
   folder.trackIds = tracks.map((track) => track.id);
 
   return { folder, tracks };

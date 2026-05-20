@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useIcons } from "@/lib/icon-context";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
+import { useVirtualList } from "@/lib/virtual-list";
 import type { LibraryPlaylist, LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { TrackListRow } from "./TrackListRow";
 import {
@@ -8,6 +9,8 @@ import {
   getDraggedTrackIds,
   setDraggedTrackIds as setDraggedTrackIdsPayload,
 } from "./track-drag";
+
+const trackRowHeight = 56;
 
 export function TrackList({
   tracks,
@@ -76,57 +79,68 @@ export function TrackList({
     trackId: string;
     edge: "before" | "after";
   } | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const selectedTracks = selectedTrackIds
-    .map((trackId) => tracks.find((track) => track.id === trackId))
-    .filter((track): track is LibraryTrack => Boolean(track));
+  const trackById = useMemo(() => new Map(tracks.map((track) => [track.id, track])), [tracks]);
+  const selectedTrackSet = useMemo(() => new Set(selectedTrackIds), [selectedTrackIds]);
+  const favoriteTrackSet = useMemo(() => new Set(favoriteTrackIds), [favoriteTrackIds]);
+  const draggedTrackSet = useMemo(() => new Set(draggedTrackIds), [draggedTrackIds]);
+  const selectedTracks = useMemo(
+    () =>
+      selectedTrackIds
+        .map((trackId) => trackById.get(trackId))
+        .filter((track): track is LibraryTrack => Boolean(track)),
+    [selectedTrackIds, trackById],
+  );
+  const virtualList = useVirtualList({
+    itemCount: tracks.length,
+    itemHeight: trackRowHeight,
+  });
+  const { container, containerRef, onScroll, rows, scrollToIndex, totalHeight } = virtualList;
 
   useEffect(() => {
-    if (!scrollToTrackId) return;
+    if (!scrollToTrackId || !container) return;
 
-    const row = scrollContainerRef.current?.querySelector<HTMLElement>(
-      `[data-track-id="${CSS.escape(scrollToTrackId)}"]`,
-    );
-    if (row && scrollContainerRef.current) {
-      scrollRowIntoNearestView(row, scrollContainerRef.current);
-    }
+    const index = tracks.findIndex((track) => track.id === scrollToTrackId);
+    if (index >= 0) scrollToIndex(index, "center");
     onScrolledToTrack();
-  }, [onScrolledToTrack, scrollToTrackId, tracks]);
+  }, [container, onScrolledToTrack, scrollToIndex, scrollToTrackId, tracks]);
 
   return (
     <section className="-mb-4 flex min-h-0 flex-1 flex-col gap-[14px]">
       <div className="relative min-h-0 flex-1">
         <div
-          ref={scrollContainerRef}
+          ref={containerRef}
           className="thin-scrollbar no-drag h-full min-h-0 overflow-y-auto pr-2"
+          onScroll={onScroll}
         >
           {tracks.length === 0 ? (
             <div className="flex h-[calc(100%-1rem)] min-h-[180px] items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.025] text-[14px] text-muted-foreground">
               No tracks here yet. Start by adding something.
             </div>
           ) : (
-            <div className="flex flex-col gap-0.5 pb-8">
-              {tracks.map((track, index) => {
-                const isFavorite = favoriteTrackIds.includes(track.id);
+            <div className="relative" style={{ height: totalHeight + 32 }}>
+              {rows.map(({ index, start }) => {
+                const track = tracks[index];
+                if (!track) return null;
+
+                const isFavorite = favoriteTrackSet.has(track.id);
+                const isSelected = selectedTrackSet.has(track.id);
                 const showBeforeLine =
                   dropIndicator?.trackId === track.id && dropIndicator.edge === "before";
                 const showAfterLine =
                   dropIndicator?.trackId === track.id && dropIndicator.edge === "after";
 
                 return (
-                  <div key={track.id} className="relative">
+                  <div key={track.id} className="absolute inset-x-0" style={{ top: start }}>
                     {showBeforeLine && <DropIndicator />}
                     <TrackListRow
                       track={track}
                       index={index}
                       activeTrackId={activeTrackId}
                       isPlaying={isPlaying}
-                      selected={selectedTrackIds.includes(track.id)}
-                      dragging={draggedTrackIds.includes(track.id)}
+                      selected={isSelected}
+                      dragging={draggedTrackSet.has(track.id)}
                       favorite={isFavorite}
-                      selectedTracks={
-                        selectedTrackIds.includes(track.id) ? selectedTracks : [track]
-                      }
+                      selectedTracks={isSelected ? selectedTracks : [track]}
                       selectedPlaylist={selectedPlaylist}
                       selectedTag={selectedTag}
                       playlists={playlists}
@@ -138,17 +152,17 @@ export function TrackList({
                       onSelect={onSelectTrack}
                       onPlay={onPlayTrack}
                       onContextMenu={(nextTrack, point) => {
-                        if (!selectedTrackIds.includes(track.id)) onSelectTrack(track);
+                        if (!selectedTrackSet.has(track.id)) onSelectTrack(track);
                         setContextMenuPoint(point);
                         setMenuTrackId(nextTrack.id);
                       }}
                       onKeyPlay={onPlayTrack}
                       onDragStart={(dragTrack, event) => {
-                        const draggedIds = selectedTrackIds.includes(dragTrack.id)
+                        const draggedIds = selectedTrackSet.has(dragTrack.id)
                           ? selectedTrackIds
                           : [dragTrack.id];
                         const draggedTracks = draggedIds
-                          .map((trackId) => tracks.find((item) => item.id === trackId))
+                          .map((trackId) => trackById.get(trackId))
                           .filter((item): item is LibraryTrack => Boolean(item));
                         setDraggedTrackIds(draggedIds);
                         event.dataTransfer.effectAllowed = "copyMove";
@@ -229,12 +243,4 @@ function DropIndicator() {
       <div className="absolute -top-px left-2 right-2 h-0.5 rounded-full bg-primary" />
     </div>
   );
-}
-
-function scrollRowIntoNearestView(row: HTMLElement, container: HTMLElement) {
-  const rowRect = row.getBoundingClientRect();
-  const containerRect = container.getBoundingClientRect();
-
-  container.scrollTop +=
-    rowRect.top - containerRect.top - containerRect.height / 2 + rowRect.height / 2;
 }
