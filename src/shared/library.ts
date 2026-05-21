@@ -5,11 +5,23 @@ export type SourceType =
   | "playlist"
   | "tag"
   | "loved"
+  | "soundcloud"
   | "library-artists"
   | "library-artist"
   | "library-albums"
   | "library-album"
   | "library-tracks";
+
+export type TrackSource = "local" | "soundcloud";
+
+export type SoundCloudCollectionId =
+  | "playlists"
+  | "liked-tracks"
+  | "liked-playlists"
+  | "uploads"
+  | "reposted-tracks"
+  | "reposted-playlists"
+  | "feed";
 
 export type LibraryFolder = {
   id: string;
@@ -20,6 +32,7 @@ export type LibraryFolder = {
 
 export type LibraryTrack = {
   id: string;
+  source?: TrackSource;
   path: string;
   fileName: string;
   title: string;
@@ -37,6 +50,15 @@ export type LibraryTrack = {
   bpm?: number;
   bpmSource?: "metadata" | "analysis";
   folderId: string;
+  soundcloud?: {
+    id: number;
+    urn?: string;
+    permalinkUrl?: string;
+    streamable: boolean;
+    access?: "playable" | "preview" | "blocked";
+    artworkUrl?: string;
+    username?: string;
+  };
 };
 
 export type EditableTrackMetadata = {
@@ -130,6 +152,7 @@ export type AppSettings = {
   appearance: AppearanceSettings;
   telemetry: TelemetrySettings;
   lastfm: LastfmSettings;
+  soundcloud: SoundCloudSettings;
   session: SessionSettings;
 };
 
@@ -162,6 +185,11 @@ export type LastfmSettings = {
   loveSyncEnabled: boolean;
 };
 
+export type SoundCloudSettings = {
+  enabled: boolean;
+  visibleCollections: SoundCloudCollectionId[];
+};
+
 export type SessionSettings = {
   activeTrackId: string | null;
   selectedTrackIds: string[];
@@ -192,6 +220,22 @@ export type LastfmState = {
   pendingAuth: boolean;
   queueSize: number;
   lastError?: string;
+};
+
+export type SoundCloudState = {
+  configured: boolean;
+  connected: boolean;
+  username?: string;
+  pendingAuth: boolean;
+  lastError?: string;
+};
+
+export type SoundCloudCollection = {
+  id: SoundCloudCollectionId | `playlist:${number}`;
+  title: string;
+  subtitle?: string;
+  trackCount?: number;
+  kind: "tracks" | "playlists" | "feed";
 };
 
 export type LastfmTrackPayload = {
@@ -269,6 +313,15 @@ export type PlayheadApi = {
   loveLastfmTrack: (track: LastfmTrackPayload) => Promise<LastfmState>;
   unloveLastfmTrack: (track: LastfmTrackPayload) => Promise<LastfmState>;
   flushLastfmQueue: () => Promise<LastfmState>;
+  getSoundCloudState: () => Promise<SoundCloudState>;
+  startSoundCloudAuth: () => Promise<SoundCloudState>;
+  completeSoundCloudAuth: () => Promise<SoundCloudState>;
+  disconnectSoundCloud: () => Promise<SoundCloudState>;
+  getSoundCloudCollections: (
+    visibleCollections: SoundCloudCollectionId[],
+  ) => Promise<SoundCloudCollection[]>;
+  getSoundCloudCollectionTracks: (collectionId: string) => Promise<LibraryTrack[]>;
+  getSoundCloudStreamUrl: (trackId: number) => Promise<string>;
   minimizeWindow: () => Promise<void>;
   toggleMaximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;
@@ -318,6 +371,19 @@ export const defaultLastfmSettings = (): LastfmSettings => ({
   loveSyncEnabled: false,
 });
 
+export const defaultSoundCloudSettings = (): SoundCloudSettings => ({
+  enabled: false,
+  visibleCollections: [
+    "playlists",
+    "liked-tracks",
+    "liked-playlists",
+    "uploads",
+    "reposted-tracks",
+    "reposted-playlists",
+    "feed",
+  ],
+});
+
 export const defaultSessionSettings = (): SessionSettings => ({
   activeTrackId: null,
   selectedTrackIds: [],
@@ -339,6 +405,7 @@ export const defaultAppSettings = (): AppSettings => ({
   appearance: defaultAppearanceSettings(),
   telemetry: defaultTelemetrySettings(),
   lastfm: defaultLastfmSettings(),
+  soundcloud: defaultSoundCloudSettings(),
   session: defaultSessionSettings(),
 });
 

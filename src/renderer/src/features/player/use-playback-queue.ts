@@ -11,6 +11,7 @@ import {
 
 export function usePlaybackQueue({
   library,
+  tracksById = library.tracks,
   shuffleEnabled,
   persistSessionSettings,
   selectTrack,
@@ -18,6 +19,7 @@ export function usePlaybackQueue({
   setScrollToTrackId,
 }: {
   library: LibraryState;
+  tracksById?: Record<string, LibraryTrack>;
   shuffleEnabled: boolean;
   persistSessionSettings: (nextSession: LibraryState["settings"]["session"]) => void;
   selectTrack: (
@@ -53,7 +55,7 @@ export function usePlaybackQueue({
 
   const playItem = useCallback(
     (item: PlaybackQueueItem) => {
-      const track = library.tracks[item.trackId];
+      const track = tracksById[item.trackId];
       if (!track) return;
 
       updateQueue({ ...queue, activeItemId: item.id });
@@ -61,7 +63,7 @@ export function usePlaybackQueue({
       setScrollToTrackId(track.id);
       void selectTrack(track, true, 0, false, "preserve", item.id);
     },
-    [library.tracks, queue, selectTrack, setScrollToTrackId, setSelectedTrackIds, updateQueue],
+    [tracksById, queue, selectTrack, setScrollToTrackId, setSelectedTrackIds, updateQueue],
   );
 
   const reorderItems = useCallback(
@@ -73,7 +75,7 @@ export function usePlaybackQueue({
 
   const addTracks = useCallback(
     (trackIds: string[], targetItemId: string | null, edge: QueueDropEdge) => {
-      const validTrackIds = trackIds.filter((trackId) => library.tracks[trackId]);
+      const validTrackIds = trackIds.filter((trackId) => tracksById[trackId]);
       if (validTrackIds.length === 0) return;
 
       updateQueue(addTracksToQueue(queue, validTrackIds, targetItemId, edge, shuffleEnabled));
@@ -83,7 +85,7 @@ export function usePlaybackQueue({
           : `${validTrackIds.length} tracks added to queue.`,
       );
     },
-    [library.tracks, queue, shuffleEnabled, updateQueue],
+    [tracksById, queue, shuffleEnabled, updateQueue],
   );
 
   const removeItem = useCallback(

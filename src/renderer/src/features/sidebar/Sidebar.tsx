@@ -9,6 +9,7 @@ import type {
   LibraryPlaylist,
   LibraryTag,
   SelectedSource,
+  SoundCloudCollection,
 } from "../../../../shared/library";
 import { SidebarContextMenu, type SidebarContextMenuState } from "./SidebarContextMenu";
 import { SidebarGroup } from "./SidebarGroup";
@@ -25,6 +26,9 @@ export function Sidebar({
   tags,
   lovedCount,
   selectedSource,
+  soundcloudEnabled,
+  soundcloudCollections,
+  soundcloudLoadingCollectionId,
   isScanning,
   updateState,
   onAddFolder,
@@ -34,6 +38,8 @@ export function Sidebar({
   onCreatePlaylist,
   onCreateTag,
   onSelectSource,
+  onSelectSoundCloudSource,
+  onRefreshSoundCloud,
   onDropTrackToPlaylist,
   onDropTrackToTag,
   onRemoveFolder,
@@ -53,6 +59,9 @@ export function Sidebar({
   tags: LibraryTag[];
   lovedCount: number;
   selectedSource: SelectedSource | null;
+  soundcloudEnabled: boolean;
+  soundcloudCollections: SoundCloudCollection[];
+  soundcloudLoadingCollectionId: string | null;
   isScanning: boolean;
   updateState: AppUpdateState;
   onAddFolder: () => void;
@@ -62,6 +71,8 @@ export function Sidebar({
   onCreatePlaylist: () => void;
   onCreateTag: () => void;
   onSelectSource: (source: SelectedSource) => void;
+  onSelectSoundCloudSource: (collectionId: string) => void;
+  onRefreshSoundCloud: () => void;
   onDropTrackToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
   onDropTrackToTag: (trackIds: string[], tag: LibraryTag) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
@@ -245,6 +256,41 @@ export function Sidebar({
               ))
             )}
           </SidebarGroup>
+          {soundcloudEnabled && (
+            <SidebarGroup
+              title="SoundCloud"
+              collapsed={false}
+              onToggleCollapsed={() => undefined}
+              actionLabel="Refresh SoundCloud"
+              actionIcon={icons["radio-tower"]}
+              onAction={onRefreshSoundCloud}
+            >
+              {soundcloudCollections.length === 0 ? (
+                <SidebarEmpty key="soundcloud-empty">
+                  {soundcloudLoadingCollectionId ? "Loading..." : "No SoundCloud collections"}
+                </SidebarEmpty>
+              ) : (
+                soundcloudCollections.map((collection) => (
+                  <SidebarItem
+                    key={collection.id}
+                    active={
+                      selectedSource?.type === "soundcloud" && selectedSource.id === collection.id
+                    }
+                    icon={icons["radio-tower"]}
+                    label={collection.title}
+                    detail={
+                      soundcloudLoadingCollectionId === collection.id
+                        ? "..."
+                        : collection.trackCount !== undefined
+                          ? `${collection.trackCount}`
+                          : collection.kind
+                    }
+                    onClick={() => onSelectSoundCloudSource(collection.id)}
+                  />
+                ))
+              )}
+            </SidebarGroup>
+          )}
         </motion.div>
       </div>
 

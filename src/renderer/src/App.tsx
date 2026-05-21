@@ -16,6 +16,9 @@ import {
   type LibraryTag,
   type LibraryTrack,
   type PlaybackSettings,
+  type SoundCloudCollection,
+  type SoundCloudSettings,
+  type SoundCloudState,
   type TelemetrySettings,
   defaultSessionSettings,
 } from "../../shared/library";
@@ -166,6 +169,10 @@ function toLastfmTrackPayload(
   };
 }
 
+function isSoundCloudTrack(track: LibraryTrack): boolean {
+  return track.source === "soundcloud" || Boolean(track.soundcloud);
+}
+
 function getUpdateMessageDismissedKey(version: string): string {
   return `playhead:update-message-dismissed:${version}`;
 }
@@ -209,6 +216,7 @@ export function App() {
   const lastfmPlaybackSessionRef = useRef<LastfmPlaybackSession | null>(null);
   const lastfmNowPlayingTrackIdRef = useRef<string | null>(null);
   const libraryRef = useRef<LibraryState>(emptyLibraryState());
+  const soundcloudTracksRef = useRef<Record<string, LibraryTrack>>({});
 
   const [library, setLibrary] = useState<LibraryState>(emptyLibraryState);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
@@ -260,6 +268,19 @@ export function App() {
     queueSize: 0,
   });
   const [lastfmActionPending, setLastfmActionPending] = useState(false);
+  const [soundcloudState, setSoundCloudState] = useState<SoundCloudState>({
+    configured: false,
+    connected: false,
+    pendingAuth: false,
+  });
+  const [soundcloudActionPending, setSoundCloudActionPending] = useState(false);
+  const [soundcloudCollections, setSoundCloudCollections] = useState<SoundCloudCollection[]>([]);
+  const [soundcloudTracksByCollection, setSoundCloudTracksByCollection] = useState<
+    Record<string, LibraryTrack[]>
+  >({});
+  const [soundcloudLoadingCollectionId, setSoundCloudLoadingCollectionId] = useState<string | null>(
+    null,
+  );
   const [batchAnalysis, setBatchAnalysis] = useState<BatchAnalysisState>(emptyBatchAnalysisState);
 
   const allTracks = useMemo(() => Object.values(library.tracks), [library.tracks]);
@@ -270,15 +291,19 @@ export function App() {
   const libraryArtists = libraryCollections.artists;
   const libraryAlbums = libraryCollections.albums;
   const tracks = useMemo(
-    () =>
-      getSourceTracksFromParts({
+    () => {
+      if (library.selectedSource?.type === "soundcloud" && library.selectedSource.id) {
+        return soundcloudTracksByCollection[library.selectedSource.id] || [];
+      }
+      return getSourceTracksFromParts({
         favoriteTrackIds: library.favoriteTrackIds,
         folders: library.folders,
         playlists: library.playlists,
         selectedSource: library.selectedSource,
         tags: library.tags,
         tracks: library.tracks,
-      }),
+      });
+    },
     [
       library.favoriteTrackIds,
       library.folders,
@@ -286,10 +311,22 @@ export function App() {
       library.selectedSource,
       library.tags,
       library.tracks,
+      soundcloudTracksByCollection,
     ],
   );
+  const allPlayableTracksById = useMemo(
+    () => ({
+      ...library.tracks,
+      ...Object.fromEntries(
+        Object.values(soundcloudTracksByCollection)
+          .flat()
+          .map((track) => [track.id, track]),
+      ),
+    }),
+    [library.tracks, soundcloudTracksByCollection],
+  );
   const libraryTrackCount = useMemo(() => Object.keys(library.tracks).length, [library.tracks]);
-  const activeTrack = activeTrackId ? library.tracks[activeTrackId] : null;
+  const activeTrack = activeTrackId ? allPlayableTracksById[activeTrackId] : null;
   const favoriteTrackSet = useMemo(
     () => new Set(library.favoriteTrackIds || []),
     [library.favoriteTrackIds],
@@ -326,6 +363,9 @@ export function App() {
       return library.folders.find((folder) => folder.id === source.id)?.name || "Folder";
     }
     if (source.type === "loved") return "Loved";
+    if (source.type === "soundcloud") {
+      return soundcloudCollections.find((collection) => collection.id === source.id)?.title || "SoundCloud";
+    }
     if (source.type === "tag") {
       return (library.tags || []).find((tag) => tag.id === source.id)?.name || "Tag";
     }
@@ -337,6 +377,7 @@ export function App() {
     library.tags,
     libraryAlbums,
     libraryArtists,
+    soundcloudCollections,
   ]);
   const appTransparency =
     (previewAppTransparency ?? library.settings.appearance.appTransparency) / 100;
@@ -584,7 +625,7 @@ export function App() {
                       title: getQueueSourceTitle(library),
                     }
                   : null,
-                library.tracks,
+                allPlayableTracksById,
                 shuffleEnabled,
               ),
               panelOpen: library.settings.session.queue.panelOpen,
@@ -601,14 +642,22 @@ export function App() {
       });
 
       try {
-        const audioUrl = await window.playhead.getAudioFileUrl(track.path);
+        if (isSoundCloudTrack(track) && track.soundcloud?.access !== "playable") {
+          throw new Error("This SoundCloud track is not available for full playback.");
+        }
+        const audioUrl =
+          isSoundCloudTrack(track) && track.soundcloud
+            ? await window.playhead.getSoundCloudStreamUrl(track.soundcloud.id)
+            : await window.playhead.getAudioFileUrl(track.path);
         if (requestId !== trackLoadRequestIdRef.current) return;
         const waveformCacheRequest = {
           trackId: track.id,
           path: track.path,
           duration: track.duration,
         };
-        const cachedWaveform = await window.playhead.getWaveformCache(waveformCacheRequest);
+        const cachedWaveform = isSoundCloudTrack(track)
+          ? null
+          : await window.playhead.getWaveformCache(waveformCacheRequest);
         if (requestId !== trackLoadRequestIdRef.current) return;
         setShouldAnimateWaveform(!cachedWaveform);
         if (!cachedWaveform) setHasWaveform(false);
@@ -630,7 +679,7 @@ export function App() {
         lastfmNowPlayingTrackIdRef.current = null;
         setHasWaveform(true);
         setDuration(wavesurfer.getDuration() || track.duration || 0);
-        if (!cachedWaveform) {
+        if (!cachedWaveform && !isSoundCloudTrack(track)) {
           const loadedDuration = wavesurfer.getDuration() || track.duration || 0;
           const maxLength = Math.max(
             1,
@@ -652,7 +701,7 @@ export function App() {
           has_duration: Boolean(track.duration),
           audio_format: track.audioFormat || "unknown",
         });
-        void analyzeTrackBpm(track);
+        if (!isSoundCloudTrack(track)) void analyzeTrackBpm(track);
         if (startTime > 0) {
           wavesurfer.setTime(clamp(startTime, 0, wavesurfer.getDuration() || startTime));
           setCurrentTime(wavesurfer.getCurrentTime());
@@ -681,7 +730,7 @@ export function App() {
         if (requestId === trackLoadRequestIdRef.current) setIsLoadingTrack(false);
       }
     },
-    [library, analyzeTrackBpm, persistSessionSettings, shuffleEnabled, tracks],
+    [allPlayableTracksById, library, analyzeTrackBpm, persistSessionSettings, shuffleEnabled, tracks],
   );
 
   const playSearchResult = useCallback(
@@ -952,6 +1001,64 @@ export function App() {
   const flushLastfmQueue = useCallback(() => {
     void runLastfmAction(() => window.playhead.flushLastfmQueue());
   }, [runLastfmAction]);
+
+  const updateSoundCloudSettings = useCallback(
+    async (settings: SoundCloudSettings) => {
+      await persistLibrary({
+        ...library,
+        settings: { ...library.settings, soundcloud: settings },
+      });
+    },
+    [library, persistLibrary],
+  );
+
+  const runSoundCloudAction = useCallback(async (action: () => Promise<SoundCloudState>) => {
+    setSoundCloudActionPending(true);
+    try {
+      const nextState = await action();
+      setSoundCloudState(nextState);
+      if (nextState.lastError) showSimpleActionToast(nextState.lastError, "error");
+    } catch (error) {
+      showSimpleActionToast(
+        error instanceof Error ? error.message : "SoundCloud action failed.",
+        "error",
+      );
+    } finally {
+      setSoundCloudActionPending(false);
+    }
+  }, []);
+
+  const startSoundCloudAuth = useCallback(() => {
+    void runSoundCloudAction(() => window.playhead.startSoundCloudAuth());
+  }, [runSoundCloudAction]);
+
+  const completeSoundCloudAuth = useCallback(() => {
+    void runSoundCloudAction(() => window.playhead.completeSoundCloudAuth());
+  }, [runSoundCloudAction]);
+
+  const disconnectSoundCloud = useCallback(() => {
+    void runSoundCloudAction(async () => {
+      const nextState = await window.playhead.disconnectSoundCloud();
+      setSoundCloudCollections([]);
+      setSoundCloudTracksByCollection({});
+      soundcloudTracksRef.current = {};
+      return nextState;
+    });
+  }, [runSoundCloudAction]);
+
+  const loadSoundCloudCollections = useCallback(async () => {
+    const settings = libraryRef.current.settings.soundcloud;
+    if (!settings.enabled || !soundcloudState.connected) return;
+    try {
+      const collections = await window.playhead.getSoundCloudCollections(settings.visibleCollections);
+      setSoundCloudCollections(collections);
+    } catch (error) {
+      showSimpleActionToast(
+        error instanceof Error ? error.message : "Could not load SoundCloud collections.",
+        "error",
+      );
+    }
+  }, [soundcloudState.connected]);
 
   const clearPlaybackState = useCallback(() => {
     wavesurferRef.current?.stop();
@@ -1225,20 +1332,20 @@ export function App() {
     if (!wavesurfer) return;
 
     if (!activeTrackId) {
-      const selectedTrack = selectedTrackIds[0] ? library.tracks[selectedTrackIds[0]] : null;
+      const selectedTrack = selectedTrackIds[0] ? allPlayableTracksById[selectedTrackIds[0]] : null;
       const nextTrack = activeTrack || selectedTrack || tracks[0];
       if (nextTrack) await selectTrack(nextTrack, true);
       return;
     }
 
     if (loadedTrackIdRef.current !== activeTrackId) {
-      const activeTrack = library.tracks[activeTrackId];
+      const activeTrack = allPlayableTracksById[activeTrackId];
       if (activeTrack) await selectTrack(activeTrack, true);
       return;
     }
 
     await wavesurfer.playPause();
-  }, [activeTrack, activeTrackId, library.tracks, selectTrack, selectedTrackIds, tracks]);
+  }, [activeTrack, activeTrackId, allPlayableTracksById, selectTrack, selectedTrackIds, tracks]);
 
   const setPlayerVolume = useCallback((nextVolume: number) => {
     const clampedVolume = clamp(nextVolume, 0, 1);
@@ -1330,9 +1437,9 @@ export function App() {
   );
 
   const playSelectedTrack = useCallback(() => {
-    const selectedTrack = selectedTrackIds[0] ? library.tracks[selectedTrackIds[0]] : null;
+    const selectedTrack = selectedTrackIds[0] ? allPlayableTracksById[selectedTrackIds[0]] : null;
     if (selectedTrack) void selectTrack(selectedTrack, true, 0, true, "source");
-  }, [library.tracks, selectTrack, selectedTrackIds]);
+  }, [allPlayableTracksById, selectTrack, selectedTrackIds]);
 
   const selectLibrarySource = useCallback(
     (source: LibraryState["selectedSource"]) => {
@@ -1341,6 +1448,31 @@ export function App() {
       void persistLibrary({ ...library, selectedSource: source });
     },
     [library, persistLibrary],
+  );
+
+  const selectSoundCloudSource = useCallback(
+    async (collectionId: string) => {
+      selectLibrarySource({ type: "soundcloud", id: collectionId });
+      if (soundcloudTracksByCollection[collectionId]) return;
+
+      setSoundCloudLoadingCollectionId(collectionId);
+      try {
+        const nextTracks = await window.playhead.getSoundCloudCollectionTracks(collectionId);
+        setSoundCloudTracksByCollection((current) => ({ ...current, [collectionId]: nextTracks }));
+        soundcloudTracksRef.current = {
+          ...soundcloudTracksRef.current,
+          ...Object.fromEntries(nextTracks.map((track) => [track.id, track])),
+        };
+      } catch (error) {
+        showSimpleActionToast(
+          error instanceof Error ? error.message : "Could not load SoundCloud tracks.",
+          "error",
+        );
+      } finally {
+        setSoundCloudLoadingCollectionId(null);
+      }
+    },
+    [selectLibrarySource, soundcloudTracksByCollection],
   );
 
   const selectLibraryBrowserItem = useCallback(
@@ -1492,7 +1624,7 @@ export function App() {
               : 0
             : (currentIndex + direction + visibleQueueItems.length) % visibleQueueItems.length;
         const nextItem = visibleQueueItems[nextIndex];
-        const nextTrack = nextItem ? library.tracks[nextItem.trackId] : null;
+        const nextTrack = nextItem ? allPlayableTracksById[nextItem.trackId] : null;
         if (!nextTrack) return;
 
         persistSessionSettings({
@@ -1529,7 +1661,7 @@ export function App() {
     [
       activeTrackId,
       library.settings.session,
-      library.tracks,
+      allPlayableTracksById,
       persistSessionSettings,
       selectTrack,
       selectedTrackIds,
@@ -1557,7 +1689,7 @@ export function App() {
           ? visibleQueueItems[currentIndex + 1] ||
             (repeatMode === "all" ? visibleQueueItems[0] : null)
           : visibleQueueItems[0] || null;
-      const nextTrack = nextItem ? library.tracks[nextItem.trackId] : null;
+      const nextTrack = nextItem ? allPlayableTracksById[nextItem.trackId] : null;
       if (!nextTrack || !nextItem) return false;
 
       persistSessionSettings({
@@ -1580,7 +1712,7 @@ export function App() {
   }, [
     activeTrackId,
     library.settings.session,
-    library.tracks,
+    allPlayableTracksById,
     persistSessionSettings,
     repeatMode,
     selectTrack,
@@ -1631,14 +1763,14 @@ export function App() {
     if (!library.settings.playback.restoreLastSession) return;
 
     const trackId = library.settings.session.activeTrackId;
-    const track = trackId ? library.tracks[trackId] : null;
+    const track = trackId ? allPlayableTracksById[trackId] : null;
     if (!track) return;
 
     didRestoreSessionRef.current = true;
     setSelectedTrackIds(library.settings.session.selectedTrackIds);
     setScrollToTrackId(track.id);
     void selectTrack(track, false, library.settings.session.trackPositions[track.id] || 0);
-  }, [isWaveformEngineReady, library, selectTrack]);
+  }, [allPlayableTracksById, isWaveformEngineReady, library, selectTrack]);
 
   useEffect(() => {
     const onSelectAll = (event: KeyboardEvent) => {
@@ -1731,6 +1863,18 @@ export function App() {
   useEffect(() => {
     void window.playhead.getLastfmState().then(setLastfmState);
   }, []);
+
+  useEffect(() => {
+    void window.playhead.getSoundCloudState().then(setSoundCloudState);
+  }, []);
+
+  useEffect(() => {
+    void loadSoundCloudCollections();
+  }, [
+    library.settings.soundcloud.enabled,
+    library.settings.soundcloud.visibleCollections,
+    loadSoundCloudCollections,
+  ]);
 
   useEffect(() => {
     playNextTrackOnEndRef.current = playNextTrackOnEnd;
@@ -1837,6 +1981,7 @@ export function App() {
 
   const playbackQueue = usePlaybackQueue({
     library,
+    tracksById: allPlayableTracksById,
     shuffleEnabled,
     persistSessionSettings,
     selectTrack,
@@ -1944,7 +2089,10 @@ export function App() {
     (trackId) => library.tracks[trackId],
   );
   const isLibraryEmpty =
-    library.folders.length === 0 && library.playlists.length === 0 && !hasLovedTracks;
+    library.folders.length === 0 &&
+    library.playlists.length === 0 &&
+    !hasLovedTracks &&
+    !(library.settings.soundcloud.enabled && soundcloudState.connected);
 
   return (
     <MotionConfig reducedMotion={reduceMotion ? "always" : "never"}>
@@ -1964,7 +2112,7 @@ export function App() {
             {playbackQueue.panelOpen ? (
               <QueueSidebar
                 items={playbackQueue.items}
-                tracksById={library.tracks}
+                tracksById={allPlayableTracksById}
                 activeItemId={playbackQueue.activeItemId}
                 updateState={updateState}
                 onToggleQueue={playbackQueue.togglePanel}
@@ -1992,6 +2140,11 @@ export function App() {
                 tags={library.tags || []}
                 lovedCount={hasLovedTracks ? library.favoriteTrackIds.length : 0}
                 selectedSource={library.selectedSource}
+                soundcloudEnabled={
+                  library.settings.soundcloud.enabled && soundcloudState.connected
+                }
+                soundcloudCollections={soundcloudCollections}
+                soundcloudLoadingCollectionId={soundcloudLoadingCollectionId}
                 isScanning={isScanning}
                 updateState={updateState}
                 onAddFolder={addFolder}
@@ -2006,6 +2159,8 @@ export function App() {
                 onCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
                 onCreateTag={() => setIsCreateTagOpen(true)}
                 onSelectSource={selectLibrarySource}
+                onSelectSoundCloudSource={(collectionId) => void selectSoundCloudSource(collectionId)}
+                onRefreshSoundCloud={() => void loadSoundCloudCollections()}
                 onDropTrackToPlaylist={(trackIds, playlist) =>
                   void addTracksToPlaylist(trackIds, playlist)
                 }
@@ -2075,7 +2230,7 @@ export function App() {
                           shuffledItems: smartShuffleQueue(
                             library.settings.session.queue.items,
                             library.settings.session.queue.activeItemId,
-                            library.tracks,
+                            allPlayableTracksById,
                           ),
                         }
                       : library.settings.session.queue;
@@ -2098,7 +2253,9 @@ export function App() {
                     });
                   }}
                   onToggleFavorite={() => {
-                    if (activeTrack) void toggleFavoriteTrack(activeTrack.id);
+                    if (activeTrack && !isSoundCloudTrack(activeTrack)) {
+                      void toggleFavoriteTrack(activeTrack.id);
+                    }
                   }}
                   onVolumeChange={setPlayerVolume}
                 />
@@ -2157,7 +2314,9 @@ export function App() {
                       selectedPlaylist={selectedPlaylist}
                       selectedTag={selectedTag}
                       canReorderTracks={
-                        selectedSource?.type !== "library-tracks" && selectedSource?.type !== "tag"
+                        selectedSource?.type !== "library-tracks" &&
+                        selectedSource?.type !== "tag" &&
+                        selectedSource?.type !== "soundcloud"
                       }
                       playlists={library.playlists}
                       tags={library.tags || []}
@@ -2283,12 +2442,19 @@ export function App() {
               lastfmState={lastfmState}
               lastfmSettings={library.settings.lastfm}
               lastfmActionPending={lastfmActionPending}
+              soundcloudState={soundcloudState}
+              soundcloudSettings={library.settings.soundcloud}
+              soundcloudActionPending={soundcloudActionPending}
               onLastfmSettingsChange={(settings) => void updateLastfmSettings(settings)}
               onStartLastfmAuth={startLastfmAuth}
               onCompleteLastfmAuth={completeLastfmAuth}
               onCancelLastfmAuth={disconnectLastfm}
               onDisconnectLastfm={disconnectLastfm}
               onFlushLastfmQueue={flushLastfmQueue}
+              onSoundCloudSettingsChange={(settings) => void updateSoundCloudSettings(settings)}
+              onStartSoundCloudAuth={startSoundCloudAuth}
+              onCompleteSoundCloudAuth={completeSoundCloudAuth}
+              onDisconnectSoundCloud={disconnectSoundCloud}
               onAdvancedAction={runAdvancedSettingsAction}
               batchAnalysis={batchAnalysis}
               onAnalyzeMissingAudioData={analyzeMissingAudioData}

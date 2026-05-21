@@ -60,6 +60,7 @@ export function normalizeSettings(
       appearance: { ...defaults.appearance, ...(grouped.appearance || {}) },
       telemetry: { ...defaults.telemetry, ...(grouped.telemetry || {}) },
       lastfm: { ...defaults.lastfm, ...(grouped.lastfm || {}) },
+      soundcloud: { ...defaults.soundcloud, ...(grouped.soundcloud || {}) },
       session: {
         ...defaults.session,
         ...(grouped.session || {}),

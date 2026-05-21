@@ -9,6 +9,7 @@ import type {
   LibraryState,
   MediaCommand,
   PlayheadApi,
+  SoundCloudCollectionId,
   WaveformCacheRequest,
   WaveformCacheWrite,
 } from "../shared/library";
@@ -58,6 +59,29 @@ const api: PlayheadApi = {
   loveLastfmTrack: (track: LastfmTrackPayload) => ipcRenderer.invoke("lastfm:love", track),
   unloveLastfmTrack: (track: LastfmTrackPayload) => ipcRenderer.invoke("lastfm:unlove", track),
   flushLastfmQueue: () => ipcRenderer.invoke("lastfm:flush-queue"),
+  getSoundCloudState: () => ipcRenderer.invoke("soundcloud:get-state"),
+  startSoundCloudAuth: () => ipcRenderer.invoke("soundcloud:start-auth"),
+  completeSoundCloudAuth: () => {
+    const input = window.prompt("Paste the SoundCloud authorization code or callback URL.");
+    if (!input) return ipcRenderer.invoke("soundcloud:get-state");
+    let code = input.trim();
+    let state: string | undefined;
+    try {
+      const url = new URL(code);
+      code = url.searchParams.get("code") || code;
+      state = url.searchParams.get("state") || undefined;
+    } catch {
+      // Plain authorization codes are accepted.
+    }
+    return ipcRenderer.invoke("soundcloud:complete-auth", code, state);
+  },
+  disconnectSoundCloud: () => ipcRenderer.invoke("soundcloud:disconnect"),
+  getSoundCloudCollections: (visibleCollections: SoundCloudCollectionId[]) =>
+    ipcRenderer.invoke("soundcloud:get-collections", visibleCollections),
+  getSoundCloudCollectionTracks: (collectionId: string) =>
+    ipcRenderer.invoke("soundcloud:get-collection-tracks", collectionId),
+  getSoundCloudStreamUrl: (trackId: number) =>
+    ipcRenderer.invoke("soundcloud:get-stream-url", trackId),
   minimizeWindow: () => ipcRenderer.invoke("window:minimize"),
   toggleMaximizeWindow: () => ipcRenderer.invoke("window:toggle-maximize"),
   closeWindow: () => ipcRenderer.invoke("window:close"),

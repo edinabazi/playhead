@@ -5,6 +5,7 @@ import {
   defaultAppearanceSettings,
   defaultLibrarySettings,
   defaultPlaybackSettings,
+  defaultSoundCloudSettings,
   defaultTelemetrySettings,
   type AppearanceSettings,
   type LastfmSettings,
@@ -12,6 +13,8 @@ import {
   type LibraryFolder,
   type LibrarySettings,
   type PlaybackSettings,
+  type SoundCloudSettings,
+  type SoundCloudState,
   type TelemetrySettings,
 } from "../../../../shared/library";
 import {
@@ -63,12 +66,19 @@ export function SettingsDialog({
   lastfmState,
   lastfmSettings,
   lastfmActionPending,
+  soundcloudState,
+  soundcloudSettings,
+  soundcloudActionPending,
   onLastfmSettingsChange,
   onStartLastfmAuth,
   onCompleteLastfmAuth,
   onCancelLastfmAuth,
   onDisconnectLastfm,
   onFlushLastfmQueue,
+  onSoundCloudSettingsChange,
+  onStartSoundCloudAuth,
+  onCompleteSoundCloudAuth,
+  onDisconnectSoundCloud,
   onAdvancedAction,
   batchAnalysis,
   onAnalyzeMissingAudioData,
@@ -91,12 +101,19 @@ export function SettingsDialog({
   lastfmState: LastfmState;
   lastfmSettings: LastfmSettings;
   lastfmActionPending: boolean;
+  soundcloudState: SoundCloudState;
+  soundcloudSettings: SoundCloudSettings;
+  soundcloudActionPending: boolean;
   onLastfmSettingsChange: (settings: LastfmSettings) => void;
   onStartLastfmAuth: () => void;
   onCompleteLastfmAuth: () => void;
   onCancelLastfmAuth: () => void;
   onDisconnectLastfm: () => void;
   onFlushLastfmQueue: () => void;
+  onSoundCloudSettingsChange: (settings: SoundCloudSettings) => void;
+  onStartSoundCloudAuth: () => void;
+  onCompleteSoundCloudAuth: () => void;
+  onDisconnectSoundCloud: () => void;
   onAdvancedAction: (action: AdvancedSettingsAction) => Promise<string>;
   batchAnalysis: {
     status: "idle" | "running" | "complete";
@@ -145,6 +162,7 @@ export function SettingsDialog({
   const savedPlaybackSettings = { ...defaultPlaybackSettings(), ...playbackSettings };
   const savedAppearanceSettings = { ...defaultAppearanceSettings(), ...appearanceSettings };
   const savedTelemetrySettings = { ...defaultTelemetrySettings(), ...telemetrySettings };
+  const savedSoundCloudSettings = { ...defaultSoundCloudSettings(), ...soundcloudSettings };
   const settingsChanged =
     savedSettings.mode !== draftLibrarySettings.mode ||
     savedSettings.watchFolders !== draftLibrarySettings.watchFolders ||
@@ -537,7 +555,10 @@ export function SettingsDialog({
               <IntegrationsSettingsPane
                 lastfmState={lastfmState}
                 lastfmSettings={lastfmSettings}
-                pendingAction={lastfmActionPending}
+                lastfmPendingAction={lastfmActionPending}
+                soundcloudState={soundcloudState}
+                soundcloudSettings={savedSoundCloudSettings}
+                soundcloudPendingAction={soundcloudActionPending}
                 icons={{
                   loader: icons.loader,
                   x: icons.x,
@@ -548,6 +569,10 @@ export function SettingsDialog({
                 onCancelLastfmAuth={onCancelLastfmAuth}
                 onDisconnectLastfm={onDisconnectLastfm}
                 onFlushLastfmQueue={onFlushLastfmQueue}
+                onSoundCloudSettingsChange={onSoundCloudSettingsChange}
+                onConnectSoundCloud={onStartSoundCloudAuth}
+                onCompleteSoundCloudAuth={onCompleteSoundCloudAuth}
+                onDisconnectSoundCloud={onDisconnectSoundCloud}
               />
             ) : (
               <AdvancedSettingsPane

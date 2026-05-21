@@ -5,6 +5,7 @@ import { registerLastfmIpc } from "./lastfm/lastfm";
 import { registerLibraryIpc } from "./library/library-ipc";
 import { registerMediaShortcuts } from "./media/media-shortcuts";
 import { installApplicationMenu } from "./menu";
+import { registerSoundCloudIpc } from "./soundcloud/soundcloud";
 import { registerTelemetryIpc, trackAppLaunch } from "./telemetry";
 import { registerUpdaterIpc, startUpdater } from "./updater";
 import { createWindow } from "./window/create-window";
@@ -54,6 +55,7 @@ app.whenReady().then(() => {
 
   registerLibraryIpc();
   registerLastfmIpc();
+  registerSoundCloudIpc();
   registerTelemetryIpc();
   registerMediaShortcuts();
   registerUpdaterIpc();

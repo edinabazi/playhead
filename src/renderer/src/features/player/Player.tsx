@@ -87,6 +87,7 @@ export function Player({
     : [];
   const visibleTags = activeTags.slice(0, 3);
   const hiddenTagCount = Math.max(0, activeTags.length - visibleTags.length);
+  const isSoundCloudTrack = activeTrack?.source === "soundcloud";
 
   return (
     <section className="relative flex shrink-0 flex-col gap-[10px] px-4 pt-4">
@@ -169,7 +170,11 @@ export function Player({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.07, duration: 0.16 }}
                 >
-                  {activeTrack ? activeTrack.artist : "Double-click a track to play"}
+                  {activeTrack
+                    ? isSoundCloudTrack
+                      ? `${activeTrack.artist} · SoundCloud`
+                      : activeTrack.artist
+                    : "Double-click a track to play"}
                 </motion.p>
               </motion.div>
             </AnimatePresence>
@@ -178,7 +183,7 @@ export function Player({
           <div className="no-drag flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
             <FavoriteHeartButton
               active={isFavorite}
-              disabled={!activeTrack}
+              disabled={!activeTrack || isSoundCloudTrack}
               tooltipSide="left"
               onClick={onToggleFavorite}
             />
