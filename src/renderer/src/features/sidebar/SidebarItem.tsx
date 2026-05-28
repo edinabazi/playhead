@@ -24,7 +24,7 @@ export function SidebarItem({
   icon: SidebarItemIcon;
   iconFilled?: boolean;
   label: string;
-  detail: string;
+  detail?: React.ReactNode;
   onClick: () => void;
   onDropTrack?: (trackIds: string[]) => void;
   onContextMenu?: (point: MenuAnchorPoint) => void;
@@ -103,9 +103,11 @@ export function SidebarItem({
         fill={iconFilled ? "currentColor" : "none"}
       />
       <span className="relative z-10 min-w-0 flex-1 truncate">{label}</span>
-      <span className="relative z-10 font-mono text-[11px] text-[var(--text-tertiary)]">
-        {detail}
-      </span>
+      {detail !== undefined && detail !== null && detail !== "" && (
+        <span className="relative z-10 font-mono text-[11px] text-[var(--text-tertiary)]">
+          {detail}
+        </span>
+      )}
     </motion.button>
   );
 }

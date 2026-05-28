@@ -12,6 +12,21 @@ import {
 
 const trackRowHeight = 56;
 
+function LoadingTracksText() {
+  const text = "Loading tracks...";
+
+  return (
+    <span className="thinking-title" aria-label={text}>
+      <span className="thinking-title-base" aria-hidden="true">
+        {text}
+      </span>
+      <span className="thinking-title-shine" aria-hidden="true">
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export function TrackList({
   tracks,
   activeTrackId,
@@ -21,6 +36,7 @@ export function TrackList({
   selectedPlaylist,
   selectedTag,
   canReorderTracks = true,
+  isLoading = false,
   playlists,
   tags,
   favoriteTrackIds,
@@ -49,6 +65,7 @@ export function TrackList({
   selectedPlaylist: LibraryPlaylist | null;
   selectedTag: LibraryTag | null;
   canReorderTracks?: boolean;
+  isLoading?: boolean;
   playlists: LibraryPlaylist[];
   tags: LibraryTag[];
   favoriteTrackIds: string[];
@@ -114,7 +131,11 @@ export function TrackList({
         >
           {tracks.length === 0 ? (
             <div className="flex h-[calc(100%-1rem)] min-h-[180px] items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.025] text-[14px] text-muted-foreground">
-              No tracks here yet. Start by adding something.
+              {isLoading ? (
+                <LoadingTracksText />
+              ) : (
+                "No tracks here yet. Start by adding something."
+              )}
             </div>
           ) : (
             <div className="relative" style={{ height: totalHeight + 32 }}>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
-import WaveSurfer from "wavesurfer.js";
+import Hls from "hls.js";
+import WaveSurfer, { type WaveSurferOptions } from "wavesurfer.js";
 import {
   type AppearanceSettings,
   type AppUpdateState,
@@ -21,6 +22,7 @@ import {
   type SoundCloudState,
   type TelemetrySettings,
   defaultSessionSettings,
+  defaultSoundCloudSettings,
 } from "../../shared/library";
 import { getMediaArtworkSrc } from "@/lib/artwork";
 import { isEditableTarget } from "@/lib/dom";
@@ -63,6 +65,7 @@ import {
 import {
   analyzeBpmFromBuffer,
   buildWaveformCachePeaks,
+  decodeAudioBytes,
   decodeAudioTrack,
   shouldAnalyzeTrackBpm,
   waveformAnalysisMaxPeaks,
@@ -87,6 +90,7 @@ import { useWindowDrag } from "@/hooks/use-window-drag";
 const waveformCachePeakRate = waveformAnalysisPeakRate;
 const waveformCacheMaxPeaks = waveformAnalysisMaxPeaks;
 const sidebarWidth = 260;
+type WaveformPeaks = NonNullable<WaveSurferOptions["peaks"]>;
 
 type BatchAnalysisState = {
   status: "idle" | "running" | "complete";
@@ -150,6 +154,16 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error.message.replace(/^Error invoking remote method '[^']+': Error: /, "");
 }
 
+function isSoundCloudPlaybackStopError(message: string): boolean {
+  return (
+    message.includes("SoundCloud temporarily challenged stream requests") ||
+    message.includes("SoundCloud only returned a 30 second preview") ||
+    message.includes("This SoundCloud track is not available for full playback") ||
+    message.includes("SoundCloud did not return a playable stream URL") ||
+    message.includes("SoundCloud stream is unavailable")
+  );
+}
+
 function toLastfmTrackPayload(
   track: LibraryTrack,
   timestamp?: number,
@@ -173,6 +187,48 @@ function isSoundCloudTrack(track: LibraryTrack): boolean {
   return track.source === "soundcloud" || Boolean(track.soundcloud);
 }
 
+function isHlsUrl(url: string): boolean {
+  return url.includes(".m3u8") || url.includes("/playlist/");
+}
+
+function hasProgressiveSoundCloudTranscoding(track: LibraryTrack): boolean {
+  return Boolean(
+    track.soundcloud?.transcodings?.some(
+      (transcoding) =>
+        transcoding.protocol === "progressive" && !transcoding.snipped && transcoding.url,
+    ),
+  );
+}
+
+function hasHlsSoundCloudTranscoding(track: LibraryTrack): boolean {
+  return Boolean(
+    track.soundcloud?.transcodings?.some(
+      (transcoding) => transcoding.protocol === "hls" && !transcoding.snipped && transcoding.url,
+    ),
+  );
+}
+
+function activatedSoundCloudSettings(settings: SoundCloudSettings): SoundCloudSettings {
+  const defaults = defaultSoundCloudSettings();
+  const previousDefaultCollections: SoundCloudSettings["visibleCollections"] = [
+    "playlists",
+    "liked-tracks",
+    "uploads",
+    "reposted-tracks",
+  ];
+  const visibleCollections = settings.visibleCollections || [];
+  const shouldResetCollections =
+    visibleCollections.length === 0 ||
+    (visibleCollections.length === previousDefaultCollections.length &&
+      previousDefaultCollections.every((collection) => visibleCollections.includes(collection)));
+
+  return {
+    ...settings,
+    enabled: true,
+    visibleCollections: shouldResetCollections ? defaults.visibleCollections : visibleCollections,
+  };
+}
+
 function getUpdateMessageDismissedKey(version: string): string {
   return `playhead:update-message-dismissed:${version}`;
 }
@@ -191,6 +247,7 @@ function dismissUpdateMessage(version: string): void {
 export function App() {
   const topGapWindowDragHandlers = useWindowDrag<HTMLDivElement>();
   const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const playNextTrackOnEndRef = useRef<() => boolean>(() => false);
   const playAdjacentTrackRef = useRef<() => void>(() => {});
   const activeTrackIdRef = useRef<string | null>(null);
@@ -217,6 +274,7 @@ export function App() {
   const lastfmNowPlayingTrackIdRef = useRef<string | null>(null);
   const libraryRef = useRef<LibraryState>(emptyLibraryState());
   const soundcloudTracksRef = useRef<Record<string, LibraryTrack>>({});
+  const soundcloudTrackLoadRequestsRef = useRef<Set<string>>(new Set());
 
   const [library, setLibrary] = useState<LibraryState>(emptyLibraryState);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
@@ -290,30 +348,27 @@ export function App() {
   );
   const libraryArtists = libraryCollections.artists;
   const libraryAlbums = libraryCollections.albums;
-  const tracks = useMemo(
-    () => {
-      if (library.selectedSource?.type === "soundcloud" && library.selectedSource.id) {
-        return soundcloudTracksByCollection[library.selectedSource.id] || [];
-      }
-      return getSourceTracksFromParts({
-        favoriteTrackIds: library.favoriteTrackIds,
-        folders: library.folders,
-        playlists: library.playlists,
-        selectedSource: library.selectedSource,
-        tags: library.tags,
-        tracks: library.tracks,
-      });
-    },
-    [
-      library.favoriteTrackIds,
-      library.folders,
-      library.playlists,
-      library.selectedSource,
-      library.tags,
-      library.tracks,
-      soundcloudTracksByCollection,
-    ],
-  );
+  const tracks = useMemo(() => {
+    if (library.selectedSource?.type === "soundcloud" && library.selectedSource.id) {
+      return soundcloudTracksByCollection[library.selectedSource.id] || [];
+    }
+    return getSourceTracksFromParts({
+      favoriteTrackIds: library.favoriteTrackIds,
+      folders: library.folders,
+      playlists: library.playlists,
+      selectedSource: library.selectedSource,
+      tags: library.tags,
+      tracks: library.tracks,
+    });
+  }, [
+    library.favoriteTrackIds,
+    library.folders,
+    library.playlists,
+    library.selectedSource,
+    library.tags,
+    library.tracks,
+    soundcloudTracksByCollection,
+  ]);
   const allPlayableTracksById = useMemo(
     () => ({
       ...library.tracks,
@@ -364,7 +419,10 @@ export function App() {
     }
     if (source.type === "loved") return "Loved";
     if (source.type === "soundcloud") {
-      return soundcloudCollections.find((collection) => collection.id === source.id)?.title || "SoundCloud";
+      return (
+        soundcloudCollections.find((collection) => collection.id === source.id)?.title ||
+        "SoundCloud"
+      );
     }
     if (source.type === "tag") {
       return (library.tags || []).find((tag) => tag.id === source.id)?.name || "Tag";
@@ -410,23 +468,50 @@ export function App() {
   const saveAnalyzedBpm = useCallback((trackId: string, bpm: number) => {
     const current = libraryRef.current;
     const track = current.tracks[trackId];
-    if (!track) return;
+    if (track) {
+      const nextState: LibraryState = {
+        ...current,
+        tracks: {
+          ...current.tracks,
+          [trackId]: {
+            ...track,
+            bpm,
+            bpmSource: "analysis" as const,
+          },
+        },
+      };
 
-    const nextState: LibraryState = {
-      ...current,
-      tracks: {
-        ...current.tracks,
+      libraryRef.current = nextState;
+      setLibrary(nextState);
+      void window.playhead.saveLibraryState(nextState);
+    }
+
+    const soundCloudTrack = soundcloudTracksRef.current[trackId];
+    if (soundCloudTrack) {
+      soundcloudTracksRef.current = {
+        ...soundcloudTracksRef.current,
         [trackId]: {
-          ...track,
+          ...soundCloudTrack,
           bpm,
           bpmSource: "analysis" as const,
         },
-      },
-    };
+      };
+    }
 
-    libraryRef.current = nextState;
-    setLibrary(nextState);
-    void window.playhead.saveLibraryState(nextState);
+    setSoundCloudTracksByCollection((currentCollections) => {
+      let changed = false;
+      const nextCollections = Object.fromEntries(
+        Object.entries(currentCollections).map(([collectionId, collectionTracks]) => {
+          const nextTracks = collectionTracks.map((item) => {
+            if (item.id !== trackId) return item;
+            changed = true;
+            return { ...item, bpm, bpmSource: "analysis" as const };
+          });
+          return [collectionId, nextTracks];
+        }),
+      );
+      return changed ? nextCollections : currentCollections;
+    });
   }, []);
 
   const analyzeTrackBpm = useCallback(
@@ -465,11 +550,174 @@ export function App() {
     [saveAnalyzedBpm],
   );
 
+  const analyzeSoundCloudTrackBpm = useCallback(
+    async (track: LibraryTrack) => {
+      const soundcloud = track.soundcloud;
+      if (!soundcloud) {
+        if (import.meta.env.DEV) {
+          console.log("[SoundCloud BPM] skipped: missing soundcloud metadata", {
+            id: track.id,
+            title: track.title,
+          });
+        }
+        return;
+      }
+      if (!shouldAnalyzeTrackBpm(track)) {
+        if (import.meta.env.DEV) {
+          console.log("[SoundCloud BPM] skipped: track already has BPM", {
+            id: track.id,
+            title: track.title,
+            bpm: track.bpm,
+            bpmSource: track.bpmSource,
+          });
+        }
+        return;
+      }
+      if (bpmAnalysisTrackIdsRef.current.has(track.id)) {
+        if (import.meta.env.DEV) {
+          console.log("[SoundCloud BPM] skipped: analysis already queued", {
+            id: track.id,
+            title: track.title,
+          });
+        }
+        return;
+      }
+
+      bpmAnalysisTrackIdsRef.current.add(track.id);
+      if (import.meta.env.DEV) {
+        console.log("[SoundCloud BPM] queued", {
+          id: track.id,
+          title: track.title,
+          duration: track.duration,
+          hls: hasHlsSoundCloudTranscoding(track),
+          progressive: hasProgressiveSoundCloudTranscoding(track),
+        });
+      }
+      const nextAnalysis = (bpmAnalysisQueueRef.current = bpmAnalysisQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          const request = { trackId: track.id, path: track.path };
+
+          try {
+            if (import.meta.env.DEV) {
+              console.log("[SoundCloud BPM] checking cache", request);
+            }
+            const cachedBpm = await window.playhead.getBpmCache(request);
+            if (cachedBpm) {
+              if (import.meta.env.DEV) {
+                console.log("[SoundCloud BPM] cache hit", {
+                  id: track.id,
+                  title: track.title,
+                  bpm: cachedBpm.bpm,
+                  analyzedAt: cachedBpm.analyzedAt,
+                });
+              }
+              saveAnalyzedBpm(track.id, Math.round(cachedBpm.bpm));
+              return;
+            }
+
+            if (import.meta.env.DEV) {
+              console.log("[SoundCloud BPM] cache miss", {
+                id: track.id,
+                title: track.title,
+              });
+            }
+            if (!track.duration || track.duration > 480) {
+              if (import.meta.env.DEV) {
+                console.log("[SoundCloud BPM] skipped: duration outside limit", {
+                  id: track.id,
+                  title: track.title,
+                  duration: track.duration,
+                });
+              }
+              return;
+            }
+            if (import.meta.env.DEV) {
+              console.log("[SoundCloud BPM] requesting analysis audio data", {
+                id: track.id,
+                soundcloudId: soundcloud.id,
+                title: track.title,
+              });
+            }
+            const bytes = await window.playhead.getSoundCloudAnalysisAudioData(
+              soundcloud.id,
+              track.duration,
+              soundcloud.transcodings,
+              soundcloud.trackAuthorization,
+            );
+            if (!bytes) {
+              if (import.meta.env.DEV) {
+                console.log("[SoundCloud BPM] no analysis audio data returned", {
+                  id: track.id,
+                  title: track.title,
+                });
+              }
+              return;
+            }
+
+            if (import.meta.env.DEV) {
+              console.log("[SoundCloud BPM] decoding audio data", {
+                id: track.id,
+                title: track.title,
+                bytes: bytes.byteLength,
+              });
+            }
+            const buffer = await decodeAudioBytes(bytes);
+            if (import.meta.env.DEV) {
+              console.log("[SoundCloud BPM] analyzing decoded audio", {
+                id: track.id,
+                title: track.title,
+                duration: buffer.duration,
+                sampleRate: buffer.sampleRate,
+              });
+            }
+            const { bpm, tempo } = await analyzeBpmFromBuffer(buffer);
+            if (import.meta.env.DEV) {
+              console.log("[SoundCloud BPM] analysis complete", {
+                id: track.id,
+                title: track.title,
+                bpm,
+                tempo,
+              });
+            }
+            await window.playhead.saveBpmCache({
+              ...request,
+              bpm,
+              tempo,
+              analyzedAt: new Date().toISOString(),
+            });
+            if (import.meta.env.DEV) {
+              console.log("[SoundCloud BPM] cache saved", {
+                id: track.id,
+                title: track.title,
+                bpm,
+              });
+            }
+            saveAnalyzedBpm(track.id, bpm);
+          } catch (error) {
+            console.warn("Failed to analyze SoundCloud BPM", { path: track.path, error });
+          } finally {
+            bpmAnalysisTrackIdsRef.current.delete(track.id);
+          }
+        }));
+      await nextAnalysis;
+    },
+    [saveAnalyzedBpm],
+  );
+
   const getBatchAnalysisCandidates = useCallback(
     async (tracksToCheck: LibraryTrack[]) => {
       const candidates: LibraryTrack[] = [];
 
       for (const track of tracksToCheck) {
+        if (isSoundCloudTrack(track)) {
+          const cachedBpm = shouldAnalyzeTrackBpm(track)
+            ? await window.playhead.getBpmCache({ trackId: track.id, path: track.path })
+            : null;
+          if (cachedBpm) saveAnalyzedBpm(track.id, Math.round(cachedBpm.bpm));
+          continue;
+        }
+
         const request = { trackId: track.id, path: track.path, duration: track.duration };
         const [cachedWaveform, cachedBpm] = await Promise.all([
           window.playhead.getWaveformCache(request),
@@ -493,6 +741,11 @@ export function App() {
 
   const analyzeTrackAudioData = useCallback(
     async (track: LibraryTrack) => {
+      if (isSoundCloudTrack(track)) {
+        await analyzeSoundCloudTrackBpm(track);
+        return;
+      }
+
       const waveformRequest = { trackId: track.id, path: track.path, duration: track.duration };
       const bpmRequest = { trackId: track.id, path: track.path };
       const [cachedWaveform, cachedBpm] = await Promise.all([
@@ -529,7 +782,7 @@ export function App() {
         saveAnalyzedBpm(track.id, bpm);
       }
     },
-    [saveAnalyzedBpm],
+    [analyzeSoundCloudTrackBpm, saveAnalyzedBpm],
   );
 
   const analyzeMissingAudioData = useCallback(async () => {
@@ -588,6 +841,96 @@ export function App() {
       : "Audio analysis completed.";
   }, [analyzeTrackAudioData, batchAnalysis.status, getBatchAnalysisCandidates]);
 
+  const destroyHls = useCallback(() => {
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
+  }, []);
+
+  const loadRemoteAudioElement = useCallback(
+    async (
+      wavesurfer: WaveSurfer,
+      audioUrl: string,
+      fallbackDuration: number,
+      waveformPeaks?: WaveformPeaks | null,
+    ) => {
+      destroyHls();
+      const media = wavesurfer.getMediaElement();
+      media.pause();
+      media.removeAttribute("src");
+      media.load();
+
+      const renderRemoteWaveform = async (waveformDuration: number) => {
+        if (!Number.isFinite(waveformDuration) || waveformDuration <= 0) return false;
+        if (waveformPeaks?.length) {
+          await wavesurfer.load("", waveformPeaks, waveformDuration);
+          return true;
+        }
+
+        await wavesurfer.load("", [[0]], waveformDuration);
+        return false;
+      };
+      const renderedWaveform = await renderRemoteWaveform(fallbackDuration);
+
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => {
+          media.removeEventListener("loadedmetadata", onLoadedMetadata);
+          media.removeEventListener("canplay", onCanPlay);
+          media.removeEventListener("error", onError);
+        };
+        const finish = () => {
+          cleanup();
+          resolve();
+        };
+        const onLoadedMetadata = () => finish();
+        const onCanPlay = () => finish();
+        const onError = () => {
+          cleanup();
+          reject(new Error("Remote audio could not be loaded."));
+        };
+
+        media.addEventListener("loadedmetadata", onLoadedMetadata, { once: true });
+        media.addEventListener("canplay", onCanPlay, { once: true });
+        media.addEventListener("error", onError, { once: true });
+
+        if (isHlsUrl(audioUrl)) {
+          if (Hls.isSupported()) {
+            const hls = new Hls({ enableWorker: true });
+            hlsRef.current = hls;
+            hls.on(Hls.Events.ERROR, (_event, data) => {
+              if (data.fatal) {
+                cleanup();
+                reject(new Error(data.details || "HLS audio could not be loaded."));
+              }
+            });
+            hls.attachMedia(media);
+            hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(audioUrl));
+          } else if (media.canPlayType("application/vnd.apple.mpegurl")) {
+            media.src = audioUrl;
+          } else {
+            cleanup();
+            reject(new Error("HLS playback is not supported in this browser."));
+          }
+        } else {
+          media.src = audioUrl;
+        }
+
+        media.load();
+        if (fallbackDuration > 0) {
+          window.setTimeout(() => {
+            if (media.readyState > 0) finish();
+          }, 1200);
+        }
+      });
+
+      const mediaDuration = media.duration;
+      const waveformDuration =
+        Number.isFinite(mediaDuration) && mediaDuration > 0 ? mediaDuration : fallbackDuration;
+      if (renderedWaveform) return true;
+      return renderRemoteWaveform(waveformDuration);
+    },
+    [destroyHls],
+  );
+
   const selectTrack = useCallback(
     async (
       track: LibraryTrack,
@@ -641,31 +984,67 @@ export function App() {
         queue: nextQueue,
       });
 
+      const remoteTrack = isSoundCloudTrack(track);
       try {
-        if (isSoundCloudTrack(track) && track.soundcloud?.access !== "playable") {
+        if (!remoteTrack) destroyHls();
+        if (
+          remoteTrack &&
+          (track.soundcloud?.access === "blocked" || track.soundcloud?.access === "preview")
+        ) {
           throw new Error("This SoundCloud track is not available for full playback.");
         }
-        const audioUrl =
-          isSoundCloudTrack(track) && track.soundcloud
-            ? await window.playhead.getSoundCloudStreamUrl(track.soundcloud.id)
-            : await window.playhead.getAudioFileUrl(track.path);
+        const audioUrlPromise =
+          remoteTrack && track.soundcloud
+            ? window.playhead.getSoundCloudStreamUrl(
+                track.soundcloud.id,
+                track.soundcloud.streamUrl,
+                track.soundcloud.transcodings,
+                track.soundcloud.trackAuthorization,
+              )
+            : window.playhead.getAudioFileUrl(track.path);
+        const remoteWaveformPeaksPromise =
+          remoteTrack && track.soundcloud
+            ? window.playhead
+                .getSoundCloudWaveformPeaks(track.soundcloud.id, track.soundcloud.waveformUrl)
+                .catch((waveformError) => {
+                  console.warn("Failed to load SoundCloud waveform", {
+                    path: track.path,
+                    error: waveformError,
+                  });
+                  return null;
+                })
+            : Promise.resolve(null);
+        const [audioUrl, remoteWaveformPeaks] = await Promise.all([
+          audioUrlPromise,
+          remoteWaveformPeaksPromise,
+        ]);
         if (requestId !== trackLoadRequestIdRef.current) return;
         const waveformCacheRequest = {
           trackId: track.id,
           path: track.path,
           duration: track.duration,
         };
-        const cachedWaveform = isSoundCloudTrack(track)
+        const cachedWaveform = remoteTrack
           ? null
           : await window.playhead.getWaveformCache(waveformCacheRequest);
         if (requestId !== trackLoadRequestIdRef.current) return;
         setShouldAnimateWaveform(!cachedWaveform);
         if (!cachedWaveform) setHasWaveform(false);
 
+        let remoteHasWaveform = false;
         await (trackLoadQueueRef.current = trackLoadQueueRef.current
           .catch(() => undefined)
           .then(async () => {
             if (requestId !== trackLoadRequestIdRef.current) return;
+            if (remoteTrack) {
+              remoteHasWaveform = await loadRemoteAudioElement(
+                wavesurfer,
+                audioUrl,
+                track.duration,
+                remoteWaveformPeaks,
+              );
+              return;
+            }
             await wavesurfer.load(
               audioUrl,
               cachedWaveform?.peaks,
@@ -677,9 +1056,9 @@ export function App() {
         loadedTrackIdRef.current = track.id;
         lastfmPlaybackSessionRef.current = null;
         lastfmNowPlayingTrackIdRef.current = null;
-        setHasWaveform(true);
+        setHasWaveform(remoteTrack ? remoteHasWaveform : true);
         setDuration(wavesurfer.getDuration() || track.duration || 0);
-        if (!cachedWaveform && !isSoundCloudTrack(track)) {
+        if (!cachedWaveform && !remoteTrack) {
           const loadedDuration = wavesurfer.getDuration() || track.duration || 0;
           const maxLength = Math.max(
             1,
@@ -701,7 +1080,8 @@ export function App() {
           has_duration: Boolean(track.duration),
           audio_format: track.audioFormat || "unknown",
         });
-        if (!isSoundCloudTrack(track)) void analyzeTrackBpm(track);
+        if (remoteTrack) void analyzeSoundCloudTrackBpm(track);
+        else void analyzeTrackBpm(track);
         if (startTime > 0) {
           wavesurfer.setTime(clamp(startTime, 0, wavesurfer.getDuration() || startTime));
           setCurrentTime(wavesurfer.getCurrentTime());
@@ -718,19 +1098,43 @@ export function App() {
       } catch (loadError) {
         if (requestId !== trackLoadRequestIdRef.current) return;
         console.error("Failed to load track", { path: track.path, error: loadError });
+        const loadErrorMessage = getErrorMessage(loadError, track.artist);
+        const soundCloudPlaybackStop =
+          remoteTrack && isSoundCloudPlaybackStopError(loadErrorMessage);
         loadedTrackIdRef.current = null;
-        setError("This track could not be loaded.");
+        setError(loadErrorMessage || "This track could not be loaded.");
         setHasWaveform(false);
         setShouldAnimateWaveform(false);
-        if (autoplay && allowSkipUnavailable && library.settings.playback.skipUnavailableTracks) {
-          showTrackActionToast({ action: "Skipped unavailable track", track });
+        if (
+          autoplay &&
+          allowSkipUnavailable &&
+          library.settings.playback.skipUnavailableTracks &&
+          !soundCloudPlaybackStop
+        ) {
+          showTrackActionToast({
+            action: "Skipped unavailable track",
+            track,
+            detail: loadErrorMessage,
+          });
           playAdjacentTrackRef.current();
+        } else if (soundCloudPlaybackStop) {
+          showSimpleActionToast(loadErrorMessage, "error");
         }
       } finally {
         if (requestId === trackLoadRequestIdRef.current) setIsLoadingTrack(false);
       }
     },
-    [allPlayableTracksById, library, analyzeTrackBpm, persistSessionSettings, shuffleEnabled, tracks],
+    [
+      allPlayableTracksById,
+      library,
+      analyzeTrackBpm,
+      analyzeSoundCloudTrackBpm,
+      destroyHls,
+      loadRemoteAudioElement,
+      persistSessionSettings,
+      shuffleEnabled,
+      tracks,
+    ],
   );
 
   const playSearchResult = useCallback(
@@ -1012,6 +1416,23 @@ export function App() {
     [library, persistLibrary],
   );
 
+  const applySoundCloudActivationDefaults = useCallback(async () => {
+    const currentLibrary = libraryRef.current;
+    const currentSettings = currentLibrary.settings.soundcloud;
+    const nextSettings = activatedSoundCloudSettings(currentSettings);
+    if (
+      currentSettings.enabled === nextSettings.enabled &&
+      currentSettings.visibleCollections.join("|") === nextSettings.visibleCollections.join("|")
+    ) {
+      return;
+    }
+
+    await persistLibrary({
+      ...currentLibrary,
+      settings: { ...currentLibrary.settings, soundcloud: nextSettings },
+    });
+  }, [persistLibrary]);
+
   const runSoundCloudAction = useCallback(async (action: () => Promise<SoundCloudState>) => {
     setSoundCloudActionPending(true);
     try {
@@ -1032,9 +1453,16 @@ export function App() {
     void runSoundCloudAction(() => window.playhead.startSoundCloudAuth());
   }, [runSoundCloudAction]);
 
-  const completeSoundCloudAuth = useCallback(() => {
-    void runSoundCloudAction(() => window.playhead.completeSoundCloudAuth());
-  }, [runSoundCloudAction]);
+  const completeSoundCloudAuth = useCallback(
+    (input: string) => {
+      void runSoundCloudAction(async () => {
+        const nextState = await window.playhead.completeSoundCloudAuth(input);
+        if (nextState.connected) await applySoundCloudActivationDefaults();
+        return nextState;
+      });
+    },
+    [applySoundCloudActivationDefaults, runSoundCloudAction],
+  );
 
   const disconnectSoundCloud = useCallback(() => {
     void runSoundCloudAction(async () => {
@@ -1050,7 +1478,9 @@ export function App() {
     const settings = libraryRef.current.settings.soundcloud;
     if (!settings.enabled || !soundcloudState.connected) return;
     try {
-      const collections = await window.playhead.getSoundCloudCollections(settings.visibleCollections);
+      const collections = await window.playhead.getSoundCloudCollections(
+        settings.visibleCollections,
+      );
       setSoundCloudCollections(collections);
     } catch (error) {
       showSimpleActionToast(
@@ -1060,7 +1490,79 @@ export function App() {
     }
   }, [soundcloudState.connected]);
 
+  const loadSoundCloudCollectionTracks = useCallback(
+    async (collectionId: string) => {
+      const collection = soundcloudCollections.find((item) => item.id === collectionId);
+      const cachedTracks = soundcloudTracksByCollection[collectionId];
+      if (cachedTracks) {
+        if (collection && collection.trackCount === undefined) {
+          setSoundCloudCollections((current) =>
+            current.map((item) =>
+              item.id === collectionId ? { ...item, trackCount: cachedTracks.length } : item,
+            ),
+          );
+          return;
+        }
+        if (cachedTracks.length > 0 || collection?.trackCount === 0 || !collection) return;
+      }
+      if (soundcloudTrackLoadRequestsRef.current.has(collectionId)) return;
+
+      soundcloudTrackLoadRequestsRef.current.add(collectionId);
+      setSoundCloudLoadingCollectionId(collectionId);
+      try {
+        const nextTracks = await window.playhead.getSoundCloudCollectionTracks(collectionId);
+        if (!nextTracks.length && collection?.trackCount) {
+          throw new Error(`Could not load tracks for "${collection.title}".`);
+        }
+        if (import.meta.env.DEV) {
+          console.table(
+            nextTracks.map((track) => ({
+              collection: collection?.title || collectionId,
+              title: track.title,
+              artist: track.artist,
+              id: track.id,
+              progressive: hasProgressiveSoundCloudTranscoding(track),
+              hls: hasHlsSoundCloudTranscoding(track),
+              bpmAnalysis: track.duration > 0 && track.duration <= 480 ? "eligible" : "too long",
+              transcodings:
+                track.soundcloud?.transcodings
+                  ?.map(
+                    (transcoding) =>
+                      `${transcoding.protocol || "unknown"}:${
+                        transcoding.mimeType || transcoding.preset || "unknown"
+                      }${transcoding.snipped ? ":snipped" : ""}`,
+                  )
+                  .join(", ") || "",
+            })),
+          );
+        }
+        setSoundCloudTracksByCollection((current) => ({ ...current, [collectionId]: nextTracks }));
+        setSoundCloudCollections((current) =>
+          current.map((item) =>
+            item.id === collectionId && item.trackCount === undefined
+              ? { ...item, trackCount: nextTracks.length }
+              : item,
+          ),
+        );
+        soundcloudTracksRef.current = {
+          ...soundcloudTracksRef.current,
+          ...Object.fromEntries(nextTracks.map((track) => [track.id, track])),
+        };
+      } catch (error) {
+        showSimpleActionToast(
+          error instanceof Error ? error.message : "Could not load SoundCloud tracks.",
+          "error",
+        );
+      } finally {
+        soundcloudTrackLoadRequestsRef.current.delete(collectionId);
+        setSoundCloudLoadingCollectionId((current) => (current === collectionId ? null : current));
+      }
+    },
+    [soundcloudCollections, soundcloudTracksByCollection],
+  );
+
   const clearPlaybackState = useCallback(() => {
+    destroyHls();
     wavesurferRef.current?.stop();
     wavesurferRef.current?.empty();
     setActiveTrackId(null);
@@ -1073,7 +1575,7 @@ export function App() {
     setIsPlaying(false);
     setIsLoadingTrack(false);
     setError("");
-  }, []);
+  }, [destroyHls]);
 
   const runAdvancedSettingsAction = useCallback(
     async (action: AdvancedSettingsAction) => {
@@ -1182,7 +1684,8 @@ export function App() {
 
   const toggleFavoriteTrack = useCallback(
     async (trackId: string) => {
-      const track = library.tracks[trackId];
+      const track = allPlayableTracksById[trackId];
+      if (!track) return;
       const favoriteTrackIds = new Set(library.favoriteTrackIds || []);
       const wasFavorite = favoriteTrackIds.has(trackId);
       if (wasFavorite) favoriteTrackIds.delete(trackId);
@@ -1190,6 +1693,10 @@ export function App() {
 
       await persistLibrary({
         ...library,
+        tracks: {
+          ...library.tracks,
+          [track.id]: track,
+        },
         favoriteTrackIds: Array.from(favoriteTrackIds),
         selectedSource:
           favoriteTrackIds.size === 0 && library.selectedSource?.type === "loved"
@@ -1208,14 +1715,12 @@ export function App() {
         ).then(setLastfmState);
       }
 
-      if (track) {
-        showTrackActionToast({
-          action: wasFavorite ? "Removed from Loved" : "Added to Loved",
-          track,
-        });
-      }
+      showTrackActionToast({
+        action: wasFavorite ? "Removed from Loved" : "Added to Loved",
+        track,
+      });
     },
-    [library, persistLibrary],
+    [allPlayableTracksById, library, persistLibrary],
   );
 
   const saveTrackMetadata = useCallback(
@@ -1256,6 +1761,7 @@ export function App() {
     removeTracksFromSelectedTag,
   } = useLibraryActions({
     library,
+    availableTracks: allPlayableTracksById,
     persistLibrary,
     setIsCreatePlaylistOpen,
     setTracksPendingPlaylistCreation,
@@ -1453,26 +1959,9 @@ export function App() {
   const selectSoundCloudSource = useCallback(
     async (collectionId: string) => {
       selectLibrarySource({ type: "soundcloud", id: collectionId });
-      if (soundcloudTracksByCollection[collectionId]) return;
-
-      setSoundCloudLoadingCollectionId(collectionId);
-      try {
-        const nextTracks = await window.playhead.getSoundCloudCollectionTracks(collectionId);
-        setSoundCloudTracksByCollection((current) => ({ ...current, [collectionId]: nextTracks }));
-        soundcloudTracksRef.current = {
-          ...soundcloudTracksRef.current,
-          ...Object.fromEntries(nextTracks.map((track) => [track.id, track])),
-        };
-      } catch (error) {
-        showSimpleActionToast(
-          error instanceof Error ? error.message : "Could not load SoundCloud tracks.",
-          "error",
-        );
-      } finally {
-        setSoundCloudLoadingCollectionId(null);
-      }
+      await loadSoundCloudCollectionTracks(collectionId);
     },
-    [selectLibrarySource, soundcloudTracksByCollection],
+    [loadSoundCloudCollectionTracks, selectLibrarySource],
   );
 
   const selectLibraryBrowserItem = useCallback(
@@ -1866,7 +2355,11 @@ export function App() {
 
   useEffect(() => {
     void window.playhead.getSoundCloudState().then(setSoundCloudState);
-  }, []);
+    return window.playhead.onSoundCloudStateChanged((nextState) => {
+      setSoundCloudState(nextState);
+      if (nextState.connected) void applySoundCloudActivationDefaults();
+    });
+  }, [applySoundCloudActivationDefaults]);
 
   useEffect(() => {
     void loadSoundCloudCollections();
@@ -1874,6 +2367,19 @@ export function App() {
     library.settings.soundcloud.enabled,
     library.settings.soundcloud.visibleCollections,
     loadSoundCloudCollections,
+  ]);
+
+  useEffect(() => {
+    const source = library.selectedSource;
+    if (source?.type !== "soundcloud" || !source.id) return;
+    if (!library.settings.soundcloud.enabled || !soundcloudState.connected) return;
+
+    void loadSoundCloudCollectionTracks(source.id);
+  }, [
+    library.selectedSource,
+    library.settings.soundcloud.enabled,
+    loadSoundCloudCollectionTracks,
+    soundcloudState.connected,
   ]);
 
   useEffect(() => {
@@ -1972,12 +2478,13 @@ export function App() {
     ];
 
     return () => {
+      destroyHls();
       unsubscribers.forEach((unsubscribe) => unsubscribe());
       wavesurfer.destroy();
       wavesurferRef.current = null;
       setIsWaveformEngineReady(false);
     };
-  }, [waveformElement]);
+  }, [destroyHls, waveformElement]);
 
   const playbackQueue = usePlaybackQueue({
     library,
@@ -2140,9 +2647,7 @@ export function App() {
                 tags={library.tags || []}
                 lovedCount={hasLovedTracks ? library.favoriteTrackIds.length : 0}
                 selectedSource={library.selectedSource}
-                soundcloudEnabled={
-                  library.settings.soundcloud.enabled && soundcloudState.connected
-                }
+                soundcloudEnabled={library.settings.soundcloud.enabled && soundcloudState.connected}
                 soundcloudCollections={soundcloudCollections}
                 soundcloudLoadingCollectionId={soundcloudLoadingCollectionId}
                 isScanning={isScanning}
@@ -2159,7 +2664,9 @@ export function App() {
                 onCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
                 onCreateTag={() => setIsCreateTagOpen(true)}
                 onSelectSource={selectLibrarySource}
-                onSelectSoundCloudSource={(collectionId) => void selectSoundCloudSource(collectionId)}
+                onSelectSoundCloudSource={(collectionId) =>
+                  void selectSoundCloudSource(collectionId)
+                }
                 onRefreshSoundCloud={() => void loadSoundCloudCollections()}
                 onDropTrackToPlaylist={(trackIds, playlist) =>
                   void addTracksToPlaylist(trackIds, playlist)
@@ -2253,7 +2760,7 @@ export function App() {
                     });
                   }}
                   onToggleFavorite={() => {
-                    if (activeTrack && !isSoundCloudTrack(activeTrack)) {
+                    if (activeTrack) {
                       void toggleFavoriteTrack(activeTrack.id);
                     }
                   }}
@@ -2317,6 +2824,10 @@ export function App() {
                         selectedSource?.type !== "library-tracks" &&
                         selectedSource?.type !== "tag" &&
                         selectedSource?.type !== "soundcloud"
+                      }
+                      isLoading={
+                        selectedSource?.type === "soundcloud" &&
+                        soundcloudLoadingCollectionId === selectedSource.id
                       }
                       playlists={library.playlists}
                       tags={library.tags || []}

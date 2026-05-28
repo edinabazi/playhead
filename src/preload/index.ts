@@ -10,6 +10,8 @@ import type {
   MediaCommand,
   PlayheadApi,
   SoundCloudCollectionId,
+  SoundCloudState,
+  SoundCloudTranscoding,
   WaveformCacheRequest,
   WaveformCacheWrite,
 } from "../shared/library";
@@ -61,9 +63,7 @@ const api: PlayheadApi = {
   flushLastfmQueue: () => ipcRenderer.invoke("lastfm:flush-queue"),
   getSoundCloudState: () => ipcRenderer.invoke("soundcloud:get-state"),
   startSoundCloudAuth: () => ipcRenderer.invoke("soundcloud:start-auth"),
-  completeSoundCloudAuth: () => {
-    const input = window.prompt("Paste the SoundCloud authorization code or callback URL.");
-    if (!input) return ipcRenderer.invoke("soundcloud:get-state");
+  completeSoundCloudAuth: (input: string) => {
     let code = input.trim();
     let state: string | undefined;
     try {
@@ -80,8 +80,51 @@ const api: PlayheadApi = {
     ipcRenderer.invoke("soundcloud:get-collections", visibleCollections),
   getSoundCloudCollectionTracks: (collectionId: string) =>
     ipcRenderer.invoke("soundcloud:get-collection-tracks", collectionId),
-  getSoundCloudStreamUrl: (trackId: number) =>
-    ipcRenderer.invoke("soundcloud:get-stream-url", trackId),
+  getSoundCloudStreamUrl: (
+    trackId: number,
+    streamUrl?: string,
+    transcodings?: SoundCloudTranscoding[],
+    trackAuthorization?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "soundcloud:get-stream-url",
+      trackId,
+      streamUrl,
+      transcodings,
+      trackAuthorization,
+    ),
+  getSoundCloudProgressiveStreamUrl: (
+    trackId: number,
+    transcodings?: SoundCloudTranscoding[],
+    trackAuthorization?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "soundcloud:get-progressive-stream-url",
+      trackId,
+      transcodings,
+      trackAuthorization,
+    ),
+  getSoundCloudAnalysisAudioData: (
+    trackId: number,
+    durationSeconds: number,
+    transcodings?: SoundCloudTranscoding[],
+    trackAuthorization?: string,
+  ) =>
+    ipcRenderer.invoke(
+      "soundcloud:get-analysis-audio-data",
+      trackId,
+      durationSeconds,
+      transcodings,
+      trackAuthorization,
+    ),
+  getSoundCloudImageUrl: (url: string) => ipcRenderer.invoke("soundcloud:get-image-url", url),
+  getSoundCloudWaveformPeaks: (trackId: number, url?: string) =>
+    ipcRenderer.invoke("soundcloud:get-waveform-peaks", trackId, url),
+  onSoundCloudStateChanged: (callback: (state: SoundCloudState) => void) => {
+    const listener = (_event: IpcRendererEvent, state: SoundCloudState) => callback(state);
+    ipcRenderer.on("soundcloud:state-changed", listener);
+    return () => ipcRenderer.removeListener("soundcloud:state-changed", listener);
+  },
   minimizeWindow: () => ipcRenderer.invoke("window:minimize"),
   toggleMaximizeWindow: () => ipcRenderer.invoke("window:toggle-maximize"),
   closeWindow: () => ipcRenderer.invoke("window:close"),

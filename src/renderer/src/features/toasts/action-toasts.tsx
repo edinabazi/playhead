@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import type { LibraryFolder, LibraryTrack } from "../../../../shared/library";
-import { getMediaArtworkSrc } from "@/lib/artwork";
+import { getArtworkSrc } from "@/lib/artwork";
 
 const richToastDuration = 2600;
 const simpleToastDuration = 2200;
@@ -16,7 +16,7 @@ export function showTrackActionToast({
 }) {
   toast.custom(
     () => {
-      const artworkSrc = getMediaArtworkSrc(track);
+      const artworkSrc = getArtworkSrc(track);
 
       return (
         <div className="flex w-[320px] items-center gap-3 rounded-[20px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-3 text-foreground shadow-2xl backdrop-blur-xl">

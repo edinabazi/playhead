@@ -5,5 +5,7 @@ export function getArtworkSrc(track: LibraryTrack): string | null {
 }
 
 export function getMediaArtworkSrc(track: LibraryTrack): string | null {
-  return getArtworkSrc(track);
+  return track.source === "soundcloud"
+    ? track.soundcloud?.artworkUrl || getArtworkSrc(track)
+    : getArtworkSrc(track);
 }

@@ -23,6 +23,16 @@ export type SoundCloudCollectionId =
   | "reposted-playlists"
   | "feed";
 
+export type SoundCloudTranscoding = {
+  url: string;
+  protocol?: string;
+  mimeType?: string;
+  preset?: string;
+  quality?: string;
+  snipped?: boolean;
+  duration?: number;
+};
+
 export type LibraryFolder = {
   id: string;
   name: string;
@@ -54,9 +64,13 @@ export type LibraryTrack = {
     id: number;
     urn?: string;
     permalinkUrl?: string;
+    streamUrl?: string;
+    trackAuthorization?: string;
+    transcodings?: SoundCloudTranscoding[];
     streamable: boolean;
     access?: "playable" | "preview" | "blocked";
     artworkUrl?: string;
+    waveformUrl?: string;
     username?: string;
   };
 };
@@ -231,7 +245,7 @@ export type SoundCloudState = {
 };
 
 export type SoundCloudCollection = {
-  id: SoundCloudCollectionId | `playlist:${number}`;
+  id: SoundCloudCollectionId | `playlist:${string}`;
   title: string;
   subtitle?: string;
   trackCount?: number;
@@ -315,13 +329,32 @@ export type PlayheadApi = {
   flushLastfmQueue: () => Promise<LastfmState>;
   getSoundCloudState: () => Promise<SoundCloudState>;
   startSoundCloudAuth: () => Promise<SoundCloudState>;
-  completeSoundCloudAuth: () => Promise<SoundCloudState>;
+  completeSoundCloudAuth: (input: string) => Promise<SoundCloudState>;
   disconnectSoundCloud: () => Promise<SoundCloudState>;
   getSoundCloudCollections: (
     visibleCollections: SoundCloudCollectionId[],
   ) => Promise<SoundCloudCollection[]>;
   getSoundCloudCollectionTracks: (collectionId: string) => Promise<LibraryTrack[]>;
-  getSoundCloudStreamUrl: (trackId: number) => Promise<string>;
+  getSoundCloudStreamUrl: (
+    trackId: number,
+    streamUrl?: string,
+    transcodings?: SoundCloudTranscoding[],
+    trackAuthorization?: string,
+  ) => Promise<string>;
+  getSoundCloudProgressiveStreamUrl: (
+    trackId: number,
+    transcodings?: SoundCloudTranscoding[],
+    trackAuthorization?: string,
+  ) => Promise<string | null>;
+  getSoundCloudAnalysisAudioData: (
+    trackId: number,
+    durationSeconds: number,
+    transcodings?: SoundCloudTranscoding[],
+    trackAuthorization?: string,
+  ) => Promise<ArrayBuffer | null>;
+  getSoundCloudImageUrl: (url: string) => Promise<string>;
+  getSoundCloudWaveformPeaks: (trackId: number, url?: string) => Promise<number[][] | null>;
+  onSoundCloudStateChanged: (callback: (state: SoundCloudState) => void) => () => void;
   minimizeWindow: () => Promise<void>;
   toggleMaximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;
@@ -372,16 +405,8 @@ export const defaultLastfmSettings = (): LastfmSettings => ({
 });
 
 export const defaultSoundCloudSettings = (): SoundCloudSettings => ({
-  enabled: false,
-  visibleCollections: [
-    "playlists",
-    "liked-tracks",
-    "liked-playlists",
-    "uploads",
-    "reposted-tracks",
-    "reposted-playlists",
-    "feed",
-  ],
+  enabled: true,
+  visibleCollections: ["playlists"],
 });
 
 export const defaultSessionSettings = (): SessionSettings => ({

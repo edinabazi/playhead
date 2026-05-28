@@ -14,6 +14,10 @@ export async function decodeAudioTrack(
   readAudioFile: (path: string) => Promise<ArrayBuffer>,
 ): Promise<AudioBuffer> {
   const bytes = await readAudioFile(track.path);
+  return decodeAudioBytes(bytes);
+}
+
+export async function decodeAudioBytes(bytes: ArrayBuffer): Promise<AudioBuffer> {
   const audioContext = new AudioContext({ sampleRate: 16000 });
 
   try {

@@ -34,7 +34,7 @@ export function TrackRowMenu({
   onViewArtist,
   onViewAlbum,
   showTrigger = true,
-  localActionsEnabled = true,
+  fileActionsEnabled = true,
 }: {
   track: LibraryTrack;
   selectedTracks?: LibraryTrack[];
@@ -58,7 +58,7 @@ export function TrackRowMenu({
   onViewArtist?: (track: LibraryTrack) => void;
   onViewAlbum?: (track: LibraryTrack) => void;
   showTrigger?: boolean;
-  localActionsEnabled?: boolean;
+  fileActionsEnabled?: boolean;
 }) {
   const icons = useIcons();
   const [playlistOpen, setPlaylistOpen] = useState(false);
@@ -80,6 +80,7 @@ export function TrackRowMenu({
   const tracksForAction =
     selectedTracks && selectedTracks.length > 1 ? selectedTracks : [track];
   const isMultiTrackMenu = tracksForAction.length > 1;
+  const soundCloudOpenIndex = 2 + (selectedPlaylist ? 1 : 0) + (selectedTag ? 1 : 0);
 
   useEffect(() => {
     if (!open) return;
@@ -125,98 +126,84 @@ export function TrackRowMenu({
           }
         >
           <Dropdown className="w-56 bg-[rgba(10,10,10,0.96)]">
-            {!localActionsEnabled && track.soundcloud?.permalinkUrl && (
+            <div
+              className="relative"
+              ref={playlistTriggerRef}
+              onMouseEnter={() => {
+                setPlaylistSide(
+                  shouldOpenSubmenuLeft(playlistTriggerRef.current) ? "left" : "right",
+                );
+                setPlaylistOpen(true);
+              }}
+              onMouseLeave={() => setPlaylistOpen(false)}
+            >
               <MenuItem
-                icon={InfoIcon}
-                label="Open in SoundCloud"
+                icon={ListPlusIcon}
+                label="Add to Playlist"
                 index={0}
-                onSelect={() => {
-                  window.open(track.soundcloud?.permalinkUrl, "_blank", "noopener,noreferrer");
-                  onOpenChange(false, null);
-                }}
+                className="pr-8"
+                onSelect={() => setPlaylistOpen((value) => !value)}
               />
-            )}
-            {localActionsEnabled && (
-              <div
-                className="relative"
-                ref={playlistTriggerRef}
-                onMouseEnter={() => {
-                  setPlaylistSide(
-                    shouldOpenSubmenuLeft(playlistTriggerRef.current) ? "left" : "right",
-                  );
-                  setPlaylistOpen(true);
-                }}
-                onMouseLeave={() => setPlaylistOpen(false)}
-              >
-                <MenuItem
-                  icon={ListPlusIcon}
-                  label="Add to Playlist"
-                  index={0}
-                  className="pr-8"
-                  onSelect={() => setPlaylistOpen((value) => !value)}
-                />
-                <ChevronRightIcon
-                  size={14}
-                  strokeWidth={1.8}
-                  className="pointer-events-none absolute right-2 top-1/2 z-20 -translate-y-1/2 text-muted-foreground"
-                />
-                {playlistOpen && (
-                  <div
-                    className={`absolute top-[-5px] z-10 ${
-                      playlistSide === "left"
-                        ? "right-[calc(100%-2px)] pr-2"
-                        : "left-[calc(100%-2px)] pl-2"
-                    }`}
-                    onMouseMove={(event) => event.stopPropagation()}
-                    onMouseEnter={() => setPlaylistOpen(true)}
-                  >
-                    <Dropdown className="w-52 bg-[rgba(10,10,10,0.96)]">
-                      {playlists.length > 0 &&
-                        playlists.map((playlist, index) => (
-                          <MenuItem
-                            key={playlist.id}
-                            icon={icons["list-music"]}
-                            label={playlist.name}
-                            index={index}
-                            checked={tracksForAction.every((item) =>
-                              playlist.trackIds.includes(item.id),
-                            )}
-                            onSelect={() => {
-                              if (isMultiTrackMenu && onAddTracksToPlaylist) {
-                                onAddTracksToPlaylist(tracksForAction, playlist);
-                              } else {
-                                onAddToPlaylist(track, playlist);
-                              }
-                              onOpenChange(false, null);
-                              setPlaylistOpen(false);
-                            }}
-                          />
-                        ))}
-                      <MenuItem
-                        icon={icons.plus}
-                        label="Create Playlist"
-                        index={playlists.length}
-                        onSelect={() => {
-                          onCreatePlaylist(tracksForAction);
-                          onOpenChange(false, null);
-                          setPlaylistOpen(false);
-                        }}
-                      />
-                    </Dropdown>
-                  </div>
-                )}
-              </div>
-            )}
-            {localActionsEnabled && (
-              <div
-                className="relative"
-                ref={tagTriggerRef}
-                onMouseEnter={() => {
-                  setTagSide(shouldOpenSubmenuLeft(tagTriggerRef.current) ? "left" : "right");
-                  setTagOpen(true);
-                }}
-                onMouseLeave={() => setTagOpen(false)}
-              >
+              <ChevronRightIcon
+                size={14}
+                strokeWidth={1.8}
+                className="pointer-events-none absolute right-2 top-1/2 z-20 -translate-y-1/2 text-muted-foreground"
+              />
+              {playlistOpen && (
+                <div
+                  className={`absolute top-[-5px] z-10 ${
+                    playlistSide === "left"
+                      ? "right-[calc(100%-2px)] pr-2"
+                      : "left-[calc(100%-2px)] pl-2"
+                  }`}
+                  onMouseMove={(event) => event.stopPropagation()}
+                  onMouseEnter={() => setPlaylistOpen(true)}
+                >
+                  <Dropdown className="w-52 bg-[rgba(10,10,10,0.96)]">
+                    {playlists.length > 0 &&
+                      playlists.map((playlist, index) => (
+                        <MenuItem
+                          key={playlist.id}
+                          icon={icons["list-music"]}
+                          label={playlist.name}
+                          index={index}
+                          checked={tracksForAction.every((item) =>
+                            playlist.trackIds.includes(item.id),
+                          )}
+                          onSelect={() => {
+                            if (isMultiTrackMenu && onAddTracksToPlaylist) {
+                              onAddTracksToPlaylist(tracksForAction, playlist);
+                            } else {
+                              onAddToPlaylist(track, playlist);
+                            }
+                            onOpenChange(false, null);
+                            setPlaylistOpen(false);
+                          }}
+                        />
+                      ))}
+                    <MenuItem
+                      icon={icons.plus}
+                      label="Create Playlist"
+                      index={playlists.length}
+                      onSelect={() => {
+                        onCreatePlaylist(tracksForAction);
+                        onOpenChange(false, null);
+                        setPlaylistOpen(false);
+                      }}
+                    />
+                  </Dropdown>
+                </div>
+              )}
+            </div>
+            <div
+              className="relative"
+              ref={tagTriggerRef}
+              onMouseEnter={() => {
+                setTagSide(shouldOpenSubmenuLeft(tagTriggerRef.current) ? "left" : "right");
+                setTagOpen(true);
+              }}
+              onMouseLeave={() => setTagOpen(false)}
+            >
               <MenuItem
                 icon={TagIcon}
                 label="Add Tag"
@@ -268,9 +255,8 @@ export function TrackRowMenu({
                   </Dropdown>
                 </div>
               )}
-              </div>
-            )}
-            {localActionsEnabled && selectedPlaylist && (
+            </div>
+            {selectedPlaylist && (
               <MenuItem
                 icon={icons.x}
                 label="Remove from Playlist"
@@ -281,7 +267,7 @@ export function TrackRowMenu({
                 }}
               />
             )}
-            {localActionsEnabled && selectedTag && (
+            {selectedTag && (
               <MenuItem
                 icon={icons.x}
                 label="Remove from Tag"
@@ -292,7 +278,21 @@ export function TrackRowMenu({
                 }}
               />
             )}
-            {!isMultiTrackMenu && localActionsEnabled && (
+            {!fileActionsEnabled && track.soundcloud?.permalinkUrl && (
+              <>
+                <DropdownSeparator />
+                <MenuItem
+                  icon={InfoIcon}
+                  label="Open in SoundCloud"
+                  index={soundCloudOpenIndex}
+                  onSelect={() => {
+                    window.open(track.soundcloud?.permalinkUrl, "_blank", "noopener,noreferrer");
+                    onOpenChange(false, null);
+                  }}
+                />
+              </>
+            )}
+            {!isMultiTrackMenu && fileActionsEnabled && (
               <>
                 <DropdownSeparator />
                 {onViewArtist && (
@@ -318,28 +318,24 @@ export function TrackRowMenu({
                   />
                 )}
                 {(onViewArtist || onViewAlbum) && <DropdownSeparator />}
-                {localActionsEnabled && (
-                  <>
-                    <MenuItem
-                      icon={FinderIcon}
-                      label={`Show in ${fileManagerName}`}
-                      index={6}
-                      onSelect={() => {
-                        onShowInFolder(track);
-                        onOpenChange(false, null);
-                      }}
-                    />
-                    <MenuItem
-                      icon={InfoIcon}
-                      label="Metadata"
-                      index={7}
-                      onSelect={() => {
-                        onShowMetadata(track);
-                        onOpenChange(false, null);
-                      }}
-                    />
-                  </>
-                )}
+                <MenuItem
+                  icon={FinderIcon}
+                  label={`Show in ${fileManagerName}`}
+                  index={6}
+                  onSelect={() => {
+                    onShowInFolder(track);
+                    onOpenChange(false, null);
+                  }}
+                />
+                <MenuItem
+                  icon={InfoIcon}
+                  label="Metadata"
+                  index={7}
+                  onSelect={() => {
+                    onShowMetadata(track);
+                    onOpenChange(false, null);
+                  }}
+                />
               </>
             )}
           </Dropdown>

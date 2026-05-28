@@ -1,5 +1,6 @@
 import { Switch } from "@/components/ui/switch";
 import type { IconComponent } from "@/lib/icon-context";
+import { useState } from "react";
 import type {
   LastfmSettings,
   LastfmState,
@@ -8,14 +9,19 @@ import type {
   SoundCloudState,
 } from "../../../../shared/library";
 
-const soundcloudCollections: Array<{ id: SoundCloudCollectionId; title: string; description: string }> = [
+const soundcloudCollections: Array<{
+  id: SoundCloudCollectionId;
+  title: string;
+  description: string;
+}> = [
   { id: "playlists", title: "Playlists", description: "Show your SoundCloud playlists." },
-  { id: "liked-tracks", title: "Loved tracks", description: "Show tracks you liked on SoundCloud." },
-  { id: "liked-playlists", title: "Liked playlists", description: "Show tracks from liked playlists." },
+  {
+    id: "liked-tracks",
+    title: "Loved tracks",
+    description: "Show tracks you liked on SoundCloud.",
+  },
   { id: "uploads", title: "Uploads", description: "Show tracks uploaded by your account." },
   { id: "reposted-tracks", title: "Reposted tracks", description: "Show tracks you reposted." },
-  { id: "reposted-playlists", title: "Reposted playlists", description: "Show tracks from reposted playlists." },
-  { id: "feed", title: "Following feed", description: "Show recent tracks from accounts you follow." },
 ];
 
 export function IntegrationsSettingsPane({
@@ -55,7 +61,7 @@ export function IntegrationsSettingsPane({
   onFlushLastfmQueue: () => void;
   onSoundCloudSettingsChange: (settings: SoundCloudSettings) => void;
   onConnectSoundCloud: () => void;
-  onCompleteSoundCloudAuth: () => void;
+  onCompleteSoundCloudAuth: (input: string) => void;
   onDisconnectSoundCloud: () => void;
 }) {
   const LoaderIcon = icons.loader;
@@ -96,7 +102,9 @@ export function IntegrationsSettingsPane({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {lastfmPendingAction && <LoaderIcon size={16} strokeWidth={1.8} className="animate-spin" />}
+            {lastfmPendingAction && (
+              <LoaderIcon size={16} strokeWidth={1.8} className="animate-spin" />
+            )}
             {!lastfmState.connected && !lastfmState.pendingAuth && (
               <button
                 type="button"
@@ -215,10 +223,11 @@ function SoundCloudIntegrationCard({
   loaderIcon: IconComponent;
   onSettingsChange: (settings: SoundCloudSettings) => void;
   onConnect: () => void;
-  onCompleteAuth: () => void;
+  onCompleteAuth: (input: string) => void;
   onDisconnect: () => void;
 }) {
   const disabled = pendingAction || !state.configured;
+  const [authInput, setAuthInput] = useState("");
   const status = !state.configured
     ? "Missing credentials"
     : state.connected
@@ -252,7 +261,9 @@ function SoundCloudIntegrationCard({
               </span>
             </div>
             <p className="mt-0.5 max-w-[420px] text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
-              {state.username ? `Signed in as ${state.username}` : "Stream your SoundCloud collections in Playhead."}
+              {state.username
+                ? `Signed in as ${state.username}`
+                : "Stream your SoundCloud collections in Playhead."}
             </p>
           </div>
         </div>
@@ -268,16 +279,7 @@ function SoundCloudIntegrationCard({
               Connect SoundCloud
             </button>
           )}
-          {!state.connected && state.pendingAuth && (
-            <button
-              type="button"
-              className="h-9 rounded-full bg-primary px-4 text-[13px] font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] disabled:opacity-45"
-              disabled={pendingAction}
-              onClick={onCompleteAuth}
-            >
-              Enter code
-            </button>
-          )}
+          {!state.connected && state.pendingAuth && null}
           {state.connected && (
             <button
               type="button"
@@ -292,8 +294,36 @@ function SoundCloudIntegrationCard({
       </div>
       {!state.configured && (
         <p className="mt-3 max-w-[420px] text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
-          Add SOUNDCLOUD_CLIENT_ID and SOUNDCLOUD_CLIENT_SECRET to the app environment to enable this integration.
+          Add SOUNDCLOUD_CLIENT_ID and SOUNDCLOUD_CLIENT_SECRET to the app environment to enable
+          this integration.
         </p>
+      )}
+      {!state.connected && state.pendingAuth && (
+        <div className="mt-4 rounded-[16px] border border-white/10 bg-white/[0.025] p-3">
+          <label className="block text-[12px] font-semibold leading-4 text-foreground">
+            Authorization code or callback URL
+          </label>
+          <div className="mt-2 flex gap-2">
+            <input
+              className="h-9 min-w-0 flex-1 rounded-full border border-white/10 bg-black/30 px-3 text-[13px] font-medium text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary/70"
+              value={authInput}
+              placeholder="Paste code or playhead://soundcloud/callback?code=..."
+              onChange={(event) => setAuthInput(event.target.value)}
+            />
+            <button
+              type="button"
+              className="h-9 rounded-full bg-primary px-4 text-[13px] font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] disabled:opacity-45"
+              disabled={pendingAction || authInput.trim().length === 0}
+              onClick={() => onCompleteAuth(authInput)}
+            >
+              Connect
+            </button>
+          </div>
+          <p className="mt-2 text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
+            SoundCloud redirects to the URI registered for the app. If the browser shows a callback
+            page or address bar with code=, paste the whole URL here.
+          </p>
+        </div>
       )}
       {state.connected && (
         <div className="mt-4 w-full overflow-hidden rounded-[16px] border border-white/10 bg-white/[0.025]">
@@ -316,7 +346,8 @@ function SoundCloudIntegrationCard({
       )}
       {state.connected && (
         <p className="mt-3 max-w-[420px] text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
-          SoundCloud playback uses streamable tracks only and keeps attribution visible in the player.
+          SoundCloud playback uses streamable tracks only and keeps attribution visible in the
+          player.
         </p>
       )}
       {state.lastError && (

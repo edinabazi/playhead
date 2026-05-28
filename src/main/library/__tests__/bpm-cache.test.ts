@@ -75,4 +75,21 @@ describe("bpm cache storage", () => {
 
     await expect(readBpmCache(request, { directory: cacheDirectory })).resolves.toBeNull();
   });
+
+  it("caches SoundCloud BPM entries by track id without a local source file", async () => {
+    const directory = await createTempDirectory();
+    const cacheDirectory = join(directory, "bpm");
+    const request = { trackId: "soundcloud:123", path: "soundcloud:123" };
+
+    await writeBpmCache(
+      { ...request, bpm: 132, tempo: 131.8, analyzedAt: "2026-05-13T00:00:00.000Z" },
+      { directory: cacheDirectory },
+    );
+
+    await expect(readBpmCache(request, { directory: cacheDirectory })).resolves.toEqual({
+      bpm: 132,
+      tempo: 131.8,
+      analyzedAt: "2026-05-13T00:00:00.000Z",
+    });
+  });
 });

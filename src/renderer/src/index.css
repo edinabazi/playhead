@@ -260,6 +260,17 @@ input,
     }
   }
 
+  @keyframes thinking-mask {
+    from {
+      mask-position: -58% 0;
+      -webkit-mask-position: -58% 0;
+    }
+    to {
+      mask-position: 168% 0;
+      -webkit-mask-position: 168% 0;
+    }
+  }
+
   @keyframes active-waveform {
     0% {
       transform: scaleY(0.5);
@@ -317,4 +328,55 @@ input,
   animation-direction: reverse;
   transform-origin: center;
   will-change: transform, opacity;
+}
+
+.thinking-title {
+  position: relative;
+  display: grid;
+  place-items: center;
+  color: var(--color-foreground);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.thinking-title-base,
+.thinking-title-shine {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+
+.thinking-title-base {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.thinking-title-shine {
+  color: rgba(255, 255, 255, 0.96);
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    rgba(0, 0, 0, 0.18) 32%,
+    black 50%,
+    rgba(0, 0, 0, 0.18) 68%,
+    transparent 100%
+  );
+  mask-size: 52% 100%;
+  mask-repeat: no-repeat;
+  animation: thinking-mask 1.65s linear infinite;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    rgba(0, 0, 0, 0.18) 32%,
+    black 50%,
+    rgba(0, 0, 0, 0.18) 68%,
+    transparent 100%
+  );
+  -webkit-mask-size: 52% 100%;
+  -webkit-mask-repeat: no-repeat;
+}
+
+.sidebar-detail-spinner-path {
+  stroke-dasharray: 15 85;
+  animation:
+    spinner-move 2s linear infinite,
+    spinner-dash 4s ease-in-out infinite;
 }

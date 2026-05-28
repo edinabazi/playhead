@@ -16,15 +16,22 @@ type StoredBpmCacheEntry = BpmCacheEntry & {
   mtimeMs: number;
 };
 
+type CacheSourceStats = Pick<Stats, "size" | "mtimeMs">;
+
 function cachePath(directory: string, trackId: string): string {
   return join(directory, `${encodeURIComponent(trackId)}${bpmExtension}`);
+}
+
+async function getCacheSourceStats(path: string): Promise<CacheSourceStats> {
+  if (path.startsWith("soundcloud:")) return { size: 0, mtimeMs: 0 };
+  return stat(path);
 }
 
 function isValidBpm(value: number): boolean {
   return Number.isFinite(value) && value > 0;
 }
 
-function isValidEntry(entry: StoredBpmCacheEntry, source: Stats): boolean {
+function isValidEntry(entry: StoredBpmCacheEntry, source: CacheSourceStats): boolean {
   return (
     entry.version === cacheVersion &&
     entry.size === source.size &&
@@ -41,7 +48,7 @@ export async function readBpmCache(
 ): Promise<BpmCacheEntry | null> {
   try {
     const [source, raw] = await Promise.all([
-      stat(request.path),
+      getCacheSourceStats(request.path),
       readFile(cachePath(options.directory, request.trackId), "utf8"),
     ]);
     const entry = JSON.parse(raw) as StoredBpmCacheEntry;
@@ -63,7 +70,7 @@ export async function writeBpmCache(
 ): Promise<void> {
   if (!isValidBpm(write.bpm) || !isValidBpm(write.tempo)) return;
 
-  const source = await stat(write.path);
+  const source = await getCacheSourceStats(write.path);
   const entry: StoredBpmCacheEntry = {
     version: cacheVersion,
     size: source.size,

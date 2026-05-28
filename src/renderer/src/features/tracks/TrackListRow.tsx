@@ -95,7 +95,7 @@ export function TrackListRow({
   const isRemoteTrack = track.source === "soundcloud";
   return (
     <TrackCell
-      draggable={!isRemoteTrack}
+      draggable
       trackId={track.id}
       selected={selected}
       dragging={dragging}
@@ -132,11 +132,9 @@ export function TrackListRow({
         <span>{formatTime(track.duration)}</span>
         <FavoriteHeartButton
           active={favorite}
-          disabled={isRemoteTrack}
           tooltipSide="top"
           onClick={(event) => {
             event.stopPropagation();
-            if (isRemoteTrack) return;
             void onToggleFavorite(track);
           }}
         />
@@ -162,7 +160,7 @@ export function TrackListRow({
           onShowMetadata={onShowMetadata}
           onViewArtist={onViewArtist}
           onViewAlbum={onViewAlbum}
-          localActionsEnabled={!isRemoteTrack}
+          fileActionsEnabled={!isRemoteTrack}
         />
       </div>
     </TrackCell>

@@ -16,6 +16,47 @@ import { SidebarGroup } from "./SidebarGroup";
 import { SidebarEmpty, SidebarItem } from "./SidebarItem";
 import { SidebarShell } from "./SidebarShell";
 
+function SidebarDetailSpinner() {
+  return (
+    <span className="flex h-[14px] w-[18px] items-center justify-end text-primary/80">
+      <svg className="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M 12 12 C 14 8.5 19 8.5 19 12 C 19 15.5 14 15.5 12 12 C 10 8.5 5 8.5 5 12 C 5 15.5 10 15.5 12 12 Z"
+          stroke="currentColor"
+          strokeWidth="1.45"
+          strokeLinecap="round"
+          pathLength="100"
+          className="sidebar-detail-spinner-path"
+        />
+      </svg>
+    </span>
+  );
+}
+
+function SidebarGroupSkeleton() {
+  return (
+    <div
+      className="flex flex-col gap-1"
+      role="status"
+      aria-label="Loading SoundCloud collections"
+    >
+      {[72, 54, 64].map((width, index) => (
+        <div
+          key={index}
+          className="relative -mx-2 flex min-h-7 w-[calc(100%+16px)] animate-pulse items-center gap-2 px-2 py-1"
+        >
+          <span className="h-[17px] w-[17px] shrink-0 rounded-[5px] bg-white/[0.07]" />
+          <span
+            className="h-3 rounded-full bg-white/[0.075]"
+            style={{ width: `${width}%` }}
+          />
+          <span className="ml-auto h-2.5 w-5 shrink-0 rounded-full bg-white/[0.055]" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Sidebar({
   folders,
   libraryMode,
@@ -87,10 +128,14 @@ export function Sidebar({
   const [foldersCollapsed, setFoldersCollapsed] = useState(false);
   const [playlistsCollapsed, setPlaylistsCollapsed] = useState(false);
   const [tagsCollapsed, setTagsCollapsed] = useState(false);
+  const [soundcloudCollapsed, setSoundcloudCollapsed] = useState(false);
   const [contextMenu, setContextMenu] = useState<SidebarContextMenuState>(null);
   const FolderPlusIcon = icons["folder-plus"];
   const SettingsIcon = icons.settings;
   const isLibraryMode = libraryMode === "library";
+  const soundcloudSidebarCollections = soundcloudCollections.filter(
+    (collection) => collection.kind === "tracks",
+  );
 
   return (
     <SidebarShell
@@ -259,18 +304,20 @@ export function Sidebar({
           {soundcloudEnabled && (
             <SidebarGroup
               title="SoundCloud"
-              collapsed={false}
-              onToggleCollapsed={() => undefined}
+              collapsed={soundcloudCollapsed}
+              onToggleCollapsed={() => setSoundcloudCollapsed((value) => !value)}
               actionLabel="Refresh SoundCloud"
               actionIcon={icons["radio-tower"]}
               onAction={onRefreshSoundCloud}
             >
-              {soundcloudCollections.length === 0 ? (
-                <SidebarEmpty key="soundcloud-empty">
-                  {soundcloudLoadingCollectionId ? "Loading..." : "No SoundCloud collections"}
-                </SidebarEmpty>
+              {soundcloudSidebarCollections.length === 0 ? (
+                soundcloudLoadingCollectionId ? (
+                  <SidebarGroupSkeleton />
+                ) : (
+                  <SidebarEmpty key="soundcloud-empty">No SoundCloud collections</SidebarEmpty>
+                )
               ) : (
-                soundcloudCollections.map((collection) => (
+                soundcloudSidebarCollections.map((collection) => (
                   <SidebarItem
                     key={collection.id}
                     active={
@@ -280,10 +327,10 @@ export function Sidebar({
                     label={collection.title}
                     detail={
                       soundcloudLoadingCollectionId === collection.id
-                        ? "..."
+                        ? <SidebarDetailSpinner />
                         : collection.trackCount !== undefined
                           ? `${collection.trackCount}`
-                          : collection.kind
+                          : undefined
                     }
                     onClick={() => onSelectSoundCloudSource(collection.id)}
                   />

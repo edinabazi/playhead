@@ -12,6 +12,9 @@ import type { RepeatMode } from "./types";
 import { WaveformEmptyState } from "./WaveformEmptyState";
 
 function formatAudioFormat(track: LibraryTrack): string {
+  if (track.source === "soundcloud" || track.soundcloud) {
+    return track.bpm ? "" : "Sourced from SoundCloud";
+  }
   const extension = track.fileName.split(".").pop() || "";
   const format = extension || track.audioFormat || "";
   return format.toUpperCase();
@@ -87,12 +90,11 @@ export function Player({
     : [];
   const visibleTags = activeTags.slice(0, 3);
   const hiddenTagCount = Math.max(0, activeTags.length - visibleTags.length);
-  const isSoundCloudTrack = activeTrack?.source === "soundcloud";
 
   return (
     <section className="relative flex shrink-0 flex-col gap-[10px] px-4 pt-4">
       <div className="app-drag flex h-16 items-center gap-3" {...windowDragHandlers}>
-        <div className="relative size-16 shrink-0 overflow-hidden rounded-[12px]">
+        <div className="relative size-16 shrink-0 rounded-[12px]">
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
               key={activeTrack?.id || "empty-artwork"}
@@ -170,11 +172,7 @@ export function Player({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.07, duration: 0.16 }}
                 >
-                  {activeTrack
-                    ? isSoundCloudTrack
-                      ? `${activeTrack.artist} · SoundCloud`
-                      : activeTrack.artist
-                    : "Double-click a track to play"}
+                  {activeTrack ? activeTrack.artist : "Double-click a track to play"}
                 </motion.p>
               </motion.div>
             </AnimatePresence>
@@ -183,7 +181,7 @@ export function Player({
           <div className="no-drag flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
             <FavoriteHeartButton
               active={isFavorite}
-              disabled={!activeTrack || isSoundCloudTrack}
+              disabled={!activeTrack}
               tooltipSide="left"
               onClick={onToggleFavorite}
             />

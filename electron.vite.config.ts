@@ -18,6 +18,13 @@ export default defineConfig(({ mode }) => {
         "process.env.POSTHOG_HOST": JSON.stringify(env.POSTHOG_HOST || "https://eu.i.posthog.com"),
         "process.env.LASTFM_API_KEY": JSON.stringify(env.LASTFM_API_KEY || ""),
         "process.env.LASTFM_SHARED_SECRET": JSON.stringify(env.LASTFM_SHARED_SECRET || ""),
+        "process.env.SOUNDCLOUD_CLIENT_ID": JSON.stringify(env.SOUNDCLOUD_CLIENT_ID || ""),
+        "process.env.SOUNDCLOUD_CLIENT_SECRET": JSON.stringify(
+          env.SOUNDCLOUD_CLIENT_SECRET || "",
+        ),
+        "process.env.SOUNDCLOUD_REDIRECT_URI": JSON.stringify(
+          env.SOUNDCLOUD_REDIRECT_URI || "",
+        ),
       },
       plugins: [externalizeDepsPlugin()],
     },

@@ -112,7 +112,7 @@ export function SettingsDialog({
   onFlushLastfmQueue: () => void;
   onSoundCloudSettingsChange: (settings: SoundCloudSettings) => void;
   onStartSoundCloudAuth: () => void;
-  onCompleteSoundCloudAuth: () => void;
+  onCompleteSoundCloudAuth: (input: string) => void;
   onDisconnectSoundCloud: () => void;
   onAdvancedAction: (action: AdvancedSettingsAction) => Promise<string>;
   batchAnalysis: {
