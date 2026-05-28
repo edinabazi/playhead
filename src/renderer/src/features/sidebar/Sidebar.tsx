@@ -1,12 +1,13 @@
 import { useIcons } from "@/lib/icon-context";
 import { panelContentVariants } from "@/lib/motion-variants";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   AppUpdateState,
   LibraryFolder,
   LibraryMode,
   LibraryPlaylist,
+  SidebarGroupId,
   LibraryTag,
   SelectedSource,
   SoundCloudCollection,
@@ -35,26 +36,41 @@ function SidebarDetailSpinner() {
 
 function SidebarGroupSkeleton() {
   return (
-    <div
-      className="flex flex-col gap-1"
-      role="status"
-      aria-label="Loading SoundCloud collections"
-    >
+    <div className="flex flex-col gap-1" role="status" aria-label="Loading SoundCloud collections">
       {[72, 54, 64].map((width, index) => (
         <div
           key={index}
           className="relative -mx-2 flex min-h-7 w-[calc(100%+16px)] animate-pulse items-center gap-2 px-2 py-1"
         >
           <span className="h-[17px] w-[17px] shrink-0 rounded-[5px] bg-white/[0.07]" />
-          <span
-            className="h-3 rounded-full bg-white/[0.075]"
-            style={{ width: `${width}%` }}
-          />
+          <span className="h-3 rounded-full bg-white/[0.075]" style={{ width: `${width}%` }} />
           <span className="ml-auto h-2.5 w-5 shrink-0 rounded-full bg-white/[0.055]" />
         </div>
       ))}
     </div>
   );
+}
+
+const defaultSidebarGroupOrder: SidebarGroupId[] = ["library", "playlists", "tags", "soundcloud"];
+
+function normalizeSidebarGroupOrder(order: SidebarGroupId[]): SidebarGroupId[] {
+  const ordered = order.filter(
+    (id, index) => defaultSidebarGroupOrder.includes(id) && order.indexOf(id) === index,
+  );
+  return [...ordered, ...defaultSidebarGroupOrder.filter((id) => !ordered.includes(id))];
+}
+
+function moveSidebarGroup(
+  order: SidebarGroupId[],
+  draggedId: SidebarGroupId,
+  targetId: SidebarGroupId,
+): SidebarGroupId[] {
+  if (draggedId === targetId) return order;
+  const nextOrder = order.filter((id) => id !== draggedId);
+  const targetIndex = nextOrder.indexOf(targetId);
+  if (targetIndex === -1) return order;
+  nextOrder.splice(targetIndex, 0, draggedId);
+  return nextOrder;
 }
 
 export function Sidebar({
@@ -70,6 +86,7 @@ export function Sidebar({
   soundcloudEnabled,
   soundcloudCollections,
   soundcloudLoadingCollectionId,
+  sidebarGroupOrder,
   isScanning,
   updateState,
   onAddFolder,
@@ -81,6 +98,7 @@ export function Sidebar({
   onSelectSource,
   onSelectSoundCloudSource,
   onRefreshSoundCloud,
+  onSidebarGroupOrderChange,
   onDropTrackToPlaylist,
   onDropTrackToTag,
   onRemoveFolder,
@@ -103,6 +121,7 @@ export function Sidebar({
   soundcloudEnabled: boolean;
   soundcloudCollections: SoundCloudCollection[];
   soundcloudLoadingCollectionId: string | null;
+  sidebarGroupOrder: SidebarGroupId[];
   isScanning: boolean;
   updateState: AppUpdateState;
   onAddFolder: () => void;
@@ -114,6 +133,7 @@ export function Sidebar({
   onSelectSource: (source: SelectedSource) => void;
   onSelectSoundCloudSource: (collectionId: string) => void;
   onRefreshSoundCloud: () => void;
+  onSidebarGroupOrderChange: (order: SidebarGroupId[]) => void;
   onDropTrackToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
   onDropTrackToTag: (trackIds: string[], tag: LibraryTag) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
@@ -129,6 +149,10 @@ export function Sidebar({
   const [playlistsCollapsed, setPlaylistsCollapsed] = useState(false);
   const [tagsCollapsed, setTagsCollapsed] = useState(false);
   const [soundcloudCollapsed, setSoundcloudCollapsed] = useState(false);
+  const [draggedGroupId, setDraggedGroupId] = useState<SidebarGroupId | null>(null);
+  const [orderedGroupIds, setOrderedGroupIds] = useState<SidebarGroupId[]>(
+    normalizeSidebarGroupOrder(sidebarGroupOrder),
+  );
   const [contextMenu, setContextMenu] = useState<SidebarContextMenuState>(null);
   const FolderPlusIcon = icons["folder-plus"];
   const SettingsIcon = icons.settings;
@@ -136,6 +160,214 @@ export function Sidebar({
   const soundcloudSidebarCollections = soundcloudCollections.filter(
     (collection) => collection.kind === "tracks",
   );
+  const activeGroupIds = orderedGroupIds.filter((id) => id !== "soundcloud" || soundcloudEnabled);
+
+  useEffect(() => {
+    if (draggedGroupId) return;
+    setOrderedGroupIds(normalizeSidebarGroupOrder(sidebarGroupOrder));
+  }, [draggedGroupId, sidebarGroupOrder]);
+
+  const reorderDraggedGroup = (targetId: SidebarGroupId) => {
+    if (!draggedGroupId) return;
+    setOrderedGroupIds((currentOrder) => moveSidebarGroup(currentOrder, draggedGroupId, targetId));
+  };
+
+  const finishGroupDrag = () => {
+    setDraggedGroupId(null);
+    const nextOrder = normalizeSidebarGroupOrder(orderedGroupIds);
+    if (nextOrder.join("|") !== normalizeSidebarGroupOrder(sidebarGroupOrder).join("|")) {
+      onSidebarGroupOrderChange(nextOrder);
+    }
+  };
+
+  const groupDragProps = (groupId: SidebarGroupId) => ({
+    dragging: draggedGroupId === groupId,
+    onDragStart: () => setDraggedGroupId(groupId),
+    onDragOver: () => reorderDraggedGroup(groupId),
+    onDragEnd: finishGroupDrag,
+  });
+
+  const libraryGroup =
+    libraryMode === "library" ? (
+      <SidebarGroup
+        key="library"
+        title="Library"
+        collapsed={foldersCollapsed}
+        onToggleCollapsed={() => setFoldersCollapsed((value) => !value)}
+        actionLabel="Add folder"
+        actionIcon={icons["folder-plus"]}
+        onAction={onAddFolder}
+        {...groupDragProps("library")}
+      >
+        <SidebarItem
+          key="library-artists"
+          active={selectedSource?.type === "library-artists"}
+          icon={icons.user}
+          label="Artists"
+          detail={`${artistCount}`}
+          onClick={() => onSelectSource({ type: "library-artists" })}
+        />
+        <SidebarItem
+          key="library-albums"
+          active={selectedSource?.type === "library-albums"}
+          icon={icons["square-library"]}
+          label="Albums"
+          detail={`${albumCount}`}
+          onClick={() => onSelectSource({ type: "library-albums" })}
+        />
+        <SidebarItem
+          key="library-tracks"
+          active={selectedSource?.type === "library-tracks"}
+          icon={icons.music}
+          label="Tracks"
+          detail={`${trackCount}`}
+          onClick={() => onSelectSource({ type: "library-tracks" })}
+        />
+      </SidebarGroup>
+    ) : (
+      <SidebarGroup
+        key="library"
+        title="Folders"
+        collapsed={foldersCollapsed}
+        onToggleCollapsed={() => setFoldersCollapsed((value) => !value)}
+        actionLabel="Add folder"
+        actionIcon={icons["folder-plus"]}
+        onAction={onAddFolder}
+        {...groupDragProps("library")}
+      >
+        {folders.length === 0 ? (
+          <SidebarEmpty key="folders-empty">
+            {isScanning ? "Scanning..." : "No folders added"}
+          </SidebarEmpty>
+        ) : (
+          folders.map((folder) => (
+            <SidebarItem
+              key={folder.id}
+              active={selectedSource?.type === "folder" && selectedSource.id === folder.id}
+              icon={icons["folder-open"]}
+              label={folder.name}
+              detail={`${folder.trackIds.length}`}
+              onClick={() => onSelectSource({ type: "folder", id: folder.id })}
+              onContextMenu={(point) => setContextMenu({ type: "folder", item: folder, point })}
+            />
+          ))
+        )}
+      </SidebarGroup>
+    );
+
+  const groups: Record<SidebarGroupId, React.ReactNode> = {
+    library: libraryGroup,
+    playlists: (
+      <SidebarGroup
+        key="playlists"
+        title="Playlists"
+        collapsed={playlistsCollapsed}
+        onToggleCollapsed={() => setPlaylistsCollapsed((value) => !value)}
+        actionLabel="Create playlist"
+        actionIcon={icons.plus}
+        onAction={onCreatePlaylist}
+        {...groupDragProps("playlists")}
+      >
+        {lovedCount === 0 && playlists.length === 0 ? (
+          <SidebarEmpty key="playlists-empty">No playlists yet</SidebarEmpty>
+        ) : (
+          <>
+            {lovedCount > 0 && (
+              <SidebarItem
+                key="loved"
+                active={selectedSource?.type === "loved"}
+                icon={icons.heart}
+                iconFilled
+                label="Loved"
+                detail={`${lovedCount}`}
+                onClick={() => onSelectSource({ type: "loved" })}
+              />
+            )}
+            {playlists.map((playlist) => (
+              <SidebarItem
+                key={playlist.id}
+                active={selectedSource?.type === "playlist" && selectedSource.id === playlist.id}
+                icon={icons["list-music"]}
+                label={playlist.name}
+                detail={`${playlist.trackIds.length}`}
+                onClick={() => onSelectSource({ type: "playlist", id: playlist.id })}
+                onDropTrack={(trackIds) => onDropTrackToPlaylist(trackIds, playlist)}
+                onContextMenu={(point) =>
+                  setContextMenu({ type: "playlist", item: playlist, point })
+                }
+              />
+            ))}
+          </>
+        )}
+      </SidebarGroup>
+    ),
+    tags: (
+      <SidebarGroup
+        key="tags"
+        title="Tags"
+        collapsed={tagsCollapsed}
+        onToggleCollapsed={() => setTagsCollapsed((value) => !value)}
+        actionLabel="Create tag"
+        actionIcon={icons.plus}
+        onAction={onCreateTag}
+        {...groupDragProps("tags")}
+      >
+        {tags.length === 0 ? (
+          <SidebarEmpty key="tags-empty">No tags yet</SidebarEmpty>
+        ) : (
+          tags.map((tag) => (
+            <SidebarItem
+              key={tag.id}
+              active={selectedSource?.type === "tag" && selectedSource.id === tag.id}
+              icon={icons.tag}
+              label={tag.name}
+              detail={`${tag.trackIds.length}`}
+              onClick={() => onSelectSource({ type: "tag", id: tag.id })}
+              onDropTrack={(trackIds) => onDropTrackToTag(trackIds, tag)}
+              onContextMenu={(point) => setContextMenu({ type: "tag", item: tag, point })}
+            />
+          ))
+        )}
+      </SidebarGroup>
+    ),
+    soundcloud: (
+      <SidebarGroup
+        key="soundcloud"
+        title="SoundCloud"
+        collapsed={soundcloudCollapsed}
+        onToggleCollapsed={() => setSoundcloudCollapsed((value) => !value)}
+        actionLabel="Refresh SoundCloud"
+        actionIcon={icons["radio-tower"]}
+        onAction={onRefreshSoundCloud}
+        {...groupDragProps("soundcloud")}
+      >
+        {soundcloudSidebarCollections.length === 0 ? (
+          soundcloudLoadingCollectionId ? (
+            <SidebarGroupSkeleton />
+          ) : (
+            <SidebarEmpty key="soundcloud-empty">No SoundCloud collections</SidebarEmpty>
+          )
+        ) : (
+          soundcloudSidebarCollections.map((collection) => (
+            <SidebarItem
+              key={collection.id}
+              active={selectedSource?.type === "soundcloud" && selectedSource.id === collection.id}
+              icon={icons["radio-tower"]}
+              label={collection.title}
+              detail={
+                soundcloudLoadingCollectionId === collection.id ? (
+                  <SidebarDetailSpinner />
+                ) : collection.trackCount !== undefined ? (
+                  `${collection.trackCount}`
+                ) : undefined
+              }
+              onClick={() => onSelectSoundCloudSource(collection.id)}
+            />
+          ))
+        )}
+      </SidebarGroup>
+    ),
+  };
 
   return (
     <SidebarShell
@@ -168,176 +400,7 @@ export function Sidebar({
           initial="hidden"
           animate="show"
         >
-          {libraryMode === "library" ? (
-            <SidebarGroup
-              title="Library"
-              collapsed={foldersCollapsed}
-              onToggleCollapsed={() => setFoldersCollapsed((value) => !value)}
-              actionLabel="Add folder"
-              actionIcon={icons["folder-plus"]}
-              onAction={onAddFolder}
-            >
-              <SidebarItem
-                key="library-artists"
-                active={selectedSource?.type === "library-artists"}
-                icon={icons.user}
-                label="Artists"
-                detail={`${artistCount}`}
-                onClick={() => onSelectSource({ type: "library-artists" })}
-              />
-              <SidebarItem
-                key="library-albums"
-                active={selectedSource?.type === "library-albums"}
-                icon={icons["square-library"]}
-                label="Albums"
-                detail={`${albumCount}`}
-                onClick={() => onSelectSource({ type: "library-albums" })}
-              />
-              <SidebarItem
-                key="library-tracks"
-                active={selectedSource?.type === "library-tracks"}
-                icon={icons.music}
-                label="Tracks"
-                detail={`${trackCount}`}
-                onClick={() => onSelectSource({ type: "library-tracks" })}
-              />
-            </SidebarGroup>
-          ) : (
-            <SidebarGroup
-              title="Folders"
-              collapsed={foldersCollapsed}
-              onToggleCollapsed={() => setFoldersCollapsed((value) => !value)}
-              actionLabel="Add folder"
-              actionIcon={icons["folder-plus"]}
-              onAction={onAddFolder}
-            >
-              {folders.length === 0 ? (
-                <SidebarEmpty key="folders-empty">
-                  {isScanning ? "Scanning..." : "No folders added"}
-                </SidebarEmpty>
-              ) : (
-                folders.map((folder) => (
-                  <SidebarItem
-                    key={folder.id}
-                    active={selectedSource?.type === "folder" && selectedSource.id === folder.id}
-                    icon={icons["folder-open"]}
-                    label={folder.name}
-                    detail={`${folder.trackIds.length}`}
-                    onClick={() => onSelectSource({ type: "folder", id: folder.id })}
-                    onContextMenu={(point) =>
-                      setContextMenu({ type: "folder", item: folder, point })
-                    }
-                  />
-                ))
-              )}
-            </SidebarGroup>
-          )}
-
-          <SidebarGroup
-            title="Playlists"
-            collapsed={playlistsCollapsed}
-            onToggleCollapsed={() => setPlaylistsCollapsed((value) => !value)}
-            actionLabel="Create playlist"
-            actionIcon={icons.plus}
-            onAction={onCreatePlaylist}
-          >
-            {lovedCount === 0 && playlists.length === 0 ? (
-              <SidebarEmpty key="playlists-empty">No playlists yet</SidebarEmpty>
-            ) : (
-              <>
-                {lovedCount > 0 && (
-                  <SidebarItem
-                    key="loved"
-                    active={selectedSource?.type === "loved"}
-                    icon={icons.heart}
-                    iconFilled
-                    label="Loved"
-                    detail={`${lovedCount}`}
-                    onClick={() => onSelectSource({ type: "loved" })}
-                  />
-                )}
-                {playlists.map((playlist) => (
-                  <SidebarItem
-                    key={playlist.id}
-                    active={
-                      selectedSource?.type === "playlist" && selectedSource.id === playlist.id
-                    }
-                    icon={icons["list-music"]}
-                    label={playlist.name}
-                    detail={`${playlist.trackIds.length}`}
-                    onClick={() => onSelectSource({ type: "playlist", id: playlist.id })}
-                    onDropTrack={(trackIds) => onDropTrackToPlaylist(trackIds, playlist)}
-                    onContextMenu={(point) =>
-                      setContextMenu({ type: "playlist", item: playlist, point })
-                    }
-                  />
-                ))}
-              </>
-            )}
-          </SidebarGroup>
-
-          <SidebarGroup
-            title="Tags"
-            collapsed={tagsCollapsed}
-            onToggleCollapsed={() => setTagsCollapsed((value) => !value)}
-            actionLabel="Create tag"
-            actionIcon={icons.plus}
-            onAction={onCreateTag}
-          >
-            {tags.length === 0 ? (
-              <SidebarEmpty key="tags-empty">No tags yet</SidebarEmpty>
-            ) : (
-              tags.map((tag) => (
-                <SidebarItem
-                  key={tag.id}
-                  active={selectedSource?.type === "tag" && selectedSource.id === tag.id}
-                  icon={icons.tag}
-                  label={tag.name}
-                  detail={`${tag.trackIds.length}`}
-                  onClick={() => onSelectSource({ type: "tag", id: tag.id })}
-                  onDropTrack={(trackIds) => onDropTrackToTag(trackIds, tag)}
-                  onContextMenu={(point) => setContextMenu({ type: "tag", item: tag, point })}
-                />
-              ))
-            )}
-          </SidebarGroup>
-          {soundcloudEnabled && (
-            <SidebarGroup
-              title="SoundCloud"
-              collapsed={soundcloudCollapsed}
-              onToggleCollapsed={() => setSoundcloudCollapsed((value) => !value)}
-              actionLabel="Refresh SoundCloud"
-              actionIcon={icons["radio-tower"]}
-              onAction={onRefreshSoundCloud}
-            >
-              {soundcloudSidebarCollections.length === 0 ? (
-                soundcloudLoadingCollectionId ? (
-                  <SidebarGroupSkeleton />
-                ) : (
-                  <SidebarEmpty key="soundcloud-empty">No SoundCloud collections</SidebarEmpty>
-                )
-              ) : (
-                soundcloudSidebarCollections.map((collection) => (
-                  <SidebarItem
-                    key={collection.id}
-                    active={
-                      selectedSource?.type === "soundcloud" && selectedSource.id === collection.id
-                    }
-                    icon={icons["radio-tower"]}
-                    label={collection.title}
-                    detail={
-                      soundcloudLoadingCollectionId === collection.id
-                        ? <SidebarDetailSpinner />
-                        : collection.trackCount !== undefined
-                          ? `${collection.trackCount}`
-                          : undefined
-                    }
-                    onClick={() => onSelectSoundCloudSource(collection.id)}
-                  />
-                ))
-              )}
-            </SidebarGroup>
-          )}
+          {activeGroupIds.map((groupId) => groups[groupId])}
         </motion.div>
       </div>
 

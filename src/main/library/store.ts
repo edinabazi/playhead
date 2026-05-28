@@ -64,6 +64,7 @@ export function normalizeSettings(
       session: {
         ...defaults.session,
         ...(grouped.session || {}),
+        sidebarGroupOrder: grouped.session?.sidebarGroupOrder || defaults.session.sidebarGroupOrder,
         queue: {
           ...defaults.session.queue,
           ...(grouped.session?.queue || {}),

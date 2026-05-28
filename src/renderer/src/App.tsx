@@ -2650,6 +2650,7 @@ export function App() {
                 soundcloudEnabled={library.settings.soundcloud.enabled && soundcloudState.connected}
                 soundcloudCollections={soundcloudCollections}
                 soundcloudLoadingCollectionId={soundcloudLoadingCollectionId}
+                sidebarGroupOrder={library.settings.session.sidebarGroupOrder}
                 isScanning={isScanning}
                 updateState={updateState}
                 onAddFolder={addFolder}
@@ -2668,6 +2669,9 @@ export function App() {
                   void selectSoundCloudSource(collectionId)
                 }
                 onRefreshSoundCloud={() => void loadSoundCloudCollections()}
+                onSidebarGroupOrderChange={(sidebarGroupOrder) =>
+                  persistSessionSettings({ ...library.settings.session, sidebarGroupOrder })
+                }
                 onDropTrackToPlaylist={(trackIds, playlist) =>
                   void addTracksToPlaylist(trackIds, playlist)
                 }

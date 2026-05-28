@@ -28,7 +28,7 @@ export function EmptyLibraryState({
     {
       mode: "library" as const,
       label: "Library",
-      description: "Combines folders into one library.",
+      description: "Organized by artists, albums, and tracks.",
       icon: LibraryIcon,
     },
     {
@@ -81,7 +81,7 @@ export function EmptyLibraryState({
           </p>
         </div>
 
-        <div className="mx-auto mt-7 max-w-[500px]">
+        <div className="mx-auto mt-7 max-w-[540px]">
           <p className="mb-2 pl-1 text-left text-[12px] font-semibold leading-4 text-foreground">
             Display mode
           </p>
@@ -118,7 +118,7 @@ export function EmptyLibraryState({
           </div>
         </div>
 
-        <div className="mx-auto mt-6 max-w-[500px]">
+        <div className="mx-auto mt-6 max-w-[540px]">
           <p className="mb-2 pl-1 text-left text-[12px] font-semibold leading-4 text-foreground">
             Add your music
           </p>

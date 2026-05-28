@@ -32,6 +32,7 @@ describe("library store settings", () => {
       trackPositions: {},
       shuffleEnabled: false,
       repeatMode: "off",
+      sidebarGroupOrder: ["library", "playlists", "tags", "soundcloud"],
       queue: {
         items: [],
         shuffledItems: [],

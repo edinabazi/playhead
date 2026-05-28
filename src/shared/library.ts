@@ -204,12 +204,15 @@ export type SoundCloudSettings = {
   visibleCollections: SoundCloudCollectionId[];
 };
 
+export type SidebarGroupId = "library" | "playlists" | "tags" | "soundcloud";
+
 export type SessionSettings = {
   activeTrackId: string | null;
   selectedTrackIds: string[];
   trackPositions: Record<string, number>;
   shuffleEnabled: boolean;
   repeatMode: "off" | "all" | "one";
+  sidebarGroupOrder: SidebarGroupId[];
   queue: PlaybackQueue;
 };
 
@@ -415,6 +418,7 @@ export const defaultSessionSettings = (): SessionSettings => ({
   trackPositions: {},
   shuffleEnabled: false,
   repeatMode: "off",
+  sidebarGroupOrder: ["library", "playlists", "tags", "soundcloud"],
   queue: {
     items: [],
     shuffledItems: [],
