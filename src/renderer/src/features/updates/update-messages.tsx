@@ -32,4 +32,13 @@ export const updateMessagesByVersion: Record<string, UpdateMessage> = {
     ),
     buttonLabel: "Got it",
   },
+  "0.2.0": {
+    title: "Playhead has been updated",
+    description: (
+      <ul>
+        <li>Added SoundCloud integration</li>
+      </ul>
+    ),
+    buttonLabel: "Got it",
+  },
 };
