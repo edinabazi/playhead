@@ -136,6 +136,9 @@ jobs:
           POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://eu.i.posthog.com' }}
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           LASTFM_SHARED_SECRET: ${{ secrets.LASTFM_SHARED_SECRET }}
+          SOUNDCLOUD_CLIENT_ID: ${{ secrets.SOUNDCLOUD_CLIENT_ID }}
+          SOUNDCLOUD_CLIENT_SECRET: ${{ secrets.SOUNDCLOUD_CLIENT_SECRET }}
+          SOUNDCLOUD_REDIRECT_URI: ${{ vars.SOUNDCLOUD_REDIRECT_URI || 'playhead://soundcloud/callback' }}
       - name: Notarize and staple DMG
         if: runner.os == 'macOS'
         shell: bash
