@@ -151,8 +151,7 @@ export function IntegrationsSettingsPane({
         </div>
         {!lastfmState.configured && (
           <p className="mt-3 max-w-[420px] text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
-            Add LASTFM_API_KEY and LASTFM_SHARED_SECRET to the app environment to enable this
-            integration.
+            The secure integrations broker is not configured for this build.
           </p>
         )}
         {lastfmState.connected && (
@@ -294,8 +293,7 @@ function SoundCloudIntegrationCard({
       </div>
       {!state.configured && (
         <p className="mt-3 max-w-[420px] text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
-          Add SOUNDCLOUD_CLIENT_ID and SOUNDCLOUD_CLIENT_SECRET to the app environment to enable
-          this integration.
+          The secure integrations broker is not configured for this build.
         </p>
       )}
       {!state.connected && state.pendingAuth && (

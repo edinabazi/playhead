@@ -9,6 +9,7 @@ import type {
   SoundCloudTranscoding,
 } from "../../shared/library";
 import { electron } from "../electron";
+import { hasIntegrationsBroker, postIntegrationsBroker } from "../integrations-broker";
 
 const { app, ipcMain, net, protocol, safeStorage, shell } = electron;
 
@@ -106,6 +107,14 @@ type SoundCloudWaveformResponse = {
   width?: number;
   height?: number;
   samples?: number[];
+};
+
+type SoundCloudTokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  error?: string;
+  error_description?: string;
 };
 
 type HlsPart = {
@@ -494,7 +503,7 @@ function statePath(): string {
 }
 
 function isConfigured(): boolean {
-  return Boolean(clientId && clientSecret);
+  return hasIntegrationsBroker() || Boolean(clientId && clientSecret);
 }
 
 async function readJson<T>(path: string, fallback: T): Promise<T> {
@@ -560,25 +569,40 @@ function createAuthUrl(state: string, codeVerifier: string): string {
 }
 
 async function exchangeToken(params: Record<string, string>): Promise<SoundCloudSession | null> {
-  const response = await soundCloudApiFetch(tokenRoot, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      ...params,
-    }),
-  });
-  const data = (await response.json().catch(() => null)) as {
-    access_token?: string;
-    refresh_token?: string;
-    expires_in?: number;
-    error?: string;
-    error_description?: string;
-  } | null;
+  let data: SoundCloudTokenResponse | null;
 
-  if (!response.ok || !data?.access_token) {
+  if (hasIntegrationsBroker()) {
+    try {
+      data = await postIntegrationsBroker<SoundCloudTokenResponse>("/soundcloud/token", {
+        grantType: params.grant_type,
+        code: params.code,
+        codeVerifier: params.code_verifier,
+        refreshToken: params.refresh_token,
+      });
+    } catch (error) {
+      await setLastError(error instanceof Error ? error.message : "SoundCloud auth failed.");
+      return null;
+    }
+  } else {
+    const response = await soundCloudApiFetch(tokenRoot, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        ...params,
+      }),
+    });
+    data = (await response.json().catch(() => null)) as SoundCloudTokenResponse | null;
+
+    if (!response.ok) {
+      await setLastError(data?.error_description || data?.error || "SoundCloud auth failed.");
+      return null;
+    }
+  }
+
+  if (!data?.access_token) {
     await setLastError(data?.error_description || data?.error || "SoundCloud auth failed.");
     return null;
   }
@@ -820,7 +844,24 @@ export async function startSoundCloudAuth(): Promise<SoundCloudState> {
   const pendingState = randomBytes(18).toString("base64url");
   const pendingCodeVerifier = randomBytes(48).toString("base64url");
   await writeStoredState({ ...state, pendingState, pendingCodeVerifier, lastError: undefined });
-  await shell.openExternal(createAuthUrl(pendingState, pendingCodeVerifier));
+  if (hasIntegrationsBroker()) {
+    try {
+      const response = await postIntegrationsBroker<{ authUrl: string }>("/soundcloud/auth-url", {
+        state: pendingState,
+        codeChallenge: createCodeChallenge(pendingCodeVerifier),
+      });
+      await shell.openExternal(response.authUrl);
+    } catch (error) {
+      await writeStoredState({
+        ...state,
+        pendingState: undefined,
+        pendingCodeVerifier: undefined,
+        lastError: error instanceof Error ? error.message : "SoundCloud auth failed.",
+      });
+    }
+  } else {
+    await shell.openExternal(createAuthUrl(pendingState, pendingCodeVerifier));
+  }
   return getSoundCloudState();
 }
 

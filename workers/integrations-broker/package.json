@@ -1,0 +1,17 @@
+{
+  "name": "playhead-integrations-broker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "wrangler": "^4.95.0"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.2.0"
+  }
+}

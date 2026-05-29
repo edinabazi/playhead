@@ -3,6 +3,7 @@ import { readFile, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { LastfmState, LastfmTrackPayload } from "../../shared/library";
 import { electron } from "../electron";
+import { hasIntegrationsBroker, postIntegrationsBroker } from "../integrations-broker";
 
 const { app, ipcMain, safeStorage, shell } = electron;
 
@@ -40,7 +41,7 @@ function queuePath(): string {
 }
 
 function isConfigured(): boolean {
-  return Boolean(apiKey && sharedSecret);
+  return hasIntegrationsBroker() || Boolean(apiKey && sharedSecret);
 }
 
 function normalizeTrack(track: LastfmTrackPayload): LastfmTrackPayload | null {
@@ -171,6 +172,18 @@ function isRetryableStatus(status: number): boolean {
 async function postLastfm<T>(
   params: Record<string, string | number | undefined>,
 ): Promise<LastfmApiResponse<T>> {
+  if (hasIntegrationsBroker()) {
+    try {
+      return await postIntegrationsBroker<LastfmApiResponse<T>>("/lastfm/request", { params });
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Last.fm broker request failed.",
+        retryable: true,
+      };
+    }
+  }
+
   if (!isConfigured()) {
     return { ok: false, error: "Last.fm credentials are not configured.", retryable: false };
   }
@@ -288,6 +301,22 @@ async function sendLove(
 
 export async function startLastfmAuth(): Promise<LastfmState> {
   if (!isConfigured()) return getLastfmState();
+
+  if (hasIntegrationsBroker()) {
+    try {
+      const response = await postIntegrationsBroker<{ token: string; authUrl: string }>(
+        "/lastfm/auth-token",
+        {},
+      );
+      const state = await readStoredState();
+      await writeStoredState({ ...state, pendingToken: response.token, lastError: undefined });
+      await shell.openExternal(response.authUrl);
+    } catch (error) {
+      await setLastError(error instanceof Error ? error.message : "Last.fm auth failed.");
+    }
+    return getLastfmState();
+  }
+
   const response = await postLastfm<{ token: string }>({ method: "auth.getToken", api_key: apiKey });
   if (!response.ok) {
     await setLastError(response.error);
@@ -303,6 +332,26 @@ export async function startLastfmAuth(): Promise<LastfmState> {
 export async function completeLastfmAuth(): Promise<LastfmState> {
   const state = await readStoredState();
   if (!state.pendingToken) return getLastfmState();
+
+  if (hasIntegrationsBroker()) {
+    try {
+      const response = await postIntegrationsBroker<{ username: string; sessionKey: string }>(
+        "/lastfm/session",
+        { token: state.pendingToken },
+      );
+      await writeStoredState({
+        session: {
+          username: response.username,
+          sessionKey: encryptSessionKey(response.sessionKey),
+          encrypted: Boolean(safeStorage?.isEncryptionAvailable()),
+        },
+      });
+      void flushQueueInternal();
+    } catch (error) {
+      await setLastError(error instanceof Error ? error.message : "Last.fm auth failed.");
+    }
+    return getLastfmState();
+  }
 
   const response = await postLastfm<{ session: { name: string; key: string } }>({
     method: "auth.getSession",

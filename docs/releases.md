@@ -42,6 +42,12 @@ wait for the **Update** button.
 - `POSTHOG_PROJECT_API_KEY`: optional. This is baked into the main-process bundle during CI builds.
   If it is missing, release builds still work and in-app telemetry cannot send events.
 - `POSTHOG_HOST`: optional repository variable. Defaults to `https://eu.i.posthog.com`.
+- `PLAYHEAD_INTEGRATIONS_BROKER_URL`: repository variable for the secure Last.fm/SoundCloud broker.
+  Production builds must use this URL instead of bundling provider secrets.
+
+Do not inject Last.fm or SoundCloud provider secrets into release builds. `LASTFM_SHARED_SECRET` and
+`SOUNDCLOUD_CLIENT_SECRET` live on the integrations broker only; see
+[`docs/integrations-broker.md`](integrations-broker.md).
 
 ## macOS Signing Secrets
 
