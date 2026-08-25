@@ -262,16 +262,6 @@ npm test
 npm run build
 ```
 
-## Roadmap ideas
-
-- Better waveform performance and caching
-- More metadata format coverage
-- More keyboard-first workflows
-- Better playlist and crate-style organization
-- Improved folder-mode filtering
-- More polished macOS packaging
-- Windows and Linux support
-
 If you have any feature requests or bugs to report, please feel free to open an issue.
 
 ## License
