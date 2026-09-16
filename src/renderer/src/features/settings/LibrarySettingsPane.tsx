@@ -1,3 +1,4 @@
+import { Switch } from "@/components/ui/switch";
 import type { IconComponent } from "@/lib/icon-context";
 import { getFolderPickerName } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,9 @@ export function LibrarySettingsPane({
           libraryIcon={icons.listMusic}
           onChange={onChange}
         />
+        {settings.mode === "folder" && (
+          <SubfolderTracksCard settings={settings} onChange={onChange} />
+        )}
         <WatchedFoldersCard
           folders={folders}
           isScanning={isScanning}
@@ -260,6 +264,35 @@ function DisplayModeCard({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function SubfolderTracksCard({
+  settings,
+  onChange,
+}: {
+  settings: LibrarySettings;
+  onChange: (settings: LibrarySettings) => void;
+}) {
+  return (
+    <div className="rounded-[22px] border border-white/10 bg-white/[0.035] p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h4 className="text-[14px] font-semibold leading-5 text-foreground">
+            Include subfolder tracks
+          </h4>
+          <p className="mt-1 max-w-[460px] text-[12px] font-medium leading-4 text-muted-foreground">
+            Show tracks from nested folders when you select a folder.
+          </p>
+        </div>
+        <Switch
+          checked={settings.includeSubfolderTracks}
+          onCheckedChange={(includeSubfolderTracks) =>
+            onChange({ ...settings, includeSubfolderTracks })
+          }
+        />
       </div>
     </div>
   );

@@ -1,12 +1,14 @@
+import { getFolderTree, type FolderTreeNode } from "@/features/library/folder-tree";
 import { useIcons } from "@/lib/icon-context";
 import { panelContentVariants } from "@/lib/motion-variants";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   AppUpdateState,
   LibraryFolder,
   LibraryMode,
   LibraryPlaylist,
+  LibraryState,
   PlaylistExportFormat,
   SidebarGroupId,
   LibraryTag,
@@ -76,6 +78,9 @@ function moveSidebarGroup(
 
 export function Sidebar({
   folders,
+  tracks,
+  includeSubfolderTracks,
+  expandedFolderPaths,
   libraryMode,
   artistCount,
   albumCount,
@@ -101,6 +106,7 @@ export function Sidebar({
   onSelectSoundCloudSource,
   onRefreshSoundCloud,
   onSidebarGroupOrderChange,
+  onExpandedFolderPathsChange,
   onDropTrackToPlaylist,
   onDropTrackToTag,
   onRemoveFolder,
@@ -113,6 +119,9 @@ export function Sidebar({
   onToggleQueue,
 }: {
   folders: LibraryFolder[];
+  tracks: LibraryState["tracks"];
+  includeSubfolderTracks: boolean;
+  expandedFolderPaths: string[];
   libraryMode: LibraryMode;
   artistCount: number;
   albumCount: number;
@@ -138,6 +147,7 @@ export function Sidebar({
   onSelectSoundCloudSource: (collectionId: string) => void;
   onRefreshSoundCloud: () => void;
   onSidebarGroupOrderChange: (order: SidebarGroupId[]) => void;
+  onExpandedFolderPathsChange: (paths: string[]) => void;
   onDropTrackToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
   onDropTrackToTag: (trackIds: string[], tag: LibraryTag) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
@@ -166,6 +176,64 @@ export function Sidebar({
     (collection) => collection.kind === "tracks",
   );
   const activeGroupIds = orderedGroupIds.filter((id) => id !== "soundcloud" || soundcloudEnabled);
+  const folderTrees = useMemo(
+    () => (isLibraryMode ? [] : folders.map((folder) => getFolderTree(folder, tracks))),
+    [folders, isLibraryMode, tracks],
+  );
+  const hasSubfolders = folderTrees.some((tree) => tree.children.length > 0);
+  const expandedFolderPathSet = useMemo(() => new Set(expandedFolderPaths), [expandedFolderPaths]);
+
+  const toggleFolderExpanded = (path: string) => {
+    onExpandedFolderPathsChange(
+      expandedFolderPathSet.has(path)
+        ? expandedFolderPaths.filter((expandedPath) => expandedPath !== path)
+        : [...expandedFolderPaths, path],
+    );
+  };
+
+  const renderFolderTreeNode = (
+    folder: LibraryFolder,
+    node: FolderTreeNode,
+    depth: number,
+  ): React.ReactNode[] => {
+    const isRoot = depth === 0;
+    const expanded = expandedFolderPathSet.has(node.path);
+    const nodeTrackCount = includeSubfolderTracks ? node.trackCount : node.directTrackCount;
+    const item = (
+      <SidebarItem
+        key={isRoot ? folder.id : `${folder.id}:${node.path}`}
+        active={
+          selectedSource?.type === "folder" &&
+          selectedSource.id === folder.id &&
+          (selectedSource.path || folder.path) === node.path
+        }
+        icon={icons["folder-open"]}
+        label={node.name}
+        detail={includeSubfolderTracks || nodeTrackCount > 0 ? `${nodeTrackCount}` : undefined}
+        depth={depth}
+        expanded={hasSubfolders ? expanded : undefined}
+        onToggleExpanded={
+          node.children.length > 0 ? () => toggleFolderExpanded(node.path) : undefined
+        }
+        onClick={() =>
+          onSelectSource(
+            isRoot
+              ? { type: "folder", id: folder.id }
+              : { type: "folder", id: folder.id, path: node.path },
+          )
+        }
+        onContextMenu={
+          isRoot ? (point) => setContextMenu({ type: "folder", item: folder, point }) : undefined
+        }
+      />
+    );
+
+    if (!expanded) return [item];
+    return [
+      item,
+      ...node.children.flatMap((child) => renderFolderTreeNode(folder, child, depth + 1)),
+    ];
+  };
 
   useEffect(() => {
     if (draggedGroupId) return;
@@ -245,17 +313,7 @@ export function Sidebar({
             {isScanning ? "Scanning..." : "No folders added"}
           </SidebarEmpty>
         ) : (
-          folders.map((folder) => (
-            <SidebarItem
-              key={folder.id}
-              active={selectedSource?.type === "folder" && selectedSource.id === folder.id}
-              icon={icons["folder-open"]}
-              label={folder.name}
-              detail={`${folder.trackIds.length}`}
-              onClick={() => onSelectSource({ type: "folder", id: folder.id })}
-              onContextMenu={(point) => setContextMenu({ type: "folder", item: folder, point })}
-            />
-          ))
+          folders.flatMap((folder, index) => renderFolderTreeNode(folder, folderTrees[index], 0))
         )}
       </SidebarGroup>
     );

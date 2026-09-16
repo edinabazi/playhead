@@ -87,6 +87,7 @@ describe("library store settings", () => {
       shuffleEnabled: false,
       repeatMode: "off",
       sidebarGroupOrder: ["library", "playlists", "tags", "soundcloud"],
+      expandedFolderPaths: [],
       queue: {
         items: [],
         shuffledItems: [],
@@ -145,6 +146,7 @@ describe("library store settings", () => {
       enabledAudioExtensions: [".mp3"],
       watchFolders: false,
       rescanOnLaunch: true,
+      includeSubfolderTracks: true,
     });
     expect(settings.playback).toEqual(defaultPlaybackSettings());
   });

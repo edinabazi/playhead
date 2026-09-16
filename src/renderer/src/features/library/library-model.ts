@@ -6,6 +6,7 @@ import {
   type LibraryTrack,
   type ScannedFolder,
 } from "../../../../shared/library";
+import { isPathInFolder } from "./folder-tree";
 
 const playlistName = "New Playlist";
 const tagName = "New Tag";
@@ -38,7 +39,9 @@ export type LibraryCollections = {
 export type LibrarySourceParts = Pick<
   LibraryState,
   "favoriteTrackIds" | "folders" | "playlists" | "selectedSource" | "tags" | "tracks"
->;
+> & {
+  includeSubfolderTracks?: boolean;
+};
 
 export function getLibraryKey(value: string): string {
   return value.trim().toLowerCase() || "unknown";
@@ -199,18 +202,31 @@ export function getSourceTracksFromParts(state: LibrarySourceParts): LibraryTrac
     );
   }
 
-  const sourceIds =
-    source.type === "folder"
-      ? state.folders.find((folder) => folder.id === source.id)?.trackIds
-      : state.playlists.find((playlist) => playlist.id === source.id)?.trackIds;
+  if (source.type === "folder") {
+    const folder = state.folders.find((item) => item.id === source.id);
+    if (!folder) return [];
+    const includeSubfolders = state.includeSubfolderTracks ?? true;
+    const folderTracks = folder.trackIds
+      .map((trackId) => state.tracks[trackId])
+      .filter((track): track is LibraryTrack => Boolean(track));
+    if (!source.path && includeSubfolders) return folderTracks;
 
-  return (sourceIds || [])
+    const folderPath = source.path || folder.path;
+    return folderTracks.filter((track) =>
+      isPathInFolder(track.path, folderPath, includeSubfolders),
+    );
+  }
+
+  return (state.playlists.find((playlist) => playlist.id === source.id)?.trackIds || [])
     .map((trackId) => state.tracks[trackId])
     .filter((track): track is LibraryTrack => Boolean(track));
 }
 
 export function getSourceTracks(state: LibraryState): LibraryTrack[] {
-  return getSourceTracksFromParts(state);
+  return getSourceTracksFromParts({
+    ...state,
+    includeSubfolderTracks: state.settings.library.includeSubfolderTracks,
+  });
 }
 
 export function createPlaylist(existing: LibraryPlaylist[], name?: string): LibraryPlaylist {

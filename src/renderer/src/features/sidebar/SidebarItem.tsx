@@ -1,3 +1,4 @@
+import { useIcons } from "@/lib/icon-context";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
 import { panelItemVariants } from "@/lib/motion-variants";
 import { motion } from "framer-motion";
@@ -16,6 +17,9 @@ export function SidebarItem({
   iconFilled,
   label,
   detail,
+  depth = 0,
+  expanded,
+  onToggleExpanded,
   onClick,
   onDropTrack,
   onContextMenu,
@@ -25,10 +29,15 @@ export function SidebarItem({
   iconFilled?: boolean;
   label: string;
   detail?: React.ReactNode;
+  depth?: number;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
   onClick: () => void;
   onDropTrack?: (trackIds: string[]) => void;
   onContextMenu?: (point: MenuAnchorPoint) => void;
 }) {
+  const icons = useIcons();
+  const ChevronIcon = icons["chevron-right"];
   const [isDropTarget, setIsDropTarget] = useState(false);
   const acceptsTrackDrop = Boolean(onDropTrack);
 
@@ -41,6 +50,8 @@ export function SidebarItem({
           ? "text-foreground"
           : "text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"
       }`}
+      style={depth > 0 ? { paddingLeft: 8 + depth * 12 } : undefined}
+      aria-expanded={onToggleExpanded ? Boolean(expanded) : undefined}
       onClick={onClick}
       onContextMenu={(event) => {
         if (!onContextMenu) return;
@@ -95,6 +106,27 @@ export function SidebarItem({
       )}
       {!isDropTarget && active && (
         <span className="pointer-events-none absolute inset-0 rounded-[8px] bg-white/[0.045]" />
+      )}
+      {expanded !== undefined && (
+        <span
+          className={`relative z-10 -mr-1 grid h-[18px] w-3 shrink-0 place-items-center rounded-[4px] ${
+            onToggleExpanded ? "text-[var(--text-tertiary)] hover:text-foreground" : ""
+          }`}
+          aria-hidden="true"
+          onClick={(event) => {
+            if (!onToggleExpanded) return;
+            event.stopPropagation();
+            onToggleExpanded();
+          }}
+        >
+          {onToggleExpanded && (
+            <ChevronIcon
+              size={12}
+              strokeWidth={1.7}
+              className={`transition-transform ${expanded ? "rotate-90" : "rotate-0"}`}
+            />
+          )}
+        </span>
       )}
       <Icon
         className="relative z-10"
