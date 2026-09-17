@@ -228,6 +228,7 @@ export type PlaybackSettings = {
   rememberTrackPositions: boolean;
   restoreLastSession: boolean;
   skipUnavailableTracks: boolean;
+  volumeBoostEnabled: boolean;
 };
 
 export type AppearanceSettings = {
@@ -450,6 +451,7 @@ export const defaultPlaybackSettings = (): PlaybackSettings => ({
   rememberTrackPositions: true,
   restoreLastSession: true,
   skipUnavailableTracks: true,
+  volumeBoostEnabled: false,
 });
 
 export const defaultAppearanceSettings = (): AppearanceSettings => ({

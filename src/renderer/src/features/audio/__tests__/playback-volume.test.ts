@@ -64,4 +64,56 @@ describe("PlaybackVolumeController", () => {
 
     expect(outputs.at(-1)).toBeCloseTo(0.8);
   });
+
+  it("keeps volume at 100% unless boost raises the maximum", () => {
+    const outputs: number[] = [];
+    const gains: number[] = [];
+    const controller = new PlaybackVolumeController(
+      (volume) => outputs.push(volume),
+      undefined,
+      (gain) => gains.push(gain),
+    );
+
+    expect(controller.setBaseVolume(1.5)).toBe(1);
+    expect(gains.at(-1)).toBe(1);
+
+    controller.setMaxVolume(2);
+    expect(controller.setBaseVolume(1.5)).toBe(1.5);
+    expect(outputs.at(-1)).toBe(1);
+    expect(gains.at(-1)).toBe(1.5);
+  });
+
+  it("applies normalization to the element volume and boost as gain", () => {
+    const outputs: number[] = [];
+    const gains: number[] = [];
+    const controller = new PlaybackVolumeController(
+      (volume) => outputs.push(volume),
+      undefined,
+      (gain) => gains.push(gain),
+    );
+
+    controller.setMaxVolume(2);
+    controller.setBaseVolume(1.6);
+    controller.setNormalizationGain(0.5);
+
+    expect(outputs.at(-1)).toBeCloseTo(0.5);
+    expect(gains.at(-1)).toBeCloseTo(1.6);
+  });
+
+  it("clamps a boosted volume back to 100% when boost is turned off", () => {
+    const outputs: number[] = [];
+    const gains: number[] = [];
+    const controller = new PlaybackVolumeController(
+      (volume) => outputs.push(volume),
+      undefined,
+      (gain) => gains.push(gain),
+    );
+
+    controller.setMaxVolume(2);
+    controller.setBaseVolume(1.8);
+
+    expect(controller.setMaxVolume(1)).toBe(1);
+    expect(outputs.at(-1)).toBe(1);
+    expect(gains.at(-1)).toBe(1);
+  });
 });

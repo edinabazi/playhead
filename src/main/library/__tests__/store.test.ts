@@ -64,6 +64,7 @@ describe("library store settings", () => {
       rememberTrackPositions: true,
       restoreLastSession: true,
       skipUnavailableTracks: true,
+      volumeBoostEnabled: false,
     });
   });
 

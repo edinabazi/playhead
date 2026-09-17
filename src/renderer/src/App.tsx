@@ -73,7 +73,9 @@ import {
   waveformAnalysisMaxPeaks,
   waveformAnalysisPeakRate,
 } from "@/features/audio/audio-analysis";
-import { PlaybackVolumeController } from "@/features/audio/playback-volume";
+import { PlaybackAudioEngine } from "@/features/audio/audio-engine";
+import { boostedMaxVolume, PlaybackVolumeController } from "@/features/audio/playback-volume";
+import { useLimiterActivity } from "@/features/audio/use-limiter-activity";
 import {
   analyzeTrackNormalizationGain,
   getCachedTrackNormalizationGain,
@@ -413,11 +415,16 @@ export function App() {
   const rememberTrackPositionRef = useRef<(trackId: string, time: number) => void>(() => {});
   const clearTrackPositionRef = useRef<(trackId: string) => void>(() => {});
   const volumeRef = useRef(1);
+  const audioEngineRef = useRef<PlaybackAudioEngine | null>(null);
   const volumeControllerRef = useRef<PlaybackVolumeController | null>(null);
   if (!volumeControllerRef.current) {
-    volumeControllerRef.current = new PlaybackVolumeController((nextVolume) => {
-      wavesurferRef.current?.setVolume(nextVolume);
-    });
+    volumeControllerRef.current = new PlaybackVolumeController(
+      (nextVolume) => {
+        wavesurferRef.current?.setVolume(nextVolume);
+      },
+      undefined,
+      (gain) => audioEngineRef.current?.setBoostGain(gain),
+    );
   }
   useEffect(
     () => () => {
@@ -2148,6 +2155,21 @@ export function App() {
     setCurrentTime(wavesurfer.getCurrentTime());
   }, []);
 
+  const volumeBoostEnabled = library.settings.playback.volumeBoostEnabled;
+  const maxVolume = volumeBoostEnabled ? boostedMaxVolume : 1;
+  const limiterActive = useLimiterActivity(
+    () => audioEngineRef.current?.getLimiterReduction() ?? 0,
+    isPlaying && volumeBoostEnabled,
+  );
+
+  useEffect(() => {
+    if (!isWaveformEngineReady) return;
+    if (volumeBoostEnabled) audioEngineRef.current?.activate();
+    const baseVolume = volumeControllerRef.current?.setMaxVolume(maxVolume) ?? 1;
+    volumeRef.current = baseVolume;
+    setVolume(baseVolume);
+  }, [isWaveformEngineReady, maxVolume, volumeBoostEnabled]);
+
   const changeVolumeBy = useCallback(
     (offset: number) => {
       setPlayerVolume((volumeControllerRef.current?.getBaseVolume() ?? volumeRef.current) + offset);
@@ -2714,6 +2736,7 @@ export function App() {
       sampleRate: 16000,
     });
     wavesurferRef.current = wavesurfer;
+    audioEngineRef.current = new PlaybackAudioEngine(wavesurfer.getMediaElement());
     volumeControllerRef.current?.setBaseVolume(volumeRef.current);
     setIsWaveformEngineReady(true);
     const unsubscribers = [
@@ -2789,6 +2812,8 @@ export function App() {
     return () => {
       destroyHls();
       unsubscribers.forEach((unsubscribe) => unsubscribe());
+      audioEngineRef.current?.dispose();
+      audioEngineRef.current = null;
       wavesurfer.destroy();
       wavesurferRef.current = null;
       setIsWaveformEngineReady(false);
@@ -3085,7 +3110,16 @@ export function App() {
                     }
                   }}
                   onTrackInfoContextMenu={setPlayerTrackMenuPoint}
+                  maxVolume={maxVolume}
+                  volumeBoostEnabled={volumeBoostEnabled}
+                  limiterActive={limiterActive}
                   onVolumeChange={setPlayerVolume}
+                  onVolumeBoostChange={(enabled) =>
+                    void updatePlaybackSettings({
+                      ...library.settings.playback,
+                      volumeBoostEnabled: enabled,
+                    })
+                  }
                 />
 
                 {activeTrack && (
