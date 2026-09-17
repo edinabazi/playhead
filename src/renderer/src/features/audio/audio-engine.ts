@@ -35,6 +35,7 @@ export class PlaybackAudioEngine {
   private bandNodes: BiquadFilterNode[] = [];
   private boostNode: GainNode | null = null;
   private limiterNode: DynamicsCompressorNode | null = null;
+  private activationFailed = false;
   private boostGain = 1;
   private equalizer: EqualizerGains = {
     preampDb: 0,
@@ -57,46 +58,57 @@ export class PlaybackAudioEngine {
   }
 
   activate(): void {
-    if (this.context) return;
+    if (this.context || this.activationFailed) return;
 
-    const context = this.createContext();
-    const source = context.createMediaElementSource(this.media);
-    const preamp = context.createGain();
-    const bands = equalizerBandFrequencies.map((frequency, index) => {
-      const band = context.createBiquadFilter();
-      band.type = "peaking";
-      band.frequency.value = frequency;
-      band.Q.value = equalizerBandQ;
-      band.gain.value = this.equalizer.gainsDb[index] ?? 0;
-      return band;
-    });
-    const boost = context.createGain();
-    const limiter = context.createDynamicsCompressor();
-    const makeupCompensation = context.createGain();
-    preamp.gain.value = dbToGain(this.equalizer.preampDb);
-    boost.gain.value = this.boostGain;
-    makeupCompensation.gain.value = limiterMakeupCompensation;
-    limiter.threshold.value = limiterSettings.threshold;
-    limiter.knee.value = limiterSettings.knee;
-    limiter.ratio.value = limiterSettings.ratio;
-    limiter.attack.value = limiterSettings.attack;
-    limiter.release.value = limiterSettings.release;
+    let context: AudioContext | null = null;
+    try {
+      context = this.createContext();
+      const graphContext = context;
+      const preamp = graphContext.createGain();
+      const bands = equalizerBandFrequencies.map((frequency, index) => {
+        const band = graphContext.createBiquadFilter();
+        band.type = "peaking";
+        band.frequency.value = frequency;
+        band.Q.value = equalizerBandQ;
+        band.gain.value = this.equalizer.gainsDb[index] ?? 0;
+        return band;
+      });
+      const boost = graphContext.createGain();
+      const limiter = graphContext.createDynamicsCompressor();
+      const makeupCompensation = graphContext.createGain();
+      preamp.gain.value = dbToGain(this.equalizer.preampDb);
+      boost.gain.value = this.boostGain;
+      makeupCompensation.gain.value = limiterMakeupCompensation;
+      limiter.threshold.value = limiterSettings.threshold;
+      limiter.knee.value = limiterSettings.knee;
+      limiter.ratio.value = limiterSettings.ratio;
+      limiter.attack.value = limiterSettings.attack;
+      limiter.release.value = limiterSettings.release;
 
-    source.connect(preamp);
-    const lastBand = bands.reduce<AudioNode>((previous, band) => {
-      previous.connect(band);
-      return band;
-    }, preamp);
-    lastBand.connect(boost);
-    boost.connect(limiter);
-    limiter.connect(makeupCompensation);
-    makeupCompensation.connect(context.destination);
+      // Capture the media element last: from here on its audio only plays through this graph.
+      const source = graphContext.createMediaElementSource(this.media);
+      source.connect(preamp);
+      const lastBand = bands.reduce<AudioNode>((previous, band) => {
+        previous.connect(band);
+        return band;
+      }, preamp);
+      lastBand.connect(boost);
+      boost.connect(limiter);
+      limiter.connect(makeupCompensation);
+      makeupCompensation.connect(graphContext.destination);
 
-    this.context = context;
-    this.preampNode = preamp;
-    this.bandNodes = bands;
-    this.boostNode = boost;
-    this.limiterNode = limiter;
+      this.preampNode = preamp;
+      this.bandNodes = bands;
+      this.boostNode = boost;
+      this.limiterNode = limiter;
+      this.context = graphContext;
+    } catch (error) {
+      console.warn("Could not build the audio graph. Playback stays on the native output.", error);
+      this.activationFailed = true;
+      void context?.close().catch(() => undefined);
+      return;
+    }
+
     if (!this.media.paused) void this.resume();
   }
 

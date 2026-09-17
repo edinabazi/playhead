@@ -113,6 +113,28 @@ describe("PlaybackAudioEngine", () => {
     expect(engine.getLimiterReduction()).toBe(-3);
   });
 
+  it("keeps the native output when the graph can't be built", () => {
+    const media = createMedia();
+    const { context } = createContext();
+    context.createDynamicsCompressor = vi.fn(() => {
+      throw new Error("unsupported");
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const engine = new PlaybackAudioEngine(
+      media as unknown as HTMLMediaElement,
+      () => context as unknown as AudioContext,
+    );
+
+    engine.activate();
+    engine.activate();
+
+    expect(context.createMediaElementSource).not.toHaveBeenCalled();
+    expect(context.close).toHaveBeenCalledTimes(1);
+    expect(engine.isActive()).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
   it("smooths boost changes and resumes the context on play", async () => {
     const media = createMedia();
     const { context, preamp, bands, boost } = createContext();
