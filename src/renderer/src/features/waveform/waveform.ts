@@ -3,6 +3,37 @@ export type Peak = {
   max: number;
 };
 
+type ProgressRenderer = {
+  renderProgress: (progress: number, isPlaying?: boolean) => void;
+  getWrapper: () => HTMLElement;
+};
+
+// wavesurfer rewrites the progress clip, width and cursor position on every animation frame
+// while playing, even when the playhead hasn't moved a pixel. Only pass frames through once the
+// playhead reaches a new device pixel; paused updates (seeks, drags, loads) always render.
+export function limitWaveformProgressRendering(
+  renderer: ProgressRenderer,
+  getPixelRatio: () => number = () => window.devicePixelRatio || 1,
+): () => void {
+  const renderProgress = renderer.renderProgress;
+  let lastPixel: number | null = null;
+
+  renderer.renderProgress = (progress, isPlaying) => {
+    if (isPlaying) {
+      const pixel = Math.round(progress * renderer.getWrapper().clientWidth * getPixelRatio());
+      if (pixel === lastPixel) return;
+      lastPixel = pixel;
+    } else {
+      lastPixel = null;
+    }
+    renderProgress.call(renderer, progress, isPlaying);
+  };
+
+  return () => {
+    renderer.renderProgress = renderProgress;
+  };
+}
+
 export function getWaveformProgress(currentTime: number, duration: number): number {
   if (!Number.isFinite(currentTime) || !Number.isFinite(duration) || duration <= 0) return 0;
   return Math.min(1, Math.max(0, currentTime / duration));

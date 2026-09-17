@@ -48,6 +48,8 @@ import {
 } from "@/features/player/lastfm-scrobble";
 import { CreatePlaylistDialog } from "@/features/playlists/CreatePlaylistDialog";
 import { setMediaActionHandler, updateMediaPosition } from "@/features/player/media-session";
+import { PlaybackClock } from "@/features/player/playback-clock";
+import { limitWaveformProgressRendering } from "@/features/waveform/waveform";
 import type { RepeatMode } from "@/features/player/types";
 import { TrackSearchDialog } from "@/features/search/TrackSearchDialog";
 import { SettingsDialog, type AdvancedSettingsAction } from "@/features/settings/SettingsDialog";
@@ -447,7 +449,7 @@ export function App() {
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
   const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([]);
   const [hasWaveform, setHasWaveform] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [playbackClock] = useState(() => new PlaybackClock());
   const [duration, setDuration] = useState(0);
   const [waveformElement, setWaveformElement] = useState<HTMLDivElement | null>(null);
   const [isWaveformEngineReady, setIsWaveformEngineReady] = useState(false);
@@ -1125,7 +1127,7 @@ export function App() {
       setShouldAnimateWaveform(false);
       setError("");
       setActiveTrackId(track.id);
-      setCurrentTime(0);
+      playbackClock.setTime(0);
       setDuration(track.duration || 0);
       setIsPlaying(false);
       const nextQueue =
@@ -1256,7 +1258,7 @@ export function App() {
         else void analyzeTrackBpm(track);
         if (startTime > 0) {
           wavesurfer.setTime(clamp(startTime, 0, wavesurfer.getDuration() || startTime));
-          setCurrentTime(wavesurfer.getCurrentTime());
+          playbackClock.setTime(wavesurfer.getCurrentTime());
         }
 
         if (autoplay) {
@@ -1299,6 +1301,7 @@ export function App() {
     [
       allPlayableTracksById,
       library,
+      playbackClock,
       analyzeTrackBpm,
       analyzeSoundCloudTrackBpm,
       destroyHls,
@@ -1451,7 +1454,7 @@ export function App() {
           wavesurferRef.current?.stop();
           wavesurferRef.current?.empty();
           setActiveTrackId(null);
-          setCurrentTime(0);
+          playbackClock.setTime(0);
           setDuration(0);
           setIsPlaying(false);
           setHasWaveform(false);
@@ -1465,7 +1468,7 @@ export function App() {
         setIsScanning(false);
       }
     },
-    [activeTrackId, persistLibrary],
+    [activeTrackId, persistLibrary, playbackClock],
   );
 
   const updateLibrarySettings = useCallback(
@@ -1757,12 +1760,12 @@ export function App() {
     setScrollToTrackId(null);
     setHasWaveform(false);
     setShouldAnimateWaveform(false);
-    setCurrentTime(0);
+    playbackClock.setTime(0);
     setDuration(0);
     setIsPlaying(false);
     setIsLoadingTrack(false);
     setError("");
-  }, [destroyHls]);
+  }, [destroyHls, playbackClock]);
 
   const runAdvancedSettingsAction = useCallback(
     async (action: AdvancedSettingsAction) => {
@@ -1841,7 +1844,7 @@ export function App() {
         wavesurferRef.current?.stop();
         wavesurferRef.current?.empty();
         setActiveTrackId(null);
-        setCurrentTime(0);
+        playbackClock.setTime(0);
         setDuration(0);
         setIsPlaying(false);
         setHasWaveform(false);
@@ -1866,7 +1869,7 @@ export function App() {
         selectedSource,
       });
     },
-    [activeTrackId, library, persistLibrary],
+    [activeTrackId, library, persistLibrary, playbackClock],
   );
 
   const toggleFavoriteTrack = useCallback(
@@ -2135,18 +2138,21 @@ export function App() {
     setVolume(baseVolume);
   }, []);
 
-  const seekBy = useCallback((offset: number) => {
-    const wavesurfer = wavesurferRef.current;
-    if (!wavesurfer) return;
+  const seekBy = useCallback(
+    (offset: number) => {
+      const wavesurfer = wavesurferRef.current;
+      if (!wavesurfer) return;
 
-    const nextTime = clamp(
-      wavesurfer.getCurrentTime() + offset,
-      0,
-      wavesurfer.getDuration() || Number.POSITIVE_INFINITY,
-    );
-    wavesurfer.setTime(nextTime);
-    setCurrentTime(wavesurfer.getCurrentTime());
-  }, []);
+      const nextTime = clamp(
+        wavesurfer.getCurrentTime() + offset,
+        0,
+        wavesurfer.getDuration() || Number.POSITIVE_INFINITY,
+      );
+      wavesurfer.setTime(nextTime);
+      playbackClock.setTime(wavesurfer.getCurrentTime());
+    },
+    [playbackClock],
+  );
 
   const changeVolumeBy = useCallback(
     (offset: number) => {
@@ -2714,15 +2720,17 @@ export function App() {
       sampleRate: 16000,
     });
     wavesurferRef.current = wavesurfer;
+    const restoreProgressRendering = limitWaveformProgressRendering(wavesurfer.getRenderer());
     volumeControllerRef.current?.setBaseVolume(volumeRef.current);
     setIsWaveformEngineReady(true);
     const unsubscribers = [
       wavesurfer.on("ready", (nextDuration) => {
         setDuration(nextDuration || 0);
-        setCurrentTime(wavesurfer.getCurrentTime());
+        playbackClock.setTime(wavesurfer.getCurrentTime());
+        updateMediaPosition(nextDuration, wavesurfer.getCurrentTime());
       }),
       wavesurfer.on("timeupdate", (time) => {
-        setCurrentTime(time);
+        playbackClock.setTime(time);
         const trackId = activeTrackIdRef.current;
         if (trackId && Date.now() - lastPositionSaveRef.current >= 5000) {
           lastPositionSaveRef.current = Date.now();
@@ -2751,12 +2759,14 @@ export function App() {
         if (payload) void window.playhead.scrobbleLastfmTrack(payload).then(setLastfmState);
       }),
       wavesurfer.on("seeking", (time) => {
-        setCurrentTime(time);
+        playbackClock.setTime(time);
+        updateMediaPosition(wavesurfer.getDuration(), time);
         const session = lastfmPlaybackSessionRef.current;
         if (session) lastfmPlaybackSessionRef.current = { ...session, lastTime: time };
       }),
       wavesurfer.on("play", () => {
         setIsPlaying(true);
+        updateMediaPosition(wavesurfer.getDuration(), wavesurfer.getCurrentTime());
         const track = activeTrackRef.current;
         if (!track || !lastfmSettingsRef.current.scrobblingEnabled) return;
         if (lastfmPlaybackSessionRef.current?.trackId !== track.id) {
@@ -2772,7 +2782,10 @@ export function App() {
         lastfmNowPlayingTrackIdRef.current = track.id;
         void window.playhead.updateLastfmNowPlaying(payload).then(setLastfmState);
       }),
-      wavesurfer.on("pause", () => setIsPlaying(false)),
+      wavesurfer.on("pause", () => {
+        setIsPlaying(false);
+        updateMediaPosition(wavesurfer.getDuration(), wavesurfer.getCurrentTime());
+      }),
       wavesurfer.on("finish", () => {
         if (activeTrackIdRef.current) clearTrackPositionRef.current(activeTrackIdRef.current);
         lastfmPlaybackSessionRef.current = null;
@@ -2789,11 +2802,12 @@ export function App() {
     return () => {
       destroyHls();
       unsubscribers.forEach((unsubscribe) => unsubscribe());
+      restoreProgressRendering();
       wavesurfer.destroy();
       wavesurferRef.current = null;
       setIsWaveformEngineReady(false);
     };
-  }, [destroyHls, waveformElement]);
+  }, [destroyHls, playbackClock, waveformElement]);
 
   const playbackQueue = usePlaybackQueue({
     library,
@@ -2852,9 +2866,11 @@ export function App() {
     navigator.mediaSession.playbackState = isPlaying ? "playing" : activeTrack ? "paused" : "none";
   }, [activeTrack, isPlaying]);
 
+  // The OS extrapolates the position from the last update, so it only needs refreshing when
+  // playback starts, pauses, seeks or the track changes.
   useEffect(() => {
-    updateMediaPosition(duration, currentTime);
-  }, [currentTime, duration]);
+    updateMediaPosition(duration, playbackClock.getTime());
+  }, [duration, playbackClock]);
 
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
@@ -2871,7 +2887,7 @@ export function App() {
       const wavesurfer = wavesurferRef.current;
       if (!wavesurfer || typeof details.seekTime !== "number") return;
       wavesurfer.setTime(details.seekTime);
-      setCurrentTime(wavesurfer.getCurrentTime());
+      playbackClock.setTime(wavesurfer.getCurrentTime());
     });
     setMediaActionHandler("seekbackward", (details) => {
       seekBy(-(details.seekOffset || 10));
@@ -2889,7 +2905,7 @@ export function App() {
       setMediaActionHandler("seekbackward", null);
       setMediaActionHandler("seekforward", null);
     };
-  }, [isPlaying, playAdjacentTrack, seekBy, togglePlayback]);
+  }, [isPlaying, playAdjacentTrack, playbackClock, seekBy, togglePlayback]);
 
   const selectedSource = library.selectedSource;
   const selectedSourceScrollKey = getSourceScrollKey(selectedSource);
@@ -3040,7 +3056,7 @@ export function App() {
                   shouldAnimateWaveform={shouldAnimateWaveform}
                   reduceMotion={reduceMotion}
                   isFavorite={activeTrack ? favoriteTrackSet.has(activeTrack.id) : false}
-                  currentTime={currentTime}
+                  playbackClock={playbackClock}
                   duration={duration}
                   waveformRef={setWaveformElement}
                   onTogglePlayback={togglePlayback}
