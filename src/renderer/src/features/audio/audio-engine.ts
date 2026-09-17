@@ -1,4 +1,11 @@
+import { equalizerBandFrequencies, equalizerBandQ } from "./equalizer";
+
 type AudioContextFactory = () => AudioContext;
+
+export type EqualizerGains = {
+  preampDb: number;
+  gainsDb: number[];
+};
 
 const limiterSettings = {
   threshold: -1,
@@ -15,14 +22,24 @@ const limiterMakeupCompensation = Math.pow(
   (limiterSettings.threshold * (1 - 1 / limiterSettings.ratio) * 0.6) / 20,
 );
 
+function dbToGain(gainDb: number): number {
+  return Number.isFinite(gainDb) ? 10 ** (gainDb / 20) : 1;
+}
+
 // Routes the player's media element through Web Audio. The graph is built lazily because a
 // media element can't be detached from Web Audio once connected, so listeners who never use
 // audio features keep the browser's native output path.
 export class PlaybackAudioEngine {
   private context: AudioContext | null = null;
+  private preampNode: GainNode | null = null;
+  private bandNodes: BiquadFilterNode[] = [];
   private boostNode: GainNode | null = null;
   private limiterNode: DynamicsCompressorNode | null = null;
   private boostGain = 1;
+  private equalizer: EqualizerGains = {
+    preampDb: 0,
+    gainsDb: equalizerBandFrequencies.map(() => 0),
+  };
   private readonly resumeOnPlay = () => {
     void this.resume();
   };
@@ -44,9 +61,19 @@ export class PlaybackAudioEngine {
 
     const context = this.createContext();
     const source = context.createMediaElementSource(this.media);
+    const preamp = context.createGain();
+    const bands = equalizerBandFrequencies.map((frequency, index) => {
+      const band = context.createBiquadFilter();
+      band.type = "peaking";
+      band.frequency.value = frequency;
+      band.Q.value = equalizerBandQ;
+      band.gain.value = this.equalizer.gainsDb[index] ?? 0;
+      return band;
+    });
     const boost = context.createGain();
     const limiter = context.createDynamicsCompressor();
     const makeupCompensation = context.createGain();
+    preamp.gain.value = dbToGain(this.equalizer.preampDb);
     boost.gain.value = this.boostGain;
     makeupCompensation.gain.value = limiterMakeupCompensation;
     limiter.threshold.value = limiterSettings.threshold;
@@ -54,12 +81,20 @@ export class PlaybackAudioEngine {
     limiter.ratio.value = limiterSettings.ratio;
     limiter.attack.value = limiterSettings.attack;
     limiter.release.value = limiterSettings.release;
-    source.connect(boost);
+
+    source.connect(preamp);
+    const lastBand = bands.reduce<AudioNode>((previous, band) => {
+      previous.connect(band);
+      return band;
+    }, preamp);
+    lastBand.connect(boost);
     boost.connect(limiter);
     limiter.connect(makeupCompensation);
     makeupCompensation.connect(context.destination);
 
     this.context = context;
+    this.preampNode = preamp;
+    this.bandNodes = bands;
     this.boostNode = boost;
     this.limiterNode = limiter;
     if (!this.media.paused) void this.resume();
@@ -75,6 +110,21 @@ export class PlaybackAudioEngine {
     );
   }
 
+  setEqualizer(equalizer: EqualizerGains): void {
+    this.equalizer = { preampDb: equalizer.preampDb, gainsDb: equalizer.gainsDb.slice() };
+    if (!this.context || !this.preampNode) return;
+
+    const now = this.context.currentTime;
+    this.preampNode.gain.setTargetAtTime(
+      dbToGain(this.equalizer.preampDb),
+      now,
+      gainSmoothingSeconds,
+    );
+    this.bandNodes.forEach((band, index) => {
+      band.gain.setTargetAtTime(this.equalizer.gainsDb[index] ?? 0, now, gainSmoothingSeconds);
+    });
+  }
+
   getLimiterReduction(): number {
     return this.limiterNode?.reduction ?? 0;
   }
@@ -88,6 +138,8 @@ export class PlaybackAudioEngine {
     this.media.removeEventListener("play", this.resumeOnPlay);
     void this.context?.close().catch(() => undefined);
     this.context = null;
+    this.preampNode = null;
+    this.bandNodes = [];
     this.boostNode = null;
     this.limiterNode = null;
   }

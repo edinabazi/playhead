@@ -221,6 +221,19 @@ export type LibrarySettings = {
   rescanOnLaunch: boolean;
 };
 
+export type EqualizerPresetId = "flat" | "quiet" | "bass" | "vocal" | "custom";
+
+export type QuietListeningStrength = "light" | "medium" | "strong";
+
+export type EqualizerSettings = {
+  enabled: boolean;
+  preset: EqualizerPresetId;
+  strength: QuietListeningStrength;
+  preampDb: number;
+  gainsDb: number[];
+  customGainsDb: number[];
+};
+
 export type PlaybackSettings = {
   seekStepSeconds: number;
   volumeStepPercent: number;
@@ -229,6 +242,7 @@ export type PlaybackSettings = {
   restoreLastSession: boolean;
   skipUnavailableTracks: boolean;
   volumeBoostEnabled: boolean;
+  equalizer: EqualizerSettings;
 };
 
 export type AppearanceSettings = {
@@ -444,6 +458,17 @@ export const defaultLibrarySettings = (): LibrarySettings => ({
   rescanOnLaunch: false,
 });
 
+export const equalizerBandCount = 10;
+
+export const defaultEqualizerSettings = (): EqualizerSettings => ({
+  enabled: false,
+  preset: "flat",
+  strength: "medium",
+  preampDb: 0,
+  gainsDb: Array.from({ length: equalizerBandCount }, () => 0),
+  customGainsDb: Array.from({ length: equalizerBandCount }, () => 0),
+});
+
 export const defaultPlaybackSettings = (): PlaybackSettings => ({
   seekStepSeconds: 5,
   volumeStepPercent: 5,
@@ -452,6 +477,7 @@ export const defaultPlaybackSettings = (): PlaybackSettings => ({
   restoreLastSession: true,
   skipUnavailableTracks: true,
   volumeBoostEnabled: false,
+  equalizer: defaultEqualizerSettings(),
 });
 
 export const defaultAppearanceSettings = (): AppearanceSettings => ({

@@ -11,6 +11,7 @@ import {
   type LastfmTrackPayload,
   type LibraryFolder,
   type LibrarySettings,
+  type EqualizerSettings,
   type LibraryMode,
   type LibraryPlaylist,
   type LibraryState,
@@ -70,10 +71,12 @@ import {
   decodeAudioBytes,
   decodeAudioTrack,
   shouldAnalyzeTrackBpm,
+  volumeNormalizationBoostedMaxGainDb,
   waveformAnalysisMaxPeaks,
   waveformAnalysisPeakRate,
 } from "@/features/audio/audio-analysis";
 import { PlaybackAudioEngine } from "@/features/audio/audio-engine";
+import { getActiveEqualizerGains, normalizeEqualizerSettings } from "@/features/audio/equalizer";
 import { boostedMaxVolume, PlaybackVolumeController } from "@/features/audio/playback-volume";
 import { useLimiterActivity } from "@/features/audio/use-limiter-activity";
 import {
@@ -2162,6 +2165,12 @@ export function App() {
     isPlaying && volumeBoostEnabled,
   );
 
+  const equalizer = useMemo(
+    () => normalizeEqualizerSettings(library.settings.playback.equalizer),
+    [library.settings.playback.equalizer],
+  );
+  const equalizerSaveTimeoutRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!isWaveformEngineReady) return;
     if (volumeBoostEnabled) audioEngineRef.current?.activate();
@@ -2169,6 +2178,40 @@ export function App() {
     volumeRef.current = baseVolume;
     setVolume(baseVolume);
   }, [isWaveformEngineReady, maxVolume, volumeBoostEnabled]);
+
+  useEffect(() => {
+    if (!isWaveformEngineReady) return;
+    const engine = audioEngineRef.current;
+    if (equalizer.enabled) engine?.activate();
+    engine?.setEqualizer(getActiveEqualizerGains(equalizer));
+  }, [equalizer, isWaveformEngineReady]);
+
+  const previewEqualizer = useCallback((nextEqualizer: EqualizerSettings) => {
+    const engine = audioEngineRef.current;
+    if (nextEqualizer.enabled) engine?.activate();
+    engine?.setEqualizer(getActiveEqualizerGains(nextEqualizer));
+  }, []);
+
+  const changeEqualizer = useCallback((nextEqualizer: EqualizerSettings) => {
+    setLibrary((current) => {
+      const nextState = {
+        ...current,
+        settings: {
+          ...current.settings,
+          playback: { ...current.settings.playback, equalizer: nextEqualizer },
+        },
+      };
+      libraryRef.current = nextState;
+      return nextState;
+    });
+    if (equalizerSaveTimeoutRef.current !== null) {
+      window.clearTimeout(equalizerSaveTimeoutRef.current);
+    }
+    equalizerSaveTimeoutRef.current = window.setTimeout(() => {
+      equalizerSaveTimeoutRef.current = null;
+      void window.playhead.saveLibraryState(libraryRef.current);
+    }, 400);
+  }, []);
 
   const changeVolumeBy = useCallback(
     (offset: number) => {
@@ -2187,22 +2230,27 @@ export function App() {
       return () => abortController.abort();
     }
 
+    const maxGainDb = volumeBoostEnabled ? volumeNormalizationBoostedMaxGainDb : undefined;
     controller.setNormalizationGain(1);
     void (async () => {
-      const cachedGain = await getCachedTrackNormalizationGain(activeTrack);
+      const cachedGain = await getCachedTrackNormalizationGain(activeTrack, maxGainDb);
       if (abortController.signal.aborted) return;
       if (cachedGain !== null) {
         controller.setNormalizationGain(cachedGain, 160);
         return;
       }
 
-      const gain = await analyzeTrackNormalizationGain(activeTrack, abortController.signal);
+      const gain = await analyzeTrackNormalizationGain(
+        activeTrack,
+        abortController.signal,
+        maxGainDb,
+      );
       if (abortController.signal.aborted) return;
       controller.setNormalizationGain(gain, 240);
     })();
 
     return () => abortController.abort();
-  }, [activeTrack, isLoadingTrack, library.settings.playback.normalizeVolume]);
+  }, [activeTrack, isLoadingTrack, library.settings.playback.normalizeVolume, volumeBoostEnabled]);
 
   const selectTrackInList = useCallback(
     (track: LibraryTrack, event?: React.MouseEvent<HTMLDivElement>) => {
@@ -3113,6 +3161,9 @@ export function App() {
                   maxVolume={maxVolume}
                   volumeBoostEnabled={volumeBoostEnabled}
                   limiterActive={limiterActive}
+                  equalizer={equalizer}
+                  onEqualizerPreview={previewEqualizer}
+                  onEqualizerChange={changeEqualizer}
                   onVolumeChange={setPlayerVolume}
                   onVolumeBoostChange={(enabled) =>
                     void updatePlaybackSettings({

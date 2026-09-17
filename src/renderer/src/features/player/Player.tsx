@@ -1,4 +1,4 @@
-import type { LibraryTag, LibraryTrack } from "../../../../shared/library";
+import type { EqualizerSettings, LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { SliderComfortable } from "@/components/ui/slider";
@@ -51,6 +51,7 @@ export function Player({
   maxVolume,
   volumeBoostEnabled,
   limiterActive,
+  equalizer,
   onTogglePlayback,
   onPreviousTrack,
   onNextTrack,
@@ -60,6 +61,8 @@ export function Player({
   onTrackInfoContextMenu,
   onVolumeChange,
   onVolumeBoostChange,
+  onEqualizerPreview,
+  onEqualizerChange,
 }: {
   activeTrack: LibraryTrack | null;
   activeTags: LibraryTag[];
@@ -78,6 +81,7 @@ export function Player({
   maxVolume: number;
   volumeBoostEnabled: boolean;
   limiterActive: boolean;
+  equalizer: EqualizerSettings;
   onTogglePlayback: () => void;
   onPreviousTrack: () => void;
   onNextTrack: () => void;
@@ -87,6 +91,8 @@ export function Player({
   onTrackInfoContextMenu: (point: MenuAnchorPoint) => void;
   onVolumeChange: (volume: number) => void;
   onVolumeBoostChange: (enabled: boolean) => void;
+  onEqualizerPreview: (equalizer: EqualizerSettings) => void;
+  onEqualizerChange: (equalizer: EqualizerSettings) => void;
 }) {
   const windowDragHandlers = useWindowDrag<HTMLDivElement>();
   const icons = useIcons();
@@ -275,14 +281,17 @@ export function Player({
           <div ref={soundControlsRef} className="relative shrink-0">
             <IconButton
               title="Sound"
-              active={soundPanelOpen}
+              active={soundPanelOpen || equalizer.enabled}
               onClick={() => setSoundPanelOpen((value) => !value)}
             >
               <SoundIcon size={19} strokeWidth={1.8} />
             </IconButton>
             <SoundPanel
               open={soundPanelOpen}
+              equalizer={equalizer}
               volumeBoostEnabled={volumeBoostEnabled}
+              onEqualizerPreview={onEqualizerPreview}
+              onEqualizerChange={onEqualizerChange}
               onVolumeBoostChange={onVolumeBoostChange}
             />
           </div>

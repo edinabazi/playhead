@@ -115,29 +115,40 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-export async function getCachedTrackNormalizationGain(track: LibraryTrack): Promise<number | null> {
+function getCachedGain(cached: CachedNormalization | undefined, maxGainDb?: number): number | null {
+  if (!cached) return null;
+  if (maxGainDb !== undefined && Number.isFinite(cached.loudnessDb)) {
+    return getLoudnessNormalizationGain(cached.loudnessDb, undefined, maxGainDb);
+  }
+  return Number.isFinite(cached.gain) ? cached.gain : null;
+}
+
+export async function getCachedTrackNormalizationGain(
+  track: LibraryTrack,
+  maxGainDb?: number,
+): Promise<number | null> {
   const cacheKey = await resolveTrackCacheKey(track);
   if (!cacheKey) return null;
-  const cached = getNormalizationCache()[cacheKey];
-  return cached && Number.isFinite(cached.gain) ? cached.gain : null;
+  return getCachedGain(getNormalizationCache()[cacheKey], maxGainDb);
 }
 
 export async function analyzeTrackNormalizationGain(
   track: LibraryTrack,
   signal?: AbortSignal,
+  maxGainDb?: number,
 ): Promise<number> {
   const cacheKey = await resolveTrackCacheKey(track);
   if (signal?.aborted) return 1;
   if (cacheKey) {
-    const cached = getNormalizationCache()[cacheKey];
-    if (cached && Number.isFinite(cached.gain)) return cached.gain;
+    const cachedGain = getCachedGain(getNormalizationCache()[cacheKey], maxGainDb);
+    if (cachedGain !== null) return cachedGain;
   }
 
   return enqueueAnalysis(async () => {
     if (signal?.aborted) return 1;
     if (cacheKey) {
-      const cached = getNormalizationCache()[cacheKey];
-      if (cached && Number.isFinite(cached.gain)) return cached.gain;
+      const cachedGain = getCachedGain(getNormalizationCache()[cacheKey], maxGainDb);
+      if (cachedGain !== null) return cachedGain;
     }
 
     try {
@@ -149,7 +160,9 @@ export async function analyzeTrackNormalizationGain(
 
       const gain = getLoudnessNormalizationGain(loudnessDb);
       if (cacheKey) saveNormalizationCacheEntry(cacheKey, loudnessDb, gain);
-      return gain;
+      return maxGainDb === undefined
+        ? gain
+        : getLoudnessNormalizationGain(loudnessDb, undefined, maxGainDb);
     } catch (error) {
       if (!isAbortError(error)) {
         console.warn("Failed to analyze track loudness", { path: track.path, error });

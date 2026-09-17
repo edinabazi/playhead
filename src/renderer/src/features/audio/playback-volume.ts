@@ -52,7 +52,7 @@ export class PlaybackVolumeController {
   }
 
   setNormalizationGain(gain: number, rampDurationMs = 0): void {
-    const nextGain = Number.isFinite(gain) ? clamp(gain, 0.25, 1) : 1;
+    const nextGain = Number.isFinite(gain) ? clamp(gain, 0.25, boostedMaxVolume) : 1;
     this.cancelRamp();
 
     if (rampDurationMs <= 0 || nextGain === this.normalizationGain) {
@@ -79,8 +79,9 @@ export class PlaybackVolumeController {
   }
 
   private applyVolume(): void {
-    this.writeVolume(clamp(Math.min(this.baseVolume, 1) * this.normalizationGain, 0, 1));
-    this.writeBoostGain(Math.max(this.baseVolume, 1));
+    const volume = clamp(this.baseVolume * this.normalizationGain, 0, this.maxVolume);
+    this.writeVolume(Math.min(volume, 1));
+    this.writeBoostGain(Math.max(volume, 1));
   }
 
   private cancelRamp(): void {

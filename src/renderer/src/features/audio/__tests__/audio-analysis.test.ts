@@ -79,6 +79,12 @@ describe("volume normalization", () => {
     expect(getLoudnessNormalizationGain(4)).toBeCloseTo(10 ** (-12 / 20), 5);
   });
 
+  it("lifts quiet tracks up to the boosted limit when allowed", () => {
+    expect(getLoudnessNormalizationGain(-21, undefined, 6)).toBeCloseTo(10 ** (3 / 20), 5);
+    expect(getLoudnessNormalizationGain(-40, undefined, 6)).toBeCloseTo(10 ** (6 / 20), 5);
+    expect(getLoudnessNormalizationGain(-8, undefined, 6)).toBeCloseTo(10 ** (-10 / 20), 5);
+  });
+
   it("ignores silence", () => {
     expect(estimateIntegratedLoudnessDb(createBuffer([0, 0, 0], 3))).toBeNull();
   });
