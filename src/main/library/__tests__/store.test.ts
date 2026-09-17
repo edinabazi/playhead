@@ -96,6 +96,7 @@ describe("library store settings", () => {
       shuffleEnabled: false,
       repeatMode: "off",
       sidebarGroupOrder: ["library", "playlists", "tags", "soundcloud"],
+      levelMeters: { open: false },
       queue: {
         items: [],
         shuffledItems: [],

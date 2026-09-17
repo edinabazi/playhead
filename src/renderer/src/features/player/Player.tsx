@@ -52,6 +52,7 @@ export function Player({
   volumeBoostEnabled,
   limiterActive,
   equalizer,
+  levelsOpen,
   onTogglePlayback,
   onPreviousTrack,
   onNextTrack,
@@ -63,6 +64,8 @@ export function Player({
   onVolumeBoostChange,
   onEqualizerPreview,
   onEqualizerChange,
+  onToggleLevels,
+  levels,
 }: {
   activeTrack: LibraryTrack | null;
   activeTags: LibraryTag[];
@@ -82,6 +85,7 @@ export function Player({
   volumeBoostEnabled: boolean;
   limiterActive: boolean;
   equalizer: EqualizerSettings;
+  levelsOpen: boolean;
   onTogglePlayback: () => void;
   onPreviousTrack: () => void;
   onNextTrack: () => void;
@@ -93,6 +97,8 @@ export function Player({
   onVolumeBoostChange: (enabled: boolean) => void;
   onEqualizerPreview: (equalizer: EqualizerSettings) => void;
   onEqualizerChange: (equalizer: EqualizerSettings) => void;
+  onToggleLevels: () => void;
+  levels?: React.ReactNode;
 }) {
   const windowDragHandlers = useWindowDrag<HTMLDivElement>();
   const icons = useIcons();
@@ -101,6 +107,7 @@ export function Player({
   const RepeatIcon = icons.repeat;
   const VolumeIcon = icons["volume-2"];
   const SoundIcon = icons["sliders-horizontal"];
+  const LevelsIcon = icons.gauge;
   const soundControlsRef = useRef<HTMLDivElement>(null);
   const [soundPanelOpen, setSoundPanelOpen] = useState(false);
 
@@ -133,6 +140,7 @@ export function Player({
 
   return (
     <section className="@container relative flex shrink-0 flex-col gap-[10px] px-4 pt-4">
+      {levels}
       <div className="app-drag flex h-16 items-center gap-3" {...windowDragHandlers}>
         <div
           className="no-drag flex min-w-0 flex-1 items-center gap-3"
@@ -228,6 +236,9 @@ export function Player({
         </div>
 
         <div className="no-drag flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
+          <IconButton title="Levels" active={levelsOpen} onClick={onToggleLevels}>
+            <LevelsIcon size={19} strokeWidth={1.8} />
+          </IconButton>
           <FavoriteHeartButton
             active={isFavorite}
             disabled={!activeTrack}

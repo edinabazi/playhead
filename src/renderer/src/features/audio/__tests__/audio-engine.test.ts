@@ -30,6 +30,24 @@ function createContext() {
   const bands: ReturnType<typeof createBand>[] = [];
   const boost = node("boost", { gain: param() });
   const makeup = node("makeup", { gain: param() });
+  const meterInput = node("meterInput", {
+    gain: param(),
+    channelCount: 0,
+    channelCountMode: "",
+    channelInterpretation: "",
+  });
+  const splitter = node("splitter");
+  const analysers = [0.5, 0.25].map((amplitude, channel) =>
+    node(`analyser${channel}`, {
+      fftSize: 0,
+      smoothingTimeConstant: 1,
+      getFloatTimeDomainData: vi.fn((buffer: Float32Array) => {
+        buffer.forEach((_, index) => {
+          buffer[index] = index % 2 === 0 ? amplitude : -amplitude;
+        });
+      }),
+    }),
+  );
   const limiter = node("limiter", {
     threshold: param(),
     knee: param(),
@@ -47,19 +65,22 @@ function createContext() {
       .fn()
       .mockReturnValueOnce(preamp)
       .mockReturnValueOnce(boost)
-      .mockReturnValueOnce(makeup),
+      .mockReturnValueOnce(makeup)
+      .mockReturnValueOnce(meterInput),
     createBiquadFilter: vi.fn(() => {
       const band = createBand();
       bands.push(band);
       return band;
     }),
     createDynamicsCompressor: vi.fn(() => limiter),
+    createChannelSplitter: vi.fn(() => splitter),
+    createAnalyser: vi.fn().mockReturnValueOnce(analysers[0]).mockReturnValueOnce(analysers[1]),
     resume: vi.fn(async () => {
       context.state = "running";
     }),
     close: vi.fn(async () => undefined),
   };
-  return { context, preamp, bands, boost, makeup, limiter, connections };
+  return { context, preamp, bands, boost, makeup, limiter, meterInput, analysers, connections };
 }
 
 describe("PlaybackAudioEngine", () => {
@@ -97,6 +118,10 @@ describe("PlaybackAudioEngine", () => {
       "boost->limiter",
       "limiter->makeup",
       "makeup->destination",
+      "makeup->meterInput",
+      "meterInput->splitter",
+      "splitter->analyser0",
+      "splitter->analyser1",
     ]);
     expect(preamp.gain.value).toBeCloseTo(0.5012, 4);
     expect(bands.map((band) => [band.type, band.frequency.value, band.Q.value])[5]).toEqual([
@@ -111,6 +136,23 @@ describe("PlaybackAudioEngine", () => {
     expect(limiter.threshold.value).toBe(-1);
     expect(limiter.ratio.value).toBe(20);
     expect(engine.getLimiterReduction()).toBe(-3);
+  });
+
+  it("reads peak levels for both channels after activation", () => {
+    const media = createMedia();
+    const { context, meterInput } = createContext();
+    const engine = new PlaybackAudioEngine(
+      media as unknown as HTMLMediaElement,
+      () => context as unknown as AudioContext,
+    );
+    const levels = { peak: [0, 0] as [number, number] };
+
+    expect(engine.readLevels(levels)).toBe(false);
+    engine.activate();
+    expect(meterInput.channelCount).toBe(2);
+    expect(meterInput.channelInterpretation).toBe("speakers");
+    expect(engine.readLevels(levels)).toBe(true);
+    expect(levels.peak).toEqual([0.5, 0.25]);
   });
 
   it("keeps the native output when the graph can't be built", () => {

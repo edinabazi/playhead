@@ -266,6 +266,10 @@ export type SoundCloudSettings = {
 
 export type SidebarGroupId = "library" | "playlists" | "tags" | "soundcloud";
 
+export type LevelMeterSettings = {
+  open: boolean;
+};
+
 export type SessionSettings = {
   activeTrackId: string | null;
   selectedTrackIds: string[];
@@ -273,6 +277,7 @@ export type SessionSettings = {
   shuffleEnabled: boolean;
   repeatMode: "off" | "all" | "one";
   sidebarGroupOrder: SidebarGroupId[];
+  levelMeters: LevelMeterSettings;
   queue: PlaybackQueue;
 };
 
@@ -506,6 +511,7 @@ export const defaultSessionSettings = (): SessionSettings => ({
   shuffleEnabled: false,
   repeatMode: "off",
   sidebarGroupOrder: ["library", "playlists", "tags", "soundcloud"],
+  levelMeters: { open: false },
   queue: {
     items: [],
     shuffledItems: [],

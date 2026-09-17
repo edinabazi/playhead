@@ -7,6 +7,10 @@ export type EqualizerGains = {
   gainsDb: number[];
 };
 
+export type ChannelLevels = {
+  peak: [number, number];
+};
+
 const limiterSettings = {
   threshold: -1,
   knee: 0,
@@ -15,6 +19,7 @@ const limiterSettings = {
   release: 0.1,
 };
 const gainSmoothingSeconds = 0.015;
+const levelAnalyserSize = 2048;
 // DynamicsCompressorNode adds automatic makeup gain derived from its curve (Web Audio spec:
 // full-range gain ^ 0.6), which would make 100% louder once the graph is active. Undo it.
 const limiterMakeupCompensation = Math.pow(
@@ -35,6 +40,8 @@ export class PlaybackAudioEngine {
   private bandNodes: BiquadFilterNode[] = [];
   private boostNode: GainNode | null = null;
   private limiterNode: DynamicsCompressorNode | null = null;
+  private levelAnalysers: AnalyserNode[] = [];
+  private levelBuffer = new Float32Array(levelAnalyserSize);
   private activationFailed = false;
   private boostGain = 1;
   private equalizer: EqualizerGains = {
@@ -76,6 +83,14 @@ export class PlaybackAudioEngine {
       const boost = graphContext.createGain();
       const limiter = graphContext.createDynamicsCompressor();
       const makeupCompensation = graphContext.createGain();
+      const meterInput = graphContext.createGain();
+      const splitter = graphContext.createChannelSplitter(2);
+      const levelAnalysers = [0, 1].map(() => {
+        const analyser = graphContext.createAnalyser();
+        analyser.fftSize = levelAnalyserSize;
+        analyser.smoothingTimeConstant = 0;
+        return analyser;
+      });
       preamp.gain.value = dbToGain(this.equalizer.preampDb);
       boost.gain.value = this.boostGain;
       makeupCompensation.gain.value = limiterMakeupCompensation;
@@ -84,6 +99,10 @@ export class PlaybackAudioEngine {
       limiter.ratio.value = limiterSettings.ratio;
       limiter.attack.value = limiterSettings.attack;
       limiter.release.value = limiterSettings.release;
+      // Splitters are always discrete, so up-mix mono to both meter channels before splitting.
+      meterInput.channelCount = 2;
+      meterInput.channelCountMode = "explicit";
+      meterInput.channelInterpretation = "speakers";
 
       // Capture the media element last: from here on its audio only plays through this graph.
       const source = graphContext.createMediaElementSource(this.media);
@@ -96,11 +115,15 @@ export class PlaybackAudioEngine {
       boost.connect(limiter);
       limiter.connect(makeupCompensation);
       makeupCompensation.connect(graphContext.destination);
+      makeupCompensation.connect(meterInput);
+      meterInput.connect(splitter);
+      levelAnalysers.forEach((analyser, channel) => splitter.connect(analyser, channel));
 
       this.preampNode = preamp;
       this.bandNodes = bands;
       this.boostNode = boost;
       this.limiterNode = limiter;
+      this.levelAnalysers = levelAnalysers;
       this.context = graphContext;
     } catch (error) {
       console.warn("Could not build the audio graph. Playback stays on the native output.", error);
@@ -137,6 +160,21 @@ export class PlaybackAudioEngine {
     });
   }
 
+  readLevels(target: ChannelLevels): boolean {
+    if (this.levelAnalysers.length < 2) return false;
+
+    this.levelAnalysers.forEach((analyser, channel) => {
+      analyser.getFloatTimeDomainData(this.levelBuffer);
+      let peak = 0;
+      for (const sample of this.levelBuffer) {
+        const magnitude = Math.abs(sample);
+        if (magnitude > peak) peak = magnitude;
+      }
+      target.peak[channel] = peak;
+    });
+    return true;
+  }
+
   getLimiterReduction(): number {
     return this.limiterNode?.reduction ?? 0;
   }
@@ -154,5 +192,6 @@ export class PlaybackAudioEngine {
     this.bandNodes = [];
     this.boostNode = null;
     this.limiterNode = null;
+    this.levelAnalysers = [];
   }
 }
