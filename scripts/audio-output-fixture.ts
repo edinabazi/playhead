@@ -97,11 +97,76 @@ import { getEqualizerResponseDb } from "../src/renderer/src/features/audio/equal
   for (let i = 0; i < bypassInput.length; i++) {
     if (Math.abs(bypassInput[i] - bypassOutput[i]) > 1e-6) throw Error("Bypass altered audio");
   }
+  const meteredContext = new OfflineAudioContext(2, 48000, 48000);
+  const meteredBuffer = meteredContext.createBuffer(2, 48000, 48000);
+  const meteredLeft = meteredBuffer.getChannelData(0);
+  const meteredRight = meteredBuffer.getChannelData(1);
+  for (let i = 0; i < 48000; i++) {
+    meteredLeft[i] = 0.99 * Math.sin((2 * Math.PI * 1000 * i) / 48000);
+    meteredRight[i] = 0.25 * Math.sin((2 * Math.PI * 1000 * i) / 48000);
+  }
+  const meteredSource = meteredContext.createBufferSource();
+  meteredSource.buffer = meteredBuffer;
+  Object.assign(meteredContext, { createMediaElementSource: () => meteredSource });
+  const meteredEngine = new PlaybackAudioEngine(
+    new Audio(),
+    () => meteredContext as unknown as AudioContext,
+  );
+  meteredEngine.setProcessingEnabled(false);
+  await meteredEngine.setMeteringEnabled(true);
+  const measured = { peak: [0, 0] as [number, number] };
+  if (!meteredEngine.readLevels(measured)) throw Error("Actual meter worklet failed to load");
+  meteredSource.start();
+  const meteredOutput = await meteredContext.startRendering();
+  for (let channel = 0; channel < 2; channel++) {
+    const actual = meteredOutput.getChannelData(channel);
+    const expected = meteredBuffer.getChannelData(channel);
+    for (let i = 0; i < actual.length; i++) {
+      if (Math.abs(actual[i] - expected[i]) > 1e-6)
+        throw Error("Opening meter changed output samples");
+    }
+  }
+  meteredEngine.readLevels(measured);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  meteredEngine.readLevels(measured);
+  if (Math.abs(measured.peak[0] - 0.99) > 0.001 || Math.abs(measured.peak[1] - 0.25) > 0.001) {
+    throw Error(`Incorrect actual worklet peaks ${measured.peak}`);
+  }
+  await meteredEngine.setMeteringEnabled(false);
+  const processedContext = new OfflineAudioContext(1, 48000, 48000);
+  const processedBuffer = processedContext.createBuffer(1, 48000, 48000);
+  processedBuffer.copyToChannel(meteredLeft, 0);
+  const processedSource = processedContext.createBufferSource();
+  processedSource.buffer = processedBuffer;
+  Object.assign(processedContext, { createMediaElementSource: () => processedSource });
+  const processedEngine = new PlaybackAudioEngine(
+    new Audio(),
+    () => processedContext as unknown as AudioContext,
+  );
+  processedEngine.setEqualizer({ preampDb: 12, gainsDb: Array(10).fill(12) });
+  processedEngine.setBoostGain(2);
+  await processedEngine.setMeteringEnabled(true);
+  processedSource.start();
+  const processedOutput = (await processedContext.startRendering()).getChannelData(0);
+  let processedPeak = 0;
+  for (const sample of processedOutput) processedPeak = Math.max(processedPeak, Math.abs(sample));
+  const processedLevels = { peak: [0, 0] as [number, number] };
+  processedEngine.readLevels(processedLevels);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  processedEngine.readLevels(processedLevels);
+  for (const peak of processedLevels.peak) {
+    if (Math.abs(peak - processedPeak) > 1e-6)
+      throw Error("Meter did not measure the post-ceiling mono output");
+  }
+  await processedEngine.setMeteringEnabled(false);
   console.log(
     "DSP_RESULTS " +
       JSON.stringify({
         ceilingCases: results.length,
         bypass: "unchanged",
+        meterOutput: "unchanged",
+        meterPeaks: measured.peak,
+        postCeilingMonoPeaks: processedLevels.peak,
         maxPeak: Math.max(...results.map((r) => r.peak)),
         response,
       }),

@@ -1,9 +1,11 @@
 import { motion, type Variants } from "framer-motion";
+import { Tooltip } from "@/components/ui/tooltip";
 
 type IconButtonMotion = "default" | "previous" | "next" | "shuffle" | "repeat";
 
 export function IconButton({
   title,
+  tooltip,
   ariaExpanded,
   ariaControls,
   disabled,
@@ -13,6 +15,7 @@ export function IconButton({
   children,
 }: {
   title: string;
+  tooltip?: string;
   ariaExpanded?: boolean;
   ariaControls?: string;
   disabled?: boolean;
@@ -23,7 +26,7 @@ export function IconButton({
 }) {
   const iconVariants = getIconVariants(motionType);
 
-  return (
+  const button = (
     <motion.button
       className={`no-drag relative grid size-9 place-items-center overflow-hidden rounded-full outline-none transition-colors duration-150 ${
         active ? "text-primary" : "text-muted-foreground hover:text-foreground"
@@ -32,6 +35,9 @@ export function IconButton({
       aria-expanded={ariaExpanded}
       aria-controls={ariaControls}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key === " " || event.key === "Enter") event.stopPropagation();
+      }}
       disabled={disabled}
       initial="rest"
       animate={active ? "active" : "rest"}
@@ -53,6 +59,14 @@ export function IconButton({
         {children}
       </motion.span>
     </motion.button>
+  );
+
+  return tooltip ? (
+    <Tooltip content={tooltip} side="left">
+      {button}
+    </Tooltip>
+  ) : (
+    button
   );
 }
 

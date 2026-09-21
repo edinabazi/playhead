@@ -13,6 +13,7 @@ try {
   await build({
     configFile: false,
     root,
+    base: "./",
     logLevel: "error",
     build: {
       outDir: temporary,

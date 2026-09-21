@@ -77,8 +77,10 @@ import {
   waveformAnalysisMaxPeaks,
   waveformAnalysisPeakRate,
 } from "@/features/audio/audio-analysis";
-import { PlaybackAudioEngine } from "@/features/audio/audio-engine";
+import { PlaybackAudioEngine, type ChannelLevels } from "@/features/audio/audio-engine";
 import { getActiveEqualizerGains, normalizeEqualizerSettings } from "@/features/audio/equalizer";
+import { LevelsPanel } from "@/features/levels/LevelsPanel";
+import { normalizeLevelMeterSettings } from "@/features/levels/meter-model";
 import { boostedMaxVolume, PlaybackVolumeController } from "@/features/audio/playback-volume";
 import { useLimiterActivity } from "@/features/audio/use-limiter-activity";
 import {
@@ -2182,6 +2184,34 @@ export function App() {
     () => normalizeEqualizerSettings(library.settings.playback.equalizer),
     [library.settings.playback.equalizer],
   );
+  const levelMeters = useMemo(
+    () => normalizeLevelMeterSettings(library.settings.session.levelMeters),
+    [library.settings.session.levelMeters],
+  );
+
+  const setMeteringEnabled = useCallback((enabled: boolean) => {
+    const engine = audioEngineRef.current;
+    if (!engine) return;
+    const playback = libraryRef.current.settings.playback;
+    engine.setProcessingEnabled(
+      normalizeEqualizerSettings(playback.equalizer).enabled || playback.volumeBoostEnabled,
+    );
+    void engine.setMeteringEnabled(enabled);
+    setIsAudioGraphActive(engine.isActive());
+  }, []);
+
+  const readLevels = useCallback(
+    (target: ChannelLevels) => audioEngineRef.current?.readLevels(target) ?? false,
+    [],
+  );
+
+  const toggleLevelMeters = useCallback(() => {
+    const session = libraryRef.current.settings.session;
+    persistSessionSettings({
+      ...session,
+      levelMeters: { open: !normalizeLevelMeterSettings(session.levelMeters).open },
+    });
+  }, [persistSessionSettings]);
 
   useEffect(() => {
     if (!isWaveformEngineReady) return;
@@ -3195,6 +3225,17 @@ export function App() {
                   volumeBoostEnabled={volumeBoostEnabled}
                   limiterActive={limiterActive}
                   equalizer={equalizer}
+                  levelsOpen={levelMeters.open}
+                  onToggleLevels={toggleLevelMeters}
+                  levels={
+                    <LevelsPanel
+                      open={levelMeters.open}
+                      isPlaying={isPlaying}
+                      reduceMotion={reduceMotion}
+                      readLevels={readLevels}
+                      onMeteringChange={setMeteringEnabled}
+                    />
+                  }
                   onEqualizerPreview={previewEqualizer}
                   onEqualizerChange={changeEqualizer}
                   onVolumeChange={setPlayerVolume}

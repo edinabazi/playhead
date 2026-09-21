@@ -1,6 +1,10 @@
+import meterWorkletUrl from "./level-meter.worklet.js?url&no-inline";
 import { equalizerBandFrequencies, equalizerBandQ } from "./equalizer";
 
 type AudioContextFactory = () => AudioContext;
+type MeterNodeFactory = (context: AudioContext) => Promise<AudioWorkletNode>;
+
+export type ChannelLevels = { peak: [number, number] };
 
 export type EqualizerGains = {
   preampDb: number;
@@ -33,6 +37,13 @@ export class PlaybackAudioEngine {
   private context: AudioContext | null = null;
   private sourceNode: MediaElementAudioSourceNode | null = null;
   private processingEnabled = true;
+  private outputNode: AudioNode | null = null;
+  private meterNode: AudioWorkletNode | null = null;
+  private meterTap: AudioNode | null = null;
+  private meterEnabled = false;
+  private meterGeneration = 0;
+  private meterModule: Promise<void> | null = null;
+  private meterPeaks: [number, number] = [0, 0];
   private preampNode: GainNode | null = null;
   private bandNodes: BiquadFilterNode[] = [];
   private boostNode: GainNode | null = null;
@@ -50,6 +61,18 @@ export class PlaybackAudioEngine {
   constructor(
     private readonly media: HTMLMediaElement,
     private readonly createContext: AudioContextFactory = () => new AudioContext(),
+    private readonly createMeterNode: MeterNodeFactory = async (context) => {
+      this.meterModule ??= context.audioWorklet.addModule(meterWorkletUrl);
+      await this.meterModule;
+      return new AudioWorkletNode(context, "playhead-level-meter", {
+        channelCount: 2,
+        channelCountMode: "explicit",
+        channelInterpretation: "speakers",
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+      });
+    },
   ) {
     media.crossOrigin = "anonymous";
     media.addEventListener("play", this.resumeOnPlay);
@@ -110,6 +133,7 @@ export class PlaybackAudioEngine {
       source = graphContext.createMediaElementSource(this.media);
       source.connect(this.processingEnabled ? preamp : graphContext.destination);
       this.sourceNode = source;
+      this.outputNode = ceiling;
 
       this.preampNode = preamp;
       this.bandNodes = bands;
@@ -149,8 +173,10 @@ export class PlaybackAudioEngine {
     if (!this.sourceNode || !this.context || !this.preampNode) return;
     // A captured media element cannot return to native playback, but it can bypass
     // every effect, including the compressor/ceiling, when both switches are off.
+    this.disconnectMeterTap();
     this.sourceNode.disconnect();
     this.sourceNode.connect(enabled ? this.preampNode : this.context.destination);
+    this.connectMeterTap();
   }
 
   setBoostGain(gain: number): void {
@@ -178,6 +204,76 @@ export class PlaybackAudioEngine {
     });
   }
 
+  async setMeteringEnabled(enabled: boolean): Promise<void> {
+    if (enabled === this.meterEnabled) return;
+    this.meterEnabled = enabled;
+    const generation = ++this.meterGeneration;
+    this.releaseMeter();
+    if (!enabled) return;
+    this.activate();
+    const context = this.context;
+    if (!this.isActive() || !context) return;
+    try {
+      const node = await this.createMeterNode(context);
+      if (!this.meterEnabled || generation !== this.meterGeneration || context !== this.context) {
+        node.port.postMessage("stop");
+        node.port.close();
+        node.disconnect();
+        return;
+      }
+      this.meterNode = node;
+      node.port.onmessage = (event: MessageEvent<number[]>) => {
+        if (this.meterNode !== node) return;
+        for (let channel = 0; channel < 2; channel++) {
+          const peak = event.data[channel];
+          if (Number.isFinite(peak))
+            this.meterPeaks[channel] = Math.max(this.meterPeaks[channel], peak);
+        }
+      };
+      // The meter's output is silence; connecting it keeps the analysis branch rendering.
+      node.connect(context.destination);
+      this.connectMeterTap();
+    } catch (error) {
+      if (generation !== this.meterGeneration) return;
+      this.releaseMeter();
+      this.meterEnabled = false;
+      console.warn("Level meter unavailable; playback is unchanged.", error);
+    }
+  }
+
+  readLevels(target: ChannelLevels): boolean {
+    if (!this.meterNode) return false;
+    target.peak[0] = this.meterPeaks[0];
+    target.peak[1] = this.meterPeaks[1];
+    this.meterPeaks = [0, 0];
+    this.meterNode.port.postMessage(null);
+    return true;
+  }
+
+  private connectMeterTap(): void {
+    const tap = this.processingEnabled ? this.outputNode : this.sourceNode;
+    if (!tap || !this.meterNode) return;
+    tap.connect(this.meterNode);
+    this.meterTap = tap;
+  }
+
+  private disconnectMeterTap(): void {
+    if (this.meterTap && this.meterNode) this.meterTap.disconnect(this.meterNode);
+    this.meterTap = null;
+  }
+
+  private releaseMeter(): void {
+    this.disconnectMeterTap();
+    if (this.meterNode) {
+      this.meterNode.port.onmessage = null;
+      this.meterNode.port.postMessage("stop");
+      this.meterNode.port.close();
+      this.meterNode.disconnect();
+      this.meterNode = null;
+    }
+    this.meterPeaks = [0, 0];
+  }
+
   getLimiterReduction(): number {
     return this.processingEnabled ? (this.limiterNode?.reduction ?? 0) : 0;
   }
@@ -188,10 +284,15 @@ export class PlaybackAudioEngine {
   }
 
   dispose(): void {
+    this.meterEnabled = false;
+    this.meterGeneration++;
+    this.releaseMeter();
     this.media.removeEventListener("play", this.resumeOnPlay);
     void this.context?.close().catch(() => undefined);
     this.context = null;
     this.sourceNode = null;
+    this.outputNode = null;
+    this.meterModule = null;
     this.preampNode = null;
     this.bandNodes = [];
     this.boostNode = null;

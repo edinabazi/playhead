@@ -63,7 +63,19 @@ function createContext() {
     }),
     close: vi.fn(async () => undefined),
   };
-  return { context, preamp, bands, boost, makeup, limiter, connections, source };
+  return { context, preamp, bands, boost, makeup, limiter, connections, source, ceiling };
+}
+
+function createMeter() {
+  return {
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    port: {
+      postMessage: vi.fn(),
+      close: vi.fn(),
+      onmessage: null as ((event: { data: number[] }) => void) | null,
+    },
+  };
 }
 
 describe("PlaybackAudioEngine", () => {
@@ -218,5 +230,96 @@ describe("PlaybackAudioEngine", () => {
     expect(context.close).toHaveBeenCalled();
     expect(media.removeEventListener).toHaveBeenCalledWith("play", expect.any(Function));
     expect(engine.isActive()).toBe(false);
+  });
+  it("does not build a meter for ordinary EQ use and attaches it only while requested", async () => {
+    const { context, source, ceiling } = createContext();
+    const meter = createMeter();
+    const factory = vi.fn(async () => meter as unknown as AudioWorkletNode);
+    const engine = new PlaybackAudioEngine(
+      createMedia() as unknown as HTMLMediaElement,
+      () => context as unknown as AudioContext,
+      factory,
+    );
+    engine.setProcessingEnabled(false);
+    engine.activate();
+    expect(factory).not.toHaveBeenCalled();
+    expect(source.connect).toHaveBeenLastCalledWith(context.destination);
+    await engine.setMeteringEnabled(true);
+    expect(source.connect).toHaveBeenLastCalledWith(meter);
+    engine.setProcessingEnabled(true);
+    expect(source.disconnect).toHaveBeenCalledWith(meter);
+    expect(ceiling.connect).toHaveBeenLastCalledWith(meter);
+    await engine.setMeteringEnabled(false);
+    expect(ceiling.disconnect).toHaveBeenCalledWith(meter);
+    expect(meter.port.postMessage).toHaveBeenLastCalledWith("stop");
+    expect(meter.port.close).toHaveBeenCalledOnce();
+    expect(context.close).not.toHaveBeenCalled();
+    expect(engine.readLevels({ peak: [0, 0] })).toBe(false);
+  });
+
+  it("preserves accumulated channel peaks between UI reads", async () => {
+    const { context } = createContext();
+    const meter = createMeter();
+    const engine = new PlaybackAudioEngine(
+      createMedia() as unknown as HTMLMediaElement,
+      () => context as unknown as AudioContext,
+      async () => meter as unknown as AudioWorkletNode,
+    );
+    await engine.setMeteringEnabled(true);
+    meter.port.onmessage?.({ data: [0.75, 0.1] });
+    meter.port.onmessage?.({ data: [0.1, 0.5] });
+    const target = { peak: [0, 0] as [number, number] };
+    expect(engine.readLevels(target)).toBe(true);
+    expect(target.peak).toEqual([0.75, 0.5]);
+    engine.readLevels(target);
+    expect(target.peak).toEqual([0, 0]);
+    engine.dispose();
+    expect(meter.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it.each(["close", "dispose"])(
+    "does not attach a late-loading worklet after %s",
+    async (action) => {
+      const { context } = createContext();
+      const meter = createMeter();
+      let resolve!: (node: AudioWorkletNode) => void;
+      const engine = new PlaybackAudioEngine(
+        createMedia() as unknown as HTMLMediaElement,
+        () => context as unknown as AudioContext,
+        () =>
+          new Promise((done) => {
+            resolve = done;
+          }),
+      );
+      const pending = engine.setMeteringEnabled(true);
+      if (action === "dispose") engine.dispose();
+      else await engine.setMeteringEnabled(false);
+      resolve(meter as unknown as AudioWorkletNode);
+      await pending;
+      expect(meter.connect).not.toHaveBeenCalled();
+      expect(meter.port.postMessage).toHaveBeenCalledWith("stop");
+      expect(meter.port.close).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("leaves playback intact when the meter module fails to load", async () => {
+    const { context, source } = createContext();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const engine = new PlaybackAudioEngine(
+        createMedia() as unknown as HTMLMediaElement,
+        () => context as unknown as AudioContext,
+        async () => {
+          throw Error("module unavailable");
+        },
+      );
+      engine.setProcessingEnabled(false);
+      await engine.setMeteringEnabled(true);
+      expect(source.connect).toHaveBeenLastCalledWith(context.destination);
+      expect(context.close).not.toHaveBeenCalled();
+      expect(engine.readLevels({ peak: [0, 0] })).toBe(false);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

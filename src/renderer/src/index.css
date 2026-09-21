@@ -109,7 +109,8 @@ canvas {
   -webkit-app-region: no-drag;
 }
 
-.app-drag {
+.app-drag,
+canvas.app-drag {
   -webkit-app-region: drag;
 }
 

@@ -32,6 +32,7 @@ import {
   FolderOpen,
   FolderPlus,
   FolderSearch,
+  Gauge,
   ListFilter,
   Minimize2,
   Monitor,
@@ -136,6 +137,7 @@ export type IconName =
   | "shuffle"
   | "skip-forward"
   | "sliders-horizontal"
+  | "gauge"
   | "volume-2"
   | "audio-waveform"
   | "repeat";
@@ -206,6 +208,7 @@ const lucideMap: Record<IconName, IconComponent> = {
   shuffle: Shuffle,
   "skip-forward": SkipForward,
   "sliders-horizontal": SlidersHorizontal,
+  gauge: Gauge,
   "volume-2": Volume2,
   "audio-waveform": AudioWaveform,
   repeat: Repeat,
