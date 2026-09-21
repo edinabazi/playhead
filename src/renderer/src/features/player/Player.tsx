@@ -10,6 +10,7 @@ import { TrackArtwork } from "@/features/tracks/TrackArtwork";
 import { IconButton } from "./IconButton";
 import { PlayPauseMorphIcon, SkipBackFilledIcon, SkipForwardFilledIcon } from "./media-icons";
 import type { RepeatMode } from "./types";
+import { usePlaybackSeconds, type PlaybackClock } from "./playback-clock";
 import { WaveformEmptyState } from "./WaveformEmptyState";
 
 function formatAudioFormat(track: LibraryTrack): string {
@@ -31,6 +32,10 @@ function formatBpm(bpm?: number): string | null {
   return `${Math.round(bpm)} BPM`;
 }
 
+function ElapsedTime({ clock }: { clock: PlaybackClock }) {
+  return <span>{formatTime(usePlaybackSeconds(clock))}</span>;
+}
+
 export function Player({
   activeTrack,
   activeTags,
@@ -40,7 +45,7 @@ export function Player({
   shouldAnimateWaveform,
   reduceMotion,
   isFavorite,
-  currentTime,
+  playbackClock,
   duration,
   waveformRef,
   shuffleEnabled,
@@ -63,7 +68,7 @@ export function Player({
   shouldAnimateWaveform: boolean;
   reduceMotion: boolean;
   isFavorite: boolean;
-  currentTime: number;
+  playbackClock: PlaybackClock;
   duration: number;
   waveformRef: React.Ref<HTMLDivElement>;
   shuffleEnabled: boolean;
@@ -219,7 +224,10 @@ export function Player({
                 },
               }}
             >
-              <div ref={waveformRef} className="no-drag h-full w-full rounded-[2px]" />
+              <div
+                ref={waveformRef}
+                className="no-drag h-full w-full rounded-[2px] [contain:layout_paint]"
+              />
             </motion.div>
           </motion.div>
 
@@ -234,7 +242,7 @@ export function Player({
           </AnimatePresence>
         </div>
         <div className="flex items-center justify-between pt-1 text-[10px] font-medium leading-none tabular-nums text-muted-foreground">
-          <span>{formatTime(currentTime)}</span>
+          <ElapsedTime clock={playbackClock} />
           <span>{formatTime(duration)}</span>
         </div>
       </div>

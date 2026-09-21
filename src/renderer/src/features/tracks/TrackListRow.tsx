@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { formatTime } from "@/lib/format";
+import { NowPlayingBars } from "@/features/player/NowPlayingBars";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
 import type { LibraryPlaylist, LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { FavoriteHeartButton } from "./FavoriteHeartButton";
@@ -213,17 +214,9 @@ function TrackNumberOrIndicator({
 
 function ActiveTrackIndicator() {
   return (
-    <span className="flex size-4 items-center justify-center gap-[1.5px] text-primary">
-      {[5, 10, 7, 13].map((height, index) => (
-        <span
-          key={index}
-          className="w-[2px] animate-[active-waveform_2.18s_ease-in-out_infinite] rounded-full bg-current"
-          style={{
-            height,
-            animationDelay: `${[0.22, 0, 0.33, 0.11][index]}s`,
-          }}
-        />
-      ))}
-    </span>
+    <NowPlayingBars
+      heights={[5, 10, 7, 13]}
+      className="flex size-4 items-center justify-center gap-[1.5px] text-primary"
+    />
   );
 }

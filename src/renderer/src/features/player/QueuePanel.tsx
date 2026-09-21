@@ -18,6 +18,7 @@ import {
   setDraggedQueueItemIds,
 } from "@/features/tracks/track-drag";
 import type { QueueDropEdge } from "./queue-model";
+import { NowPlayingBars } from "./NowPlayingBars";
 
 const queueRowHeight = 56;
 
@@ -373,17 +374,9 @@ function DropIndicator() {
 
 function NowPlayingIndicator() {
   return (
-    <span className="flex size-5 items-center justify-center gap-[1.5px]">
-      {[6, 12, 8, 15].map((height, index) => (
-        <span
-          key={index}
-          className="w-[2px] animate-[active-waveform_2.18s_ease-in-out_infinite] rounded-full bg-current"
-          style={{
-            height,
-            animationDelay: `${[0.22, 0, 0.33, 0.11][index]}s`,
-          }}
-        />
-      ))}
-    </span>
+    <NowPlayingBars
+      heights={[6, 12, 8, 15]}
+      className="flex size-5 items-center justify-center gap-[1.5px]"
+    />
   );
 }
