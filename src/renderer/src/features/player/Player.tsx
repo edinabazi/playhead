@@ -1,6 +1,8 @@
-import type { LibraryTag, LibraryTrack } from "../../../../shared/library";
+import type { EqualizerSettings, LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useId, useRef, useState } from "react";
 import { SliderComfortable } from "@/components/ui/slider";
+import { SoundPanel } from "@/features/audio/SoundPanel";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
@@ -51,6 +53,10 @@ export function Player({
   shuffleEnabled,
   repeatMode,
   volume,
+  maxVolume,
+  volumeBoostEnabled,
+  limiterActive,
+  equalizer,
   onTogglePlayback,
   onPreviousTrack,
   onNextTrack,
@@ -59,6 +65,9 @@ export function Player({
   onToggleFavorite,
   onTrackInfoContextMenu,
   onVolumeChange,
+  onVolumeBoostChange,
+  onEqualizerPreview,
+  onEqualizerChange,
 }: {
   activeTrack: LibraryTrack | null;
   activeTags: LibraryTag[];
@@ -74,6 +83,10 @@ export function Player({
   shuffleEnabled: boolean;
   repeatMode: RepeatMode;
   volume: number;
+  maxVolume: number;
+  volumeBoostEnabled: boolean;
+  limiterActive: boolean;
+  equalizer: EqualizerSettings;
   onTogglePlayback: () => void;
   onPreviousTrack: () => void;
   onNextTrack: () => void;
@@ -82,6 +95,9 @@ export function Player({
   onToggleFavorite: () => void;
   onTrackInfoContextMenu: (point: MenuAnchorPoint) => void;
   onVolumeChange: (volume: number) => void;
+  onVolumeBoostChange: (enabled: boolean) => void;
+  onEqualizerPreview: (equalizer: EqualizerSettings) => void;
+  onEqualizerChange: (equalizer: EqualizerSettings) => void;
 }) {
   const windowDragHandlers = useWindowDrag<HTMLDivElement>();
   const icons = useIcons();
@@ -89,6 +105,31 @@ export function Player({
   const ShuffleIcon = icons.shuffle;
   const RepeatIcon = icons.repeat;
   const VolumeIcon = icons["volume-2"];
+  const SoundIcon = icons["sliders-horizontal"];
+  const soundPanelId = useId();
+  const soundControlsRef = useRef<HTMLDivElement>(null);
+  const [soundPanelOpen, setSoundPanelOpen] = useState(false);
+
+  useEffect(() => {
+    if (!soundPanelOpen) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!soundControlsRef.current?.contains(event.target as Node)) setSoundPanelOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSoundPanelOpen(false);
+        soundControlsRef.current?.querySelector("button")?.focus();
+      }
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [soundPanelOpen]);
   const trackInfo = activeTrack
     ? [
         formatAudioFormat(activeTrack),
@@ -100,7 +141,7 @@ export function Player({
   const hiddenTagCount = Math.max(0, activeTags.length - visibleTags.length);
 
   return (
-    <section className="relative flex shrink-0 flex-col gap-[10px] px-4 pt-4">
+    <section className="@container relative flex shrink-0 flex-col gap-[10px] px-4 pt-4">
       <div className="app-drag flex h-16 items-center gap-3" {...windowDragHandlers}>
         <div
           className="no-drag flex min-w-0 flex-1 items-center gap-3"
@@ -248,14 +289,40 @@ export function Player({
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center py-1">
-        <div className="min-w-0 pr-4">
+        <div className="flex min-w-0 items-center gap-2 pr-4">
+          <div
+            ref={soundControlsRef}
+            className="relative shrink-0"
+            onKeyDown={(event) => {
+              if (event.key === " " || event.key === "Enter") event.stopPropagation();
+            }}
+          >
+            <IconButton
+              title="Sound"
+              ariaExpanded={soundPanelOpen}
+              ariaControls={soundPanelId}
+              active={soundPanelOpen || equalizer.enabled}
+              onClick={() => setSoundPanelOpen((value) => !value)}
+            >
+              <SoundIcon size={19} strokeWidth={1.8} />
+            </IconButton>
+            <SoundPanel
+              open={soundPanelOpen}
+              id={soundPanelId}
+              equalizer={equalizer}
+              volumeBoostEnabled={volumeBoostEnabled}
+              onEqualizerPreview={onEqualizerPreview}
+              onEqualizerChange={onEqualizerChange}
+              onVolumeBoostChange={onVolumeBoostChange}
+            />
+          </div>
           {trackInfo.length > 0 && (
-            <div className="truncate text-[12px] font-medium leading-normal text-muted-foreground">
+            <div className="min-w-0 truncate text-[12px] font-medium leading-normal text-muted-foreground @max-lg:hidden">
               {trackInfo.join(" · ")}
             </div>
           )}
         </div>
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3 @max-lg:gap-1">
           <IconButton
             title={shuffleEnabled ? "Shuffle on" : "Shuffle"}
             active={shuffleEnabled}
@@ -342,18 +409,44 @@ export function Player({
             </span>
           </IconButton>
         </div>
-        <div className="no-drag ml-auto w-[152px]">
-          <SliderComfortable
-            value={Math.round(volume * 100)}
-            min={0}
-            max={100}
-            step={1}
-            variant="scrubber"
-            label={<VolumeIcon size={15} strokeWidth={1.8} />}
-            formatValue={(value) => `${Math.round(value)}%`}
-            className="h-7 border-white/10 bg-white/[0.045]"
-            onChange={(value) => onVolumeChange(value / 100)}
-          />
+        <div className="no-drag ml-auto flex items-center gap-2">
+          {(volumeBoostEnabled || limiterActive) && (
+            <span
+              className={`rounded-[4px] border px-1 py-0.5 font-mono text-[10px] font-semibold leading-none transition-colors duration-100 @max-lg:hidden ${
+                limiterActive
+                  ? "border-red-400/60 bg-red-500/15 text-red-300"
+                  : "border-white/10 text-muted-foreground/60"
+              }`}
+              title="Limiter"
+            >
+              LIM
+            </span>
+          )}
+          <div className="relative w-[152px] @max-lg:w-[120px]">
+            {maxVolume > 1 && (
+              <span
+                className="pointer-events-none absolute -top-1.5 h-1 w-px bg-white/30"
+                style={{ left: `${100 / maxVolume}%` }}
+              />
+            )}
+            <SliderComfortable
+              value={Math.round(volume * 100)}
+              min={0}
+              max={Math.round(maxVolume * 100)}
+              step={1}
+              variant="scrubber"
+              label={
+                <VolumeIcon
+                  size={15}
+                  strokeWidth={1.8}
+                  className={limiterActive ? "@max-lg:text-red-300" : undefined}
+                />
+              }
+              formatValue={(value) => `${Math.round(value)}%`}
+              className="h-7 border-white/10 bg-white/[0.045]"
+              onChange={(value) => onVolumeChange(value / 100)}
+            />
+          </div>
         </div>
       </div>
     </section>

@@ -10,26 +10,39 @@ const browserScheduler: VolumeAnimationScheduler = {
   cancelFrame: (id) => cancelAnimationFrame(id),
 };
 
+export const boostedMaxVolume = 2;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
 export class PlaybackVolumeController {
   private baseVolume = 1;
+  private maxVolume = 1;
   private normalizationGain = 1;
   private animationFrame: number | null = null;
 
   constructor(
     private readonly writeVolume: (volume: number) => void,
     private readonly scheduler = browserScheduler,
+    private readonly writeBoostGain: (gain: number) => void = () => {},
   ) {}
 
   getBaseVolume(): number {
     return this.baseVolume;
   }
 
+  getMaxVolume(): number {
+    return this.maxVolume;
+  }
+
+  setMaxVolume(maxVolume: number): number {
+    this.maxVolume = Number.isFinite(maxVolume) ? clamp(maxVolume, 1, boostedMaxVolume) : 1;
+    return this.setBaseVolume(this.baseVolume);
+  }
+
   setBaseVolume(volume: number): number {
-    this.baseVolume = Number.isFinite(volume) ? clamp(volume, 0, 1) : 1;
+    this.baseVolume = Number.isFinite(volume) ? clamp(volume, 0, this.maxVolume) : 1;
     this.applyVolume();
     return this.baseVolume;
   }
@@ -39,7 +52,7 @@ export class PlaybackVolumeController {
   }
 
   setNormalizationGain(gain: number, rampDurationMs = 0): void {
-    const nextGain = Number.isFinite(gain) ? clamp(gain, 0.25, 1) : 1;
+    const nextGain = Number.isFinite(gain) ? clamp(gain, 0.25, boostedMaxVolume) : 1;
     this.cancelRamp();
 
     if (rampDurationMs <= 0 || nextGain === this.normalizationGain) {
@@ -66,7 +79,9 @@ export class PlaybackVolumeController {
   }
 
   private applyVolume(): void {
-    this.writeVolume(clamp(this.baseVolume * this.normalizationGain, 0, 1));
+    const volume = clamp(this.baseVolume * this.normalizationGain, 0, this.maxVolume);
+    this.writeVolume(Math.min(volume, 1));
+    this.writeBoostGain(Math.max(volume, 1));
   }
 
   private cancelRamp(): void {

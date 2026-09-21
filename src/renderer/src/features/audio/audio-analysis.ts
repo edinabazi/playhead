@@ -3,6 +3,7 @@ import type { LibraryTrack } from "../../../../shared/library";
 export const waveformAnalysisPeakRate = 20;
 export const waveformAnalysisMaxPeaks = 24_000;
 export const volumeNormalizationTargetLoudnessDb = -18;
+export const volumeNormalizationBoostedMaxGainDb = 6;
 
 const loudnessAbsoluteGateDb = -70;
 const loudnessOffsetDb = -0.691;
@@ -186,11 +187,12 @@ export function estimateIntegratedLoudnessDb(buffer: AudioBuffer): number | null
 export function getLoudnessNormalizationGain(
   loudnessDb: number,
   targetLoudnessDb = volumeNormalizationTargetLoudnessDb,
+  maxGainDb = volumeNormalizationMaxGainDb,
 ): number {
   if (!Number.isFinite(loudnessDb) || !Number.isFinite(targetLoudnessDb)) return 1;
 
   const gainDb = Math.min(
-    volumeNormalizationMaxGainDb,
+    maxGainDb,
     Math.max(volumeNormalizationMinGainDb, targetLoudnessDb - loudnessDb),
   );
   return 10 ** (gainDb / 20);

@@ -51,6 +51,7 @@ import {
   Shield,
   Shuffle,
   SkipForward,
+  SlidersHorizontal,
   SquareLibrary,
   Star,
   Sun,
@@ -134,6 +135,7 @@ export type IconName =
   | "music"
   | "shuffle"
   | "skip-forward"
+  | "sliders-horizontal"
   | "volume-2"
   | "audio-waveform"
   | "repeat";
@@ -203,6 +205,7 @@ const lucideMap: Record<IconName, IconComponent> = {
   music: Music,
   shuffle: Shuffle,
   "skip-forward": SkipForward,
+  "sliders-horizontal": SlidersHorizontal,
   "volume-2": Volume2,
   "audio-waveform": AudioWaveform,
   repeat: Repeat,

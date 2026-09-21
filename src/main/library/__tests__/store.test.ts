@@ -81,6 +81,16 @@ describe("library store settings", () => {
       rememberTrackPositions: true,
       restoreLastSession: true,
       skipUnavailableTracks: true,
+      volumeBoostEnabled: false,
+      equalizer: {
+        enabled: false,
+        preset: "flat",
+        strength: "medium",
+        preampDb: 0,
+        gainsDb: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        customPreampDb: 0,
+        customGainsDb: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      },
     });
   });
 
