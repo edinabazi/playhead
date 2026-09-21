@@ -220,7 +220,7 @@ export type LibrarySettings = {
   enabledAudioExtensions: string[];
   watchFolders: boolean;
   rescanOnLaunch: boolean;
-  includeSubfolderTracks: boolean;
+  showSubfolders: boolean;
 };
 
 export type PlaybackSettings = {
@@ -444,7 +444,7 @@ export const defaultLibrarySettings = (): LibrarySettings => ({
   ],
   watchFolders: true,
   rescanOnLaunch: false,
-  includeSubfolderTracks: true,
+  showSubfolders: false,
 });
 
 export const defaultPlaybackSettings = (): PlaybackSettings => ({

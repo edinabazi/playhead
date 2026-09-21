@@ -167,7 +167,7 @@ export function SettingsDialog({
     savedSettings.mode !== draftLibrarySettings.mode ||
     savedSettings.watchFolders !== draftLibrarySettings.watchFolders ||
     savedSettings.rescanOnLaunch !== draftLibrarySettings.rescanOnLaunch ||
-    savedSettings.includeSubfolderTracks !== draftLibrarySettings.includeSubfolderTracks ||
+    savedSettings.showSubfolders !== draftLibrarySettings.showSubfolders ||
     savedSettings.enabledAudioExtensions.join("|") !==
       draftLibrarySettings.enabledAudioExtensions.join("|");
   const playbackSettingsChanged =

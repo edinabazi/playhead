@@ -87,7 +87,7 @@ import {
   getTrackArtistId,
   mergeScannedFolder,
 } from "@/features/library/library-model";
-import { getParentPath, getPathName } from "@/features/library/folder-tree";
+import { getPathName } from "@/features/library/folder-tree";
 import { useLibraryActions } from "@/features/library/use-library-actions";
 import { EmptyLibraryState } from "@/features/library/EmptyLibraryState";
 import { LibraryDetailHeader } from "@/features/library/LibraryDetailHeader";
@@ -525,7 +525,6 @@ export function App() {
     return getSourceTracksFromParts({
       favoriteTrackIds: library.favoriteTrackIds,
       folders: library.folders,
-      includeSubfolderTracks: library.settings.library.includeSubfolderTracks,
       playlists: library.playlists,
       selectedSource: library.selectedSource,
       tags: library.tags,
@@ -536,7 +535,6 @@ export function App() {
     library.folders,
     library.playlists,
     library.selectedSource,
-    library.settings.library.includeSubfolderTracks,
     library.tags,
     library.tracks,
     soundcloudTracksByCollection,
@@ -1324,9 +1322,7 @@ export function App() {
         selectedSource:
           library.settings.library.mode === "library"
             ? { type: "library-tracks" }
-            : library.settings.library.includeSubfolderTracks
-              ? { type: "folder", id: track.folderId }
-              : { type: "folder", id: track.folderId, path: getParentPath(track.path) },
+            : { type: "folder", id: track.folderId },
       });
       await selectTrack(track, true);
     },
@@ -1480,8 +1476,7 @@ export function App() {
       const nextLibrarySettings = { ...settings, watchFolders: true };
       const onlyDisplaySettingsChanged =
         (nextLibrarySettings.mode !== library.settings.library.mode ||
-          nextLibrarySettings.includeSubfolderTracks !==
-            library.settings.library.includeSubfolderTracks) &&
+          nextLibrarySettings.showSubfolders !== library.settings.library.showSubfolders) &&
         nextLibrarySettings.watchFolders === library.settings.library.watchFolders &&
         nextLibrarySettings.rescanOnLaunch === library.settings.library.rescanOnLaunch &&
         nextLibrarySettings.enabledAudioExtensions.join("|") ===
@@ -1495,7 +1490,9 @@ export function App() {
               : library.folders[0]
                 ? { type: "folder" as const, id: library.folders[0].id }
                 : null
-            : library.selectedSource,
+            : !nextLibrarySettings.showSubfolders && library.selectedSource?.type === "folder"
+              ? { type: "folder" as const, id: library.selectedSource.id }
+              : library.selectedSource,
         settings: { ...library.settings, library: nextLibrarySettings },
       };
       if (onlyDisplaySettingsChanged) {
@@ -2963,7 +2960,7 @@ export function App() {
               <Sidebar
                 folders={library.folders}
                 tracks={library.tracks}
-                includeSubfolderTracks={library.settings.library.includeSubfolderTracks}
+                showSubfolders={library.settings.library.showSubfolders}
                 expandedFolderPaths={library.settings.session.expandedFolderPaths}
                 libraryMode={library.settings.library.mode}
                 artistCount={libraryArtists.length}

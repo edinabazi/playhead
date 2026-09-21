@@ -39,9 +39,7 @@ export type LibraryCollections = {
 export type LibrarySourceParts = Pick<
   LibraryState,
   "favoriteTrackIds" | "folders" | "playlists" | "selectedSource" | "tags" | "tracks"
-> & {
-  includeSubfolderTracks?: boolean;
-};
+>;
 
 export function getLibraryKey(value: string): string {
   return value.trim().toLowerCase() || "unknown";
@@ -92,10 +90,7 @@ export function mergeScannedFolder(state: LibraryState, scanned: ScannedFolder):
     new Set([...(existingFolder?.trackIds || []), ...scanned.folder.trackIds]),
   ).filter((trackId) => Boolean(tracks[trackId]));
   const folder = { ...scanned.folder, trackIds: folderTrackIds };
-  const folders = [
-    ...state.folders.filter((folder) => folder.id !== scanned.folder.id),
-    folder,
-  ];
+  const folders = [...state.folders.filter((folder) => folder.id !== scanned.folder.id), folder];
 
   return {
     ...state,
@@ -205,16 +200,13 @@ export function getSourceTracksFromParts(state: LibrarySourceParts): LibraryTrac
   if (source.type === "folder") {
     const folder = state.folders.find((item) => item.id === source.id);
     if (!folder) return [];
-    const includeSubfolders = state.includeSubfolderTracks ?? true;
     const folderTracks = folder.trackIds
       .map((trackId) => state.tracks[trackId])
       .filter((track): track is LibraryTrack => Boolean(track));
-    if (!source.path && includeSubfolders) return folderTracks;
+    if (!source.path) return folderTracks;
 
     const folderPath = source.path || folder.path;
-    return folderTracks.filter((track) =>
-      isPathInFolder(track.path, folderPath, includeSubfolders),
-    );
+    return folderTracks.filter((track) => isPathInFolder(track.path, folderPath, true));
   }
 
   return (state.playlists.find((playlist) => playlist.id === source.id)?.trackIds || [])
@@ -223,10 +215,7 @@ export function getSourceTracksFromParts(state: LibrarySourceParts): LibraryTrac
 }
 
 export function getSourceTracks(state: LibraryState): LibraryTrack[] {
-  return getSourceTracksFromParts({
-    ...state,
-    includeSubfolderTracks: state.settings.library.includeSubfolderTracks,
-  });
+  return getSourceTracksFromParts(state);
 }
 
 export function createPlaylist(existing: LibraryPlaylist[], name?: string): LibraryPlaylist {

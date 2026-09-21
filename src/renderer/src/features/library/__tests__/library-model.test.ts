@@ -102,14 +102,6 @@ describe("library model", () => {
         },
       },
     };
-    const withoutSubfolderTracks = (source: LibraryState["selectedSource"]): LibraryState => ({
-      ...state,
-      selectedSource: source,
-      settings: {
-        ...state.settings,
-        library: { ...state.settings.library, includeSubfolderTracks: false },
-      },
-    });
     const trackIds = (next: LibraryState) => getSourceTracks(next).map((track) => track.id);
 
     expect(trackIds(state)).toEqual(["track-1", "track-2", "track-3"]);
@@ -119,12 +111,6 @@ describe("library model", () => {
         selectedSource: { type: "folder", id: "folder-1", path: "/music/house" },
       }),
     ).toEqual(["track-2", "track-3"]);
-    expect(trackIds(withoutSubfolderTracks({ type: "folder", id: "folder-1" }))).toEqual([
-      "track-1",
-    ]);
-    expect(
-      trackIds(withoutSubfolderTracks({ type: "folder", id: "folder-1", path: "/music/house" })),
-    ).toEqual(["track-2"]);
   });
 
   it("builds library artists and albums", () => {

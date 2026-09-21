@@ -65,6 +65,12 @@ async function loadLibraryState(): Promise<LibraryState> {
         settings: { ...state.settings, session: runtimeState.session },
       }
     : state;
+  if (
+    !withRuntime.settings.library.showSubfolders &&
+    withRuntime.selectedSource?.type === "folder"
+  ) {
+    withRuntime.selectedSource = { type: "folder", id: withRuntime.selectedSource.id };
+  }
   cachedLibraryState = applyTrackAnalysisJournal(withRuntime, analysisEntries);
   cachedLibraryFilePath = filePath;
   return cachedLibraryState;

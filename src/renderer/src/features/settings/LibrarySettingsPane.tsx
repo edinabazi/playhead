@@ -67,7 +67,7 @@ export function LibrarySettingsPane({
           onChange={onChange}
         />
         {settings.mode === "folder" && (
-          <SubfolderTracksCard settings={settings} onChange={onChange} />
+          <ShowSubfoldersCard settings={settings} onChange={onChange} />
         )}
         <WatchedFoldersCard
           folders={folders}
@@ -269,7 +269,7 @@ function DisplayModeCard({
   );
 }
 
-function SubfolderTracksCard({
+function ShowSubfoldersCard({
   settings,
   onChange,
 }: {
@@ -280,18 +280,15 @@ function SubfolderTracksCard({
     <div className="rounded-[22px] border border-white/10 bg-white/[0.035] p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h4 className="text-[14px] font-semibold leading-5 text-foreground">
-            Include subfolder tracks
-          </h4>
+          <h4 className="text-[14px] font-semibold leading-5 text-foreground">Show subfolders</h4>
           <p className="mt-1 max-w-[460px] text-[12px] font-medium leading-4 text-muted-foreground">
-            Show tracks from nested folders when you select a folder.
+            Show a collapsible subfolder tree under each watched folder.
           </p>
         </div>
         <Switch
-          checked={settings.includeSubfolderTracks}
-          onCheckedChange={(includeSubfolderTracks) =>
-            onChange({ ...settings, includeSubfolderTracks })
-          }
+          aria-label="Show subfolders"
+          checked={settings.showSubfolders}
+          onCheckedChange={(showSubfolders) => onChange({ ...settings, showSubfolders })}
         />
       </div>
     </div>
