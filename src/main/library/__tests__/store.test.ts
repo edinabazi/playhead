@@ -56,6 +56,23 @@ function namedState(name: string): LibraryState {
 }
 
 describe("library store settings", () => {
+  it("defaults to a flat sidebar and preserves an explicit subfolder preference", async () => {
+    expect((await readLibraryState()).settings.library.showSubfolders).toBe(false);
+    const state = namedState("Subfolders");
+    state.settings.library.showSubfolders = true;
+    await writeLibraryState(state);
+    resetLibraryStoreCache();
+    expect((await readLibraryState()).settings.library.showSubfolders).toBe(true);
+  });
+
+  it("restores the watched folder when a saved subfolder is hidden", async () => {
+    const state = namedState("Flat");
+    state.selectedSource = { type: "folder", id: "music", path: "/music/house" };
+    await writeLibraryState(state);
+    resetLibraryStoreCache();
+    expect((await readLibraryState()).selectedSource).toEqual({ type: "folder", id: "music" });
+  });
+
   it("provides playback defaults", () => {
     expect(defaultPlaybackSettings()).toEqual({
       seekStepSeconds: 5,
@@ -87,6 +104,7 @@ describe("library store settings", () => {
       shuffleEnabled: false,
       repeatMode: "off",
       sidebarGroupOrder: ["library", "playlists", "tags", "soundcloud"],
+      expandedFolderPaths: [],
       queue: {
         items: [],
         shuffledItems: [],
@@ -145,6 +163,7 @@ describe("library store settings", () => {
       enabledAudioExtensions: [".mp3"],
       watchFolders: false,
       rescanOnLaunch: true,
+      showSubfolders: false,
     });
     expect(settings.playback).toEqual(defaultPlaybackSettings());
   });

@@ -6,6 +6,7 @@ import {
   type LibraryTrack,
   type ScannedFolder,
 } from "../../../../shared/library";
+import { isPathInFolder } from "./folder-tree";
 
 const playlistName = "New Playlist";
 const tagName = "New Tag";
@@ -89,10 +90,7 @@ export function mergeScannedFolder(state: LibraryState, scanned: ScannedFolder):
     new Set([...(existingFolder?.trackIds || []), ...scanned.folder.trackIds]),
   ).filter((trackId) => Boolean(tracks[trackId]));
   const folder = { ...scanned.folder, trackIds: folderTrackIds };
-  const folders = [
-    ...state.folders.filter((folder) => folder.id !== scanned.folder.id),
-    folder,
-  ];
+  const folders = [...state.folders.filter((folder) => folder.id !== scanned.folder.id), folder];
 
   return {
     ...state,
@@ -199,12 +197,19 @@ export function getSourceTracksFromParts(state: LibrarySourceParts): LibraryTrac
     );
   }
 
-  const sourceIds =
-    source.type === "folder"
-      ? state.folders.find((folder) => folder.id === source.id)?.trackIds
-      : state.playlists.find((playlist) => playlist.id === source.id)?.trackIds;
+  if (source.type === "folder") {
+    const folder = state.folders.find((item) => item.id === source.id);
+    if (!folder) return [];
+    const folderTracks = folder.trackIds
+      .map((trackId) => state.tracks[trackId])
+      .filter((track): track is LibraryTrack => Boolean(track));
+    if (!source.path) return folderTracks;
 
-  return (sourceIds || [])
+    const folderPath = source.path || folder.path;
+    return folderTracks.filter((track) => isPathInFolder(track.path, folderPath, true));
+  }
+
+  return (state.playlists.find((playlist) => playlist.id === source.id)?.trackIds || [])
     .map((trackId) => state.tracks[trackId])
     .filter((track): track is LibraryTrack => Boolean(track));
 }

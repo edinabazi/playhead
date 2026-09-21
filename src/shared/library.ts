@@ -173,6 +173,7 @@ export type LibraryTag = {
 export type SelectedSource = {
   type: SourceType;
   id?: string;
+  path?: string;
 };
 
 export type PlaybackQueueSource = {
@@ -219,6 +220,7 @@ export type LibrarySettings = {
   enabledAudioExtensions: string[];
   watchFolders: boolean;
   rescanOnLaunch: boolean;
+  showSubfolders: boolean;
 };
 
 export type PlaybackSettings = {
@@ -258,6 +260,7 @@ export type SessionSettings = {
   shuffleEnabled: boolean;
   repeatMode: "off" | "all" | "one";
   sidebarGroupOrder: SidebarGroupId[];
+  expandedFolderPaths: string[];
   queue: PlaybackQueue;
 };
 
@@ -441,6 +444,7 @@ export const defaultLibrarySettings = (): LibrarySettings => ({
   ],
   watchFolders: true,
   rescanOnLaunch: false,
+  showSubfolders: false,
 });
 
 export const defaultPlaybackSettings = (): PlaybackSettings => ({
@@ -478,6 +482,7 @@ export const defaultSessionSettings = (): SessionSettings => ({
   shuffleEnabled: false,
   repeatMode: "off",
   sidebarGroupOrder: ["library", "playlists", "tags", "soundcloud"],
+  expandedFolderPaths: [],
   queue: {
     items: [],
     shuffledItems: [],

@@ -1,12 +1,12 @@
+import { getFolderTree, type FolderTreeNode } from "@/features/library/folder-tree";
 import { useIcons } from "@/lib/icon-context";
-import { panelContentVariants } from "@/lib/motion-variants";
-import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   AppUpdateState,
   LibraryFolder,
   LibraryMode,
   LibraryPlaylist,
+  LibraryState,
   PlaylistExportFormat,
   SidebarGroupId,
   LibraryTag,
@@ -14,6 +14,7 @@ import type {
   SoundCloudCollection,
 } from "../../../../shared/library";
 import { SidebarContextMenu, type SidebarContextMenuState } from "./SidebarContextMenu";
+import { SidebarDisclosure } from "./SidebarDisclosure";
 import { SidebarGroup } from "./SidebarGroup";
 import { SidebarEmpty, SidebarItem } from "./SidebarItem";
 import { SidebarShell } from "./SidebarShell";
@@ -76,6 +77,9 @@ function moveSidebarGroup(
 
 export function Sidebar({
   folders,
+  tracks,
+  showSubfolders,
+  expandedFolderPaths,
   libraryMode,
   artistCount,
   albumCount,
@@ -101,6 +105,7 @@ export function Sidebar({
   onSelectSoundCloudSource,
   onRefreshSoundCloud,
   onSidebarGroupOrderChange,
+  onExpandedFolderPathsChange,
   onDropTrackToPlaylist,
   onDropTrackToTag,
   onRemoveFolder,
@@ -113,6 +118,9 @@ export function Sidebar({
   onToggleQueue,
 }: {
   folders: LibraryFolder[];
+  tracks: LibraryState["tracks"];
+  showSubfolders: boolean;
+  expandedFolderPaths: string[];
   libraryMode: LibraryMode;
   artistCount: number;
   albumCount: number;
@@ -138,6 +146,7 @@ export function Sidebar({
   onSelectSoundCloudSource: (collectionId: string) => void;
   onRefreshSoundCloud: () => void;
   onSidebarGroupOrderChange: (order: SidebarGroupId[]) => void;
+  onExpandedFolderPathsChange: (paths: string[]) => void;
   onDropTrackToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
   onDropTrackToTag: (trackIds: string[], tag: LibraryTag) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
@@ -166,6 +175,74 @@ export function Sidebar({
     (collection) => collection.kind === "tracks",
   );
   const activeGroupIds = orderedGroupIds.filter((id) => id !== "soundcloud" || soundcloudEnabled);
+  const folderTrees = useMemo(
+    () =>
+      isLibraryMode || !showSubfolders
+        ? []
+        : folders.map((folder) => getFolderTree(folder, tracks)),
+    [folders, isLibraryMode, showSubfolders, tracks],
+  );
+  const hasSubfolders = showSubfolders && folderTrees.some((tree) => tree.children.length > 0);
+  const expandedFolderPathSet = useMemo(() => new Set(expandedFolderPaths), [expandedFolderPaths]);
+
+  const toggleFolderExpanded = (path: string) => {
+    onExpandedFolderPathsChange(
+      expandedFolderPathSet.has(path)
+        ? expandedFolderPaths.filter((expandedPath) => expandedPath !== path)
+        : [...expandedFolderPaths, path],
+    );
+  };
+
+  const renderFolderTreeNode = (
+    folder: LibraryFolder,
+    node: FolderTreeNode,
+    depth: number,
+  ): React.ReactNode => {
+    const isRoot = depth === 0;
+    const expanded = expandedFolderPathSet.has(node.path);
+    const nodeTrackCount = node.trackCount;
+    const item = (
+      <SidebarItem
+        key={isRoot ? folder.id : `${folder.id}:${node.path}`}
+        active={
+          selectedSource?.type === "folder" &&
+          selectedSource.id === folder.id &&
+          (selectedSource.path || folder.path) === node.path
+        }
+        icon={icons["folder-open"]}
+        label={node.name}
+        detail={`${nodeTrackCount}`}
+        depth={depth}
+        expanded={hasSubfolders ? expanded : undefined}
+        onToggleExpanded={
+          showSubfolders && node.children.length > 0
+            ? () => toggleFolderExpanded(node.path)
+            : undefined
+        }
+        onClick={() =>
+          onSelectSource(
+            isRoot
+              ? { type: "folder", id: folder.id }
+              : { type: "folder", id: folder.id, path: node.path },
+          )
+        }
+        onContextMenu={
+          isRoot ? (point) => setContextMenu({ type: "folder", item: folder, point }) : undefined
+        }
+      />
+    );
+
+    return (
+      <div key={`${folder.id}:${node.path}`} className="flex flex-col">
+        {item}
+        {showSubfolders && node.children.length > 0 && (
+          <SidebarDisclosure open={expanded}>
+            {() => node.children.map((child) => renderFolderTreeNode(folder, child, depth + 1))}
+          </SidebarDisclosure>
+        )}
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (draggedGroupId) return;
@@ -245,17 +322,19 @@ export function Sidebar({
             {isScanning ? "Scanning..." : "No folders added"}
           </SidebarEmpty>
         ) : (
-          folders.map((folder) => (
-            <SidebarItem
-              key={folder.id}
-              active={selectedSource?.type === "folder" && selectedSource.id === folder.id}
-              icon={icons["folder-open"]}
-              label={folder.name}
-              detail={`${folder.trackIds.length}`}
-              onClick={() => onSelectSource({ type: "folder", id: folder.id })}
-              onContextMenu={(point) => setContextMenu({ type: "folder", item: folder, point })}
-            />
-          ))
+          folders.map((folder, index) =>
+            renderFolderTreeNode(
+              folder,
+              folderTrees[index] ?? {
+                path: folder.path,
+                name: folder.name,
+                trackCount: folder.trackIds.length,
+                directTrackCount: 0,
+                children: [],
+              },
+              0,
+            ),
+          )
         )}
       </SidebarGroup>
     );
@@ -406,14 +485,9 @@ export function Sidebar({
       }
     >
       <div className="thin-scrollbar -mx-2 mt-[30px] min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2">
-        <motion.div
-          className="flex flex-col gap-[30px] overflow-visible no-drag"
-          variants={panelContentVariants}
-          initial="hidden"
-          animate="show"
-        >
+        <div className="flex flex-col gap-[30px] overflow-visible no-drag">
           {activeGroupIds.map((groupId) => groups[groupId])}
-        </motion.div>
+        </div>
       </div>
 
       <SidebarContextMenu

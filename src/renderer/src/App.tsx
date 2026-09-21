@@ -87,6 +87,7 @@ import {
   getTrackArtistId,
   mergeScannedFolder,
 } from "@/features/library/library-model";
+import { getPathName } from "@/features/library/folder-tree";
 import { useLibraryActions } from "@/features/library/use-library-actions";
 import { EmptyLibraryState } from "@/features/library/EmptyLibraryState";
 import { LibraryDetailHeader } from "@/features/library/LibraryDetailHeader";
@@ -157,6 +158,7 @@ function getQueueSourceTitle(library: LibraryState): string {
   if (source.type === "library-artists") return "Artists";
   if (source.type === "library-albums") return "Albums";
   if (source.type === "folder") {
+    if (source.path) return getPathName(source.path);
     return library.folders.find((folder) => folder.id === source.id)?.name || "Folder";
   }
   if (source.type === "playlist") {
@@ -171,7 +173,7 @@ function getQueueSourceTitle(library: LibraryState): string {
 
 function getSourceScrollKey(source: LibraryState["selectedSource"]): string {
   if (!source) return "none";
-  return `${source.type}:${source.id || ""}`;
+  return `${source.type}:${source.id || ""}${source.path ? `:${source.path}` : ""}`;
 }
 
 function mergeScannedLibraryState(
@@ -588,6 +590,7 @@ export function App() {
       return libraryAlbums.find((album) => album.id === source.id)?.title || "Album";
     }
     if (source.type === "folder") {
+      if (source.path) return getPathName(source.path);
       return library.folders.find((folder) => folder.id === source.id)?.name || "Folder";
     }
     if (source.type === "loved") return "Loved";
@@ -1471,8 +1474,9 @@ export function App() {
   const updateLibrarySettings = useCallback(
     async (settings: LibrarySettings) => {
       const nextLibrarySettings = { ...settings, watchFolders: true };
-      const onlyModeChanged =
-        nextLibrarySettings.mode !== library.settings.library.mode &&
+      const onlyDisplaySettingsChanged =
+        (nextLibrarySettings.mode !== library.settings.library.mode ||
+          nextLibrarySettings.showSubfolders !== library.settings.library.showSubfolders) &&
         nextLibrarySettings.watchFolders === library.settings.library.watchFolders &&
         nextLibrarySettings.rescanOnLaunch === library.settings.library.rescanOnLaunch &&
         nextLibrarySettings.enabledAudioExtensions.join("|") ===
@@ -1486,10 +1490,12 @@ export function App() {
               : library.folders[0]
                 ? { type: "folder" as const, id: library.folders[0].id }
                 : null
-            : library.selectedSource,
+            : !nextLibrarySettings.showSubfolders && library.selectedSource?.type === "folder"
+              ? { type: "folder" as const, id: library.selectedSource.id }
+              : library.selectedSource,
         settings: { ...library.settings, library: nextLibrarySettings },
       };
-      if (onlyModeChanged) {
+      if (onlyDisplaySettingsChanged) {
         await persistLibrary(nextState);
         return;
       }
@@ -2953,6 +2959,9 @@ export function App() {
             ) : (
               <Sidebar
                 folders={library.folders}
+                tracks={library.tracks}
+                showSubfolders={library.settings.library.showSubfolders}
+                expandedFolderPaths={library.settings.session.expandedFolderPaths}
                 libraryMode={library.settings.library.mode}
                 artistCount={libraryArtists.length}
                 albumCount={libraryAlbums.length}
@@ -2986,6 +2995,9 @@ export function App() {
                 onRefreshSoundCloud={() => void loadSoundCloudCollections()}
                 onSidebarGroupOrderChange={(sidebarGroupOrder) =>
                   persistSessionSettings({ ...library.settings.session, sidebarGroupOrder })
+                }
+                onExpandedFolderPathsChange={(expandedFolderPaths) =>
+                  persistSessionSettings({ ...library.settings.session, expandedFolderPaths })
                 }
                 onDropTrackToPlaylist={(trackIds, playlist) =>
                   void addTracksToPlaylist(trackIds, playlist)

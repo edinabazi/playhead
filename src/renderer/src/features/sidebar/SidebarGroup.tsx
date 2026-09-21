@@ -1,7 +1,6 @@
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
-import { panelSectionVariants } from "@/lib/motion-variants";
-import { motion } from "framer-motion";
+import { SidebarDisclosure } from "./SidebarDisclosure";
 import { useState } from "react";
 
 type SidebarIcon = React.ComponentType<{
@@ -46,15 +45,12 @@ export function SidebarGroup({
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <motion.section
-      layout="position"
-      variants={panelSectionVariants}
-      className={`no-drag flex flex-col gap-1 ${dragging ? "opacity-55" : ""}`}
+    <section
+      className={`no-drag flex flex-col ${dragging ? "opacity-55" : ""}`}
       onPointerEnter={() => setIsHovered(true)}
       onPointerLeave={() => setIsHovered(false)}
     >
-      <motion.div
-        layout="position"
+      <div
         draggable
         className="-mx-1 flex min-h-6 cursor-grab items-center justify-between px-1 active:cursor-grabbing"
         onDragStartCapture={(event) => {
@@ -71,6 +67,7 @@ export function SidebarGroup({
         <button
           className="no-drag flex items-center gap-1 text-[13px] font-semibold leading-[1.35] text-[var(--text-tertiary)]"
           onClick={onToggleCollapsed}
+          aria-expanded={!collapsed}
         >
           <span>{title}</span>
           <ChevronIcon
@@ -110,8 +107,8 @@ export function SidebarGroup({
             </button>
           </Tooltip>
         </div>
-      </motion.div>
-      {!collapsed && <div className="-mx-2 flex flex-col gap-1 px-2">{children}</div>}
-    </motion.section>
+      </div>
+      <SidebarDisclosure open={!collapsed}>{children}</SidebarDisclosure>
+    </section>
   );
 }
