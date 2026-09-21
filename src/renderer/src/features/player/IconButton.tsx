@@ -4,6 +4,8 @@ type IconButtonMotion = "default" | "previous" | "next" | "shuffle" | "repeat";
 
 export function IconButton({
   title,
+  ariaExpanded,
+  ariaControls,
   disabled,
   active,
   motionType = "default",
@@ -11,6 +13,8 @@ export function IconButton({
   children,
 }: {
   title: string;
+  ariaExpanded?: boolean;
+  ariaControls?: string;
   disabled?: boolean;
   active?: boolean;
   motionType?: IconButtonMotion;
@@ -25,7 +29,12 @@ export function IconButton({
         active ? "text-primary" : "text-muted-foreground hover:text-foreground"
       }`}
       title={title}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key === " " || event.key === "Enter") event.stopPropagation();
+      }}
       disabled={disabled}
       initial="rest"
       animate={active ? "active" : "rest"}

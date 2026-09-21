@@ -18,7 +18,7 @@ export function useLimiterActivity(getReduction: () => number, enabled: boolean)
       return;
     }
 
-    let lastActiveAt = 0;
+    let lastActiveAt = -Infinity;
     const interval = window.setInterval(() => {
       const now = performance.now();
       if (getReductionRef.current() <= activeReductionDb) lastActiveAt = now;

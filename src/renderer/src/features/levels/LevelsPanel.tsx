@@ -1,3 +1,4 @@
+import { scheduleMeterFrames } from "./meter-scheduler";
 import type { ChannelLevels } from "@/features/audio/audio-engine";
 import { useWindowDrag } from "@/hooks/use-window-drag";
 import { AnimatePresence, motion } from "framer-motion";
@@ -22,7 +23,6 @@ import {
 // recomposite more often, so the loop sleeps between frames instead of running every vsync.
 const frameIntervalMs = 50;
 const reducedMotionFrameIntervalMs = 100;
-const vsyncAllowanceMs = 16;
 const playerRowGapPx = 10;
 
 function isSameFrame(a: LedMeterFrame | null, b: LedMeterFrame): boolean {
@@ -40,11 +40,13 @@ export function LevelsPanel({
   isPlaying,
   reduceMotion,
   readLevels,
+  onMeteringChange,
 }: {
   open: boolean;
   isPlaying: boolean;
   reduceMotion: boolean;
   readLevels: (target: ChannelLevels) => boolean;
+  onMeteringChange: (enabled: boolean) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -65,6 +67,17 @@ export function LevelsPanel({
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, []);
+
+  useEffect(() => {
+    onMeteringChange(open && visible && isPlaying);
+    return () => onMeteringChange(false);
+  }, [open, visible, isPlaying, onMeteringChange]);
+
+  useEffect(() => {
+    if (!open || !visible) {
+      channelsRef.current = [createMeterChannelState(), createMeterChannelState()];
+    }
+  }, [open, visible]);
 
   useEffect(() => {
     if (!open) return;
@@ -94,8 +107,6 @@ export function LevelsPanel({
     canvas.height = Math.round(ledMeterHeight * ratio);
     const { segmentCount } = getLedMeterLayout(width);
     const intervalMs = reduceMotion ? reducedMotionFrameIntervalMs : frameIntervalMs;
-    let frame = 0;
-    let timeout = 0;
     let lastTime = performance.now();
     let lastFrame: LedMeterFrame | null = null;
 
@@ -129,21 +140,10 @@ export function LevelsPanel({
       }
 
       const atRest = !isPlaying && channels.every(isMeterChannelAtRest);
-      frame = 0;
-      if (atRest) return;
-      timeout = window.setTimeout(
-        () => {
-          frame = requestAnimationFrame(render);
-        },
-        Math.max(0, intervalMs - vsyncAllowanceMs),
-      );
+      return !atRest;
     };
 
-    frame = requestAnimationFrame(render);
-    return () => {
-      window.clearTimeout(timeout);
-      cancelAnimationFrame(frame);
-    };
+    return scheduleMeterFrames(render, intervalMs);
   }, [isPlaying, open, reduceMotion, visible, width]);
 
   // The meters sit at the top of the player and double as a handle for moving the window.

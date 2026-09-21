@@ -71,6 +71,7 @@ describe("library store settings", () => {
         strength: "medium",
         preampDb: 0,
         gainsDb: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        customPreampDb: 0,
         customGainsDb: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       },
     });

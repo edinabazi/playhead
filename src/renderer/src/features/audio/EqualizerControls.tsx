@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EqualizerSettings } from "../../../../shared/library";
 import { equalizerGainLimitDb, getEqualizerResponseDb } from "./equalizer";
 
@@ -111,6 +111,7 @@ export function EqualizerBandSlider({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+  const [pointerFocus, setPointerFocus] = useState(false);
   const latestGainRef = useRef(gainDb);
   const center = sliderTrackHeight / 2;
   const travel = center - sliderThumbHeight;
@@ -141,13 +142,17 @@ export function EqualizerBandSlider({
         role="slider"
         tabIndex={0}
         aria-label={ariaLabel}
+        aria-orientation="vertical"
         aria-valuemin={-equalizerGainLimitDb}
         aria-valuemax={equalizerGainLimitDb}
         aria-valuenow={gainDb}
         aria-valuetext={`${formatGain(gainDb)} dB`}
-        className="group relative w-[22px] cursor-ns-resize touch-none rounded-[6px] outline-none focus-visible:ring-1 focus-visible:ring-primary/70"
+        className={`group relative w-[22px] cursor-ns-resize touch-none rounded-[6px] outline-none ${pointerFocus ? "" : "focus-visible:ring-1 focus-visible:ring-primary/70"}`}
+        onBlur={() => setPointerFocus(false)}
         style={{ height: sliderTrackHeight }}
         onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          setPointerFocus(true);
           event.currentTarget.setPointerCapture(event.pointerId);
           draggingRef.current = true;
           preview(gainFromPointer(event.clientY));
@@ -168,6 +173,7 @@ export function EqualizerBandSlider({
         }}
         onDoubleClick={() => onCommit(0)}
         onKeyDown={(event) => {
+          setPointerFocus(false);
           const step = event.shiftKey ? 3 : 0.5;
           const nextGainDb =
             event.key === "ArrowUp" || event.key === "ArrowRight"

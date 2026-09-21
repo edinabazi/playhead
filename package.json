@@ -21,6 +21,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:audio": "node scripts/test-audio-output.mjs",
     "broker:typecheck": "npm --prefix workers/integrations-broker run typecheck",
     "broker:deploy": "npm --prefix workers/integrations-broker run deploy",
     "dist": "npm run dist:mac && npm run dist:win && npm run dist:linux",

@@ -421,6 +421,7 @@ export function App() {
   const clearTrackPositionRef = useRef<(trackId: string) => void>(() => {});
   const volumeRef = useRef(1);
   const audioEngineRef = useRef<PlaybackAudioEngine | null>(null);
+  const [isAudioGraphActive, setIsAudioGraphActive] = useState(false);
   const volumeControllerRef = useRef<PlaybackVolumeController | null>(null);
   if (!volumeControllerRef.current) {
     volumeControllerRef.current = new PlaybackVolumeController(
@@ -2161,25 +2162,31 @@ export function App() {
   }, []);
 
   const volumeBoostEnabled = library.settings.playback.volumeBoostEnabled;
-  const maxVolume = volumeBoostEnabled ? boostedMaxVolume : 1;
+  const maxVolume = volumeBoostEnabled && isAudioGraphActive ? boostedMaxVolume : 1;
   const limiterActive = useLimiterActivity(
     () => audioEngineRef.current?.getLimiterReduction() ?? 0,
-    isPlaying && volumeBoostEnabled,
+    isPlaying && isAudioGraphActive,
   );
 
   const equalizer = useMemo(
     () => normalizeEqualizerSettings(library.settings.playback.equalizer),
     [library.settings.playback.equalizer],
   );
-  const equalizerSaveTimeoutRef = useRef<number | null>(null);
   const levelMeters = useMemo(
     () => normalizeLevelMeterSettings(library.settings.session.levelMeters),
     [library.settings.session.levelMeters],
   );
 
-  useEffect(() => {
-    if (isWaveformEngineReady && levelMeters.open) audioEngineRef.current?.activate();
-  }, [isWaveformEngineReady, levelMeters.open]);
+  const setMeteringEnabled = useCallback((enabled: boolean) => {
+    const engine = audioEngineRef.current;
+    if (!engine) return;
+    const playback = libraryRef.current.settings.playback;
+    engine.setProcessingEnabled(
+      normalizeEqualizerSettings(playback.equalizer).enabled || playback.volumeBoostEnabled,
+    );
+    void engine.setMeteringEnabled(enabled);
+    setIsAudioGraphActive(engine.isActive());
+  }, []);
 
   const readLevels = useCallback(
     (target: ChannelLevels) => audioEngineRef.current?.readLevels(target) ?? false,
@@ -2197,6 +2204,7 @@ export function App() {
   useEffect(() => {
     if (!isWaveformEngineReady) return;
     if (volumeBoostEnabled) audioEngineRef.current?.activate();
+    setIsAudioGraphActive(audioEngineRef.current?.isActive() ?? false);
     const baseVolume = volumeControllerRef.current?.setMaxVolume(maxVolume) ?? 1;
     volumeRef.current = baseVolume;
     setVolume(baseVolume);
@@ -2206,34 +2214,37 @@ export function App() {
     if (!isWaveformEngineReady) return;
     const engine = audioEngineRef.current;
     if (equalizer.enabled) engine?.activate();
+    setIsAudioGraphActive(engine?.isActive() ?? false);
     engine?.setEqualizer(getActiveEqualizerGains(equalizer));
-  }, [equalizer, isWaveformEngineReady]);
+    engine?.setProcessingEnabled(equalizer.enabled || volumeBoostEnabled);
+  }, [equalizer, isWaveformEngineReady, volumeBoostEnabled]);
 
   const previewEqualizer = useCallback((nextEqualizer: EqualizerSettings) => {
     const engine = audioEngineRef.current;
-    if (nextEqualizer.enabled) engine?.activate();
+    if (nextEqualizer.enabled) {
+      engine?.activate();
+      engine?.setProcessingEnabled(true);
+    }
+    setIsAudioGraphActive(engine?.isActive() ?? false);
     engine?.setEqualizer(getActiveEqualizerGains(nextEqualizer));
   }, []);
 
   const changeEqualizer = useCallback((nextEqualizer: EqualizerSettings) => {
-    setLibrary((current) => {
-      const nextState = {
-        ...current,
-        settings: {
-          ...current.settings,
-          playback: { ...current.settings.playback, equalizer: nextEqualizer },
-        },
-      };
-      libraryRef.current = nextState;
-      return nextState;
+    // Pointer previews do not save. Commit once on release (or each keyboard edit),
+    // so closing the app immediately after an edit cannot discard a pending debounce.
+    const current = libraryRef.current;
+    const nextState = {
+      ...current,
+      settings: {
+        ...current.settings,
+        playback: { ...current.settings.playback, equalizer: nextEqualizer },
+      },
+    };
+    libraryRef.current = nextState;
+    setLibrary(nextState);
+    void window.playhead.saveLibraryState(nextState).catch((error) => {
+      console.error("Could not save equalizer settings", error);
     });
-    if (equalizerSaveTimeoutRef.current !== null) {
-      window.clearTimeout(equalizerSaveTimeoutRef.current);
-    }
-    equalizerSaveTimeoutRef.current = window.setTimeout(() => {
-      equalizerSaveTimeoutRef.current = null;
-      void window.playhead.saveLibraryState(libraryRef.current);
-    }, 400);
   }, []);
 
   const changeVolumeBy = useCallback(
@@ -2885,6 +2896,7 @@ export function App() {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
       audioEngineRef.current?.dispose();
       audioEngineRef.current = null;
+      setIsAudioGraphActive(false);
       wavesurfer.destroy();
       wavesurferRef.current = null;
       setIsWaveformEngineReady(false);
@@ -3193,6 +3205,7 @@ export function App() {
                       isPlaying={isPlaying}
                       reduceMotion={reduceMotion}
                       readLevels={readLevels}
+                      onMeteringChange={setMeteringEnabled}
                     />
                   }
                   onEqualizerPreview={previewEqualizer}
