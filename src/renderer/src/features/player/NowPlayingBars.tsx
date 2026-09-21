@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { MotionConfigContext, useReducedMotion } from "framer-motion";
+import { useContext, useEffect, useRef } from "react";
 import {
   getRestingBarPose,
   sampleNowPlayingBar,
@@ -16,21 +17,27 @@ function applyPose(element: HTMLSpanElement | null, pose: BarPose) {
 
 export function NowPlayingBars({ heights, className }: { heights: number[]; className: string }) {
   const barRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const { reducedMotion } = useContext(MotionConfigContext);
+  const prefersReducedMotion = useReducedMotion();
+  const reduceMotion =
+    reducedMotion === "always" || (reducedMotion !== "never" && prefersReducedMotion);
 
   useEffect(() => {
-    const reduceMotion = Boolean(barRefs.current[0]?.closest(".reduce-motion"));
-    return subscribeToNowPlayingTicks((timeSeconds) => {
+    const updateBars = (timeSeconds: number | null) => {
       barRefs.current.forEach((element, index) => {
         const delay = barDelays[index % barDelays.length];
         applyPose(
           element,
-          timeSeconds === null || reduceMotion
-            ? getRestingBarPose(delay)
-            : sampleNowPlayingBar(timeSeconds, delay),
+          timeSeconds === null ? getRestingBarPose(delay) : sampleNowPlayingBar(timeSeconds, delay),
         );
       });
-    });
-  }, []);
+    };
+    if (reduceMotion) {
+      updateBars(null);
+      return;
+    }
+    return subscribeToNowPlayingTicks(updateBars);
+  }, [reduceMotion]);
 
   return (
     <span className={className}>

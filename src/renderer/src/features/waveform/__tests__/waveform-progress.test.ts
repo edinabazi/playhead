@@ -40,3 +40,21 @@ describe("limitWaveformProgressRendering", () => {
     expect(renderer.renderProgress).toBe(original);
   });
 });
+
+it("redraws after resizing, changing pixel density, and seeking backward", () => {
+  let width = 500;
+  let ratio = 1;
+  const original = vi.fn();
+  const renderer = {
+    renderProgress: original,
+    getWrapper: () => ({ clientWidth: width }) as HTMLElement,
+  };
+  limitWaveformProgressRendering(renderer, () => ratio);
+  renderer.renderProgress(0.5, true);
+  width = 1000;
+  renderer.renderProgress(0.5, true);
+  ratio = 2;
+  renderer.renderProgress(0.5, true);
+  renderer.renderProgress(0.1, true);
+  expect(original.mock.calls.map(([progress]) => progress)).toEqual([0.5, 0.5, 0.5, 0.1]);
+});

@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 type Listener = () => void;
 
 // Holds the playhead position outside React state. The waveform reports it on every animation
-// frame, but the UI only shows whole seconds, so subscribers re-render once per second.
+// frame, but the UI only shows whole seconds, so subscribers are notified only when the displayed second changes.
 export class PlaybackClock {
   private time = 0;
   private readonly listeners = new Set<Listener>();
@@ -22,7 +22,9 @@ export class PlaybackClock {
   setTime(time: number): void {
     const nextTime = Number.isFinite(time) ? Math.max(0, time) : 0;
     if (nextTime === this.time) return;
+    const previousSecond = this.getWholeSeconds();
     this.time = nextTime;
+    if (this.getWholeSeconds() === previousSecond) return;
     this.listeners.forEach((listener) => listener());
   }
 }
