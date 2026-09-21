@@ -232,6 +232,7 @@ export type EqualizerSettings = {
   preampDb: number;
   gainsDb: number[];
   customGainsDb: number[];
+  customPreampDb: number;
 };
 
 export type PlaybackSettings = {
@@ -467,6 +468,7 @@ export const defaultEqualizerSettings = (): EqualizerSettings => ({
   preampDb: 0,
   gainsDb: Array.from({ length: equalizerBandCount }, () => 0),
   customGainsDb: Array.from({ length: equalizerBandCount }, () => 0),
+  customPreampDb: 0,
 });
 
 export const defaultPlaybackSettings = (): PlaybackSettings => ({

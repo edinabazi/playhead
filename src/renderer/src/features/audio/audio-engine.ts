@@ -31,6 +31,8 @@ function dbToGain(gainDb: number): number {
 // audio features keep the browser's native output path.
 export class PlaybackAudioEngine {
   private context: AudioContext | null = null;
+  private sourceNode: MediaElementAudioSourceNode | null = null;
+  private processingEnabled = true;
   private preampNode: GainNode | null = null;
   private bandNodes: BiquadFilterNode[] = [];
   private boostNode: GainNode | null = null;
@@ -54,13 +56,14 @@ export class PlaybackAudioEngine {
   }
 
   isActive(): boolean {
-    return this.context !== null;
+    return this.context !== null && !this.activationFailed;
   }
 
   activate(): void {
     if (this.context || this.activationFailed) return;
 
     let context: AudioContext | null = null;
+    let source: MediaElementAudioSourceNode | null = null;
     try {
       context = this.createContext();
       const graphContext = context;
@@ -76,6 +79,14 @@ export class PlaybackAudioEngine {
       const boost = graphContext.createGain();
       const limiter = graphContext.createDynamicsCompressor();
       const makeupCompensation = graphContext.createGain();
+      // The compressor has a finite ratio and is not a brick-wall limiter. Guard the
+      // final samples against overshoot at extreme EQ/boost settings, without changing
+      // samples below the -1 dBFS ceiling. Do not oversample: interpolation can overshoot.
+      const ceiling = graphContext.createWaveShaper();
+      const peakLimit = 10 ** (-1 / 20);
+      ceiling.curve = Float32Array.from({ length: 8193 }, (_, index) =>
+        Math.max(-peakLimit, Math.min(peakLimit, (index / 8192) * 2 - 1)),
+      );
       preamp.gain.value = dbToGain(this.equalizer.preampDb);
       boost.gain.value = this.boostGain;
       makeupCompensation.gain.value = limiterMakeupCompensation;
@@ -85,9 +96,6 @@ export class PlaybackAudioEngine {
       limiter.attack.value = limiterSettings.attack;
       limiter.release.value = limiterSettings.release;
 
-      // Capture the media element last: from here on its audio only plays through this graph.
-      const source = graphContext.createMediaElementSource(this.media);
-      source.connect(preamp);
       const lastBand = bands.reduce<AudioNode>((previous, band) => {
         previous.connect(band);
         return band;
@@ -95,7 +103,13 @@ export class PlaybackAudioEngine {
       lastBand.connect(boost);
       boost.connect(limiter);
       limiter.connect(makeupCompensation);
-      makeupCompensation.connect(graphContext.destination);
+      makeupCompensation.connect(ceiling);
+      ceiling.connect(graphContext.destination);
+
+      // All potentially failing graph construction happens before irreversible media capture.
+      source = graphContext.createMediaElementSource(this.media);
+      source.connect(this.processingEnabled ? preamp : graphContext.destination);
+      this.sourceNode = source;
 
       this.preampNode = preamp;
       this.bandNodes = bands;
@@ -103,13 +117,40 @@ export class PlaybackAudioEngine {
       this.limiterNode = limiter;
       this.context = graphContext;
     } catch (error) {
-      console.warn("Could not build the audio graph. Playback stays on the native output.", error);
       this.activationFailed = true;
-      void context?.close().catch(() => undefined);
+      if (source && context) {
+        // Media capture cannot be undone. Keep its context alive and bypass failed effects.
+        try {
+          source.disconnect();
+          source.connect(context.destination);
+          this.context = context;
+          if (!this.media.paused) void this.resume();
+          console.warn("Audio effects unavailable; using direct playback.", error);
+        } catch (fallbackError) {
+          console.error("Could not restore audio after media capture.", fallbackError);
+          void context.close().catch(() => undefined);
+        }
+      } else {
+        console.warn(
+          "Could not build the audio graph. Playback stays on the native output.",
+          error,
+        );
+        void context?.close().catch(() => undefined);
+      }
       return;
     }
 
     if (!this.media.paused) void this.resume();
+  }
+
+  setProcessingEnabled(enabled: boolean): void {
+    if (enabled === this.processingEnabled) return;
+    this.processingEnabled = enabled;
+    if (!this.sourceNode || !this.context || !this.preampNode) return;
+    // A captured media element cannot return to native playback, but it can bypass
+    // every effect, including the compressor/ceiling, when both switches are off.
+    this.sourceNode.disconnect();
+    this.sourceNode.connect(enabled ? this.preampNode : this.context.destination);
   }
 
   setBoostGain(gain: number): void {
@@ -138,7 +179,7 @@ export class PlaybackAudioEngine {
   }
 
   getLimiterReduction(): number {
-    return this.limiterNode?.reduction ?? 0;
+    return this.processingEnabled ? (this.limiterNode?.reduction ?? 0) : 0;
   }
 
   async resume(): Promise<void> {
@@ -150,6 +191,7 @@ export class PlaybackAudioEngine {
     this.media.removeEventListener("play", this.resumeOnPlay);
     void this.context?.close().catch(() => undefined);
     this.context = null;
+    this.sourceNode = null;
     this.preampNode = null;
     this.bandNodes = [];
     this.boostNode = null;

@@ -17,6 +17,7 @@ import { EqualizerBandSlider, EqualizerCurve } from "./EqualizerControls";
 
 export function SoundPanel({
   open,
+  id,
   equalizer,
   volumeBoostEnabled,
   onEqualizerPreview,
@@ -24,6 +25,7 @@ export function SoundPanel({
   onVolumeBoostChange,
 }: {
   open: boolean;
+  id: string;
   equalizer: EqualizerSettings;
   volumeBoostEnabled: boolean;
   onEqualizerPreview: (equalizer: EqualizerSettings) => void;
@@ -54,7 +56,13 @@ export function SoundPanel({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="no-drag absolute left-0 top-full z-50 mt-2 w-[min(470px,calc(100vw-340px))] rounded-[22px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+          id={id}
+          role="region"
+          aria-label="Sound settings"
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") event.stopPropagation();
+          }}
+          className="no-drag absolute left-0 top-full z-50 mt-2 max-h-[calc(100dvh-300px)] w-[min(470px,calc(100vw-340px))] overflow-y-auto overscroll-contain rounded-[22px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl"
           initial={{ opacity: 0, y: -6, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.98 }}
@@ -170,8 +178,8 @@ export function SoundPanel({
             <div>
               <h4 className="text-[13px] font-semibold leading-5 text-foreground">Volume boost</h4>
               <p className="mt-0.5 text-[12px] font-medium leading-4 text-muted-foreground">
-                Lets volume go up to 200% and lifts quiet tracks when normalizing. A limiter keeps
-                it clean.
+                Lets volume go up to 200% and lifts quiet tracks when normalizing. A limiter
+                controls output peaks.
               </p>
             </div>
             <Switch

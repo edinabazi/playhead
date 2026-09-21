@@ -1,6 +1,6 @@
 import type { EqualizerSettings, LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { SliderComfortable } from "@/components/ui/slider";
 import { SoundPanel } from "@/features/audio/SoundPanel";
 import { formatTime } from "@/lib/format";
@@ -101,6 +101,7 @@ export function Player({
   const RepeatIcon = icons.repeat;
   const VolumeIcon = icons["volume-2"];
   const SoundIcon = icons["sliders-horizontal"];
+  const soundPanelId = useId();
   const soundControlsRef = useRef<HTMLDivElement>(null);
   const [soundPanelOpen, setSoundPanelOpen] = useState(false);
 
@@ -111,7 +112,10 @@ export function Player({
       if (!soundControlsRef.current?.contains(event.target as Node)) setSoundPanelOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSoundPanelOpen(false);
+      if (event.key === "Escape") {
+        setSoundPanelOpen(false);
+        soundControlsRef.current?.querySelector("button")?.focus();
+      }
     };
 
     document.addEventListener("pointerdown", onPointerDown);
@@ -278,9 +282,17 @@ export function Player({
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center py-1">
         <div className="flex min-w-0 items-center gap-2 pr-4">
-          <div ref={soundControlsRef} className="relative shrink-0">
+          <div
+            ref={soundControlsRef}
+            className="relative shrink-0"
+            onKeyDown={(event) => {
+              if (event.key === " " || event.key === "Enter") event.stopPropagation();
+            }}
+          >
             <IconButton
               title="Sound"
+              ariaExpanded={soundPanelOpen}
+              ariaControls={soundPanelId}
               active={soundPanelOpen || equalizer.enabled}
               onClick={() => setSoundPanelOpen((value) => !value)}
             >
@@ -288,6 +300,7 @@ export function Player({
             </IconButton>
             <SoundPanel
               open={soundPanelOpen}
+              id={soundPanelId}
               equalizer={equalizer}
               volumeBoostEnabled={volumeBoostEnabled}
               onEqualizerPreview={onEqualizerPreview}
@@ -389,7 +402,7 @@ export function Player({
           </IconButton>
         </div>
         <div className="no-drag ml-auto flex items-center gap-2">
-          {volumeBoostEnabled && (
+          {(volumeBoostEnabled || limiterActive) && (
             <span
               className={`rounded-[4px] border px-1 py-0.5 font-mono text-[10px] font-semibold leading-none transition-colors duration-100 @max-lg:hidden ${
                 limiterActive

@@ -37,6 +37,26 @@ describe("equalizer", () => {
     expect(selectEqualizerPreset(flat, "custom").gainsDb).toEqual(edited.gainsDb);
   });
 
+  it("resets preset preamp while retaining the complete custom sound", () => {
+    const bass = selectEqualizerPreset(defaultEqualizerSettings(), "bass");
+    const custom = setEqualizerPreamp(bass, 5);
+    expect(custom.preset).toBe("custom");
+    const flat = selectEqualizerPreset(custom, "flat");
+    expect(flat.preampDb).toBe(0);
+    expect(getEqualizerResponseDb({ ...flat, enabled: true }, 1000)).toBe(0);
+    const restored = selectEqualizerPreset(flat, "custom");
+    expect(restored.preampDb).toBe(5);
+    expect(restored.gainsDb).toEqual(bass.gainsDb);
+    expect(selectQuietListeningStrength(custom, "strong").preampDb).toBe(0);
+  });
+
+  it("preserves the custom preamp from settings saved before the new field existed", () => {
+    const restored = normalizeEqualizerSettings({ preset: "custom", preampDb: -4 });
+    expect(selectEqualizerPreset(selectEqualizerPreset(restored, "flat"), "custom").preampDb).toBe(
+      -4,
+    );
+  });
+
   it("clamps gains to the slider range", () => {
     const settings = setEqualizerPreamp(
       setEqualizerBandGain(defaultEqualizerSettings(), 0, 40),

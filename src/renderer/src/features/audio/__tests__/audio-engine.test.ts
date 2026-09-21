@@ -16,6 +16,7 @@ function createContext() {
   const connections: string[] = [];
   const node = <T extends object>(name: string, extra = {} as T) => ({
     name,
+    disconnect: vi.fn(),
     connect: vi.fn((target: { name: string }) => {
       connections.push(`${name}->${target.name}`);
       return target;
@@ -38,11 +39,14 @@ function createContext() {
     release: param(),
     reduction: -3,
   });
+  const source = node("source");
+  const ceiling = node("ceiling", { curve: null as Float32Array | null });
   const context = {
     state: "suspended",
     currentTime: 12,
     destination: { name: "destination" },
-    createMediaElementSource: vi.fn(() => node("source")),
+    createMediaElementSource: vi.fn(() => source),
+    createWaveShaper: vi.fn(() => ceiling),
     createGain: vi
       .fn()
       .mockReturnValueOnce(preamp)
@@ -59,7 +63,7 @@ function createContext() {
     }),
     close: vi.fn(async () => undefined),
   };
-  return { context, preamp, bands, boost, makeup, limiter, connections };
+  return { context, preamp, bands, boost, makeup, limiter, connections, source };
 }
 
 describe("PlaybackAudioEngine", () => {
@@ -90,13 +94,14 @@ describe("PlaybackAudioEngine", () => {
 
     expect(context.createMediaElementSource).toHaveBeenCalledTimes(1);
     expect(connections).toEqual([
-      "source->preamp",
       "preamp->band0",
       ...Array.from({ length: 9 }, (_, index) => `band${index}->band${index + 1}`),
       "band9->boost",
       "boost->limiter",
       "limiter->makeup",
-      "makeup->destination",
+      "makeup->ceiling",
+      "ceiling->destination",
+      "source->preamp",
     ]);
     expect(preamp.gain.value).toBeCloseTo(0.5012, 4);
     expect(bands.map((band) => [band.type, band.frequency.value, band.Q.value])[5]).toEqual([
@@ -133,6 +138,61 @@ describe("PlaybackAudioEngine", () => {
     expect(engine.isActive()).toBe(false);
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
+  });
+
+  it("does not capture media if a downstream connection fails", () => {
+    const { context, makeup } = createContext();
+    makeup.connect.mockImplementation(() => {
+      throw new Error("connection failed");
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const engine = new PlaybackAudioEngine(
+      createMedia() as unknown as HTMLMediaElement,
+      () => context as unknown as AudioContext,
+    );
+    engine.activate();
+    expect(context.createMediaElementSource).not.toHaveBeenCalled();
+    expect(context.close).toHaveBeenCalledOnce();
+    expect(engine.isActive()).toBe(false);
+    warn.mockRestore();
+  });
+
+  it("keeps captured media alive through a direct fallback if its first connection fails", async () => {
+    const { context, source } = createContext();
+    source.connect.mockImplementationOnce(() => {
+      throw new Error("connection failed");
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const engine = new PlaybackAudioEngine(
+      createMedia(false) as unknown as HTMLMediaElement,
+      () => context as unknown as AudioContext,
+    );
+    engine.activate();
+    await Promise.resolve();
+    expect(source.disconnect).toHaveBeenCalledOnce();
+    expect(source.connect).toHaveBeenLastCalledWith(context.destination);
+    expect(context.close).not.toHaveBeenCalled();
+    expect(context.resume).toHaveBeenCalledOnce();
+    expect(engine.isActive()).toBe(false);
+    engine.dispose();
+    expect(context.close).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it("bypasses all effects when disabled and reuses the captured source when re-enabled", () => {
+    const { context, source, preamp } = createContext();
+    const engine = new PlaybackAudioEngine(
+      createMedia() as unknown as HTMLMediaElement,
+      () => context as unknown as AudioContext,
+    );
+    engine.activate();
+    engine.setProcessingEnabled(false);
+    expect(source.connect).toHaveBeenLastCalledWith(context.destination);
+    expect(engine.getLimiterReduction()).toBe(0);
+    engine.setProcessingEnabled(true);
+    expect(source.connect).toHaveBeenLastCalledWith(preamp);
+    expect(context.createMediaElementSource).toHaveBeenCalledOnce();
+    expect(source.disconnect).toHaveBeenCalledTimes(2);
   });
 
   it("smooths boost changes and resumes the context on play", async () => {

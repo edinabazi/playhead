@@ -79,6 +79,7 @@ export function normalizeEqualizerSettings(value: Partial<EqualizerSettings> | u
     preampDb: clampEqualizerGain(Number(value.preampDb)),
     gainsDb: normalizeGains(value.gainsDb),
     customGainsDb: normalizeGains(value.customGainsDb),
+    customPreampDb: clampEqualizerGain(Number(value.customPreampDb ?? value.preampDb)),
   } satisfies EqualizerSettings;
 }
 
@@ -103,6 +104,7 @@ export function selectEqualizerPreset(
   return {
     ...settings,
     preset,
+    preampDb: preset === "custom" ? settings.customPreampDb : 0,
     gainsDb: getPresetGains(preset, settings.strength, settings.customGainsDb),
   };
 }
@@ -114,6 +116,7 @@ export function selectQuietListeningStrength(
   return {
     ...settings,
     preset: "quiet",
+    preampDb: 0,
     strength,
     gainsDb: getPresetGains("quiet", strength, settings.customGainsDb),
   };
@@ -126,14 +129,26 @@ export function setEqualizerBandGain(
 ): EqualizerSettings {
   const gainsDb = settings.gainsDb.slice();
   gainsDb[bandIndex] = clampEqualizerGain(gainDb);
-  return { ...settings, preset: "custom", gainsDb, customGainsDb: gainsDb.slice() };
+  return {
+    ...settings,
+    preset: "custom",
+    gainsDb,
+    customGainsDb: gainsDb.slice(),
+    customPreampDb: settings.preampDb,
+  };
 }
 
 export function setEqualizerPreamp(
   settings: EqualizerSettings,
   preampDb: number,
 ): EqualizerSettings {
-  return { ...settings, preampDb: clampEqualizerGain(preampDb) };
+  return {
+    ...settings,
+    preset: "custom",
+    preampDb: clampEqualizerGain(preampDb),
+    customPreampDb: clampEqualizerGain(preampDb),
+    customGainsDb: settings.gainsDb.slice(),
+  };
 }
 
 export function getActiveEqualizerGains(settings: EqualizerSettings): {
