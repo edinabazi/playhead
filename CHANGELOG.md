@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.6
+
+- Customizable, resizable track columns with metadata sorting. Thanks @stripedgoat! ([#14](https://github.com/edinabazi/playhead/issues/14))
+- Embedded and `.lrc` lyrics with synced highlighting and click-to-seek. Thanks @reviewlord! ([#9](https://github.com/edinabazi/playhead/issues/9))
+- More reliable network-drive playback with automatic recovery and **Retry**. Thanks @steamfan! ([#7](https://github.com/edinabazi/playhead/issues/7))
+- Removed library scan limits; added progress, cancellation, and faster browsing and folder watching. Thanks @andreschoppe! ([#8](https://github.com/edinabazi/playhead/issues/8))
+
 ## 0.2.5
 
 ### New

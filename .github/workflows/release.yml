@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 2
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.sha }}
 
       - id: version
         shell: bash
@@ -65,7 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.sha }}
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -97,7 +97,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.sha }}
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -181,6 +181,24 @@ jobs:
     if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+      - name: Read release notes from changelog
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const lines = fs.readFileSync('CHANGELOG.md', 'utf8').split(/\r?\n/);
+          const start = lines.findIndex(line => line.trim() === `## ${process.env.RELEASE_VERSION}`);
+          if (start === -1) throw new Error(`Missing changelog for ${process.env.RELEASE_VERSION}`);
+          const end = lines.findIndex((line, index) => index > start && /^## /.test(line));
+          const notes = lines.slice(start + 1, end === -1 ? undefined : end).join('\n').trim();
+          if (!notes) throw new Error('Release notes are empty');
+          fs.writeFileSync('release-notes.md', notes + '\n');
+          NODE
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
@@ -188,8 +206,10 @@ jobs:
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.event_name != 'workflow_dispatch' && github.sha || '' }}
           name: Playhead ${{ needs.version.outputs.version }}
           draft: ${{ github.event_name != 'workflow_dispatch' }}
-          generate_release_notes: true
+          body_path: ${{ github.event_name != 'workflow_dispatch' && 'release-notes.md' || '' }}
+          generate_release_notes: false
           files: artifacts/*
           overwrite_files: true

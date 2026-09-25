@@ -5,10 +5,12 @@ already have a matching Git tag.
 
 ## Version Flow
 
-1. Update `package.json` and `package-lock.json` to the next version.
+1. Update `package.json` and `package-lock.json` to the next version, add a matching `## <version>`
+   entry to `CHANGELOG.md`, and update the in-app notes in `update-messages.tsx`.
 2. Merge or push that change to `main`.
-3. GitHub Actions runs lint, tests, typecheck, and macOS builds.
-4. The workflow creates a draft GitHub Release tagged `v<version>`.
+3. GitHub Actions runs lint, tests, typecheck, and macOS, Windows, and Linux builds.
+4. The workflow creates a draft GitHub Release tagged `v<version>`, using that version's changelog
+   entry as its release notes. Rebuilding an existing tag keeps its published notes.
 5. Review the draft release notes and assets, then publish it.
 
 Published releases are required for in-app updates. Installed apps check the GitHub release feed,

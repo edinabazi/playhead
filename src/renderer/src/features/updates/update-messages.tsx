@@ -1,6 +1,39 @@
 import type { UpdateMessage } from "./UpdateMessageDialog";
 
 export const updateMessagesByVersion: Record<string, UpdateMessage> = {
+  "0.2.6": {
+    title: "Playhead has been updated",
+    description: (
+      <>
+        <ul>
+          <li>Customize and resize track columns, and sort by metadata</li>
+          <li>Read embedded and .lrc lyrics with synced highlighting and click-to-seek</li>
+          <li>More reliable network-drive playback with automatic recovery and Retry</li>
+          <li>Import larger libraries with progress, cancellation, and faster browsing</li>
+        </ul>
+        <p>
+          Thanks to{" "}
+          <a href="https://github.com/stripedgoat" target="_blank" rel="noreferrer">
+            @stripedgoat
+          </a>
+          ,{" "}
+          <a href="https://github.com/reviewlord" target="_blank" rel="noreferrer">
+            @reviewlord
+          </a>
+          ,{" "}
+          <a href="https://github.com/steamfan" target="_blank" rel="noreferrer">
+            @steamfan
+          </a>
+          , and{" "}
+          <a href="https://github.com/andreschoppe" target="_blank" rel="noreferrer">
+            @andreschoppe
+          </a>{" "}
+          for the requests and reports!
+        </p>
+      </>
+    ),
+    buttonLabel: "Got it",
+  },
   "0.1.10": {
     title: "Playhead has been updated",
     description: (
