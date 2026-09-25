@@ -257,10 +257,6 @@ function LyricLines({
                 className={`group relative flex w-full items-baseline gap-3 rounded-lg py-3 text-left outline-none transition-colors duration-200 hover:text-foreground focus-visible:ring-1 focus-visible:ring-primary/50 ${active ? "text-foreground" : "text-muted-foreground/60"}`}
               >
                 <span
-                  aria-hidden="true"
-                  className={`relative top-[-0.15em] h-1 w-1 shrink-0 rounded-full ${active ? "bg-primary" : "bg-transparent"}`}
-                />
-                <span
                   className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[clamp(20px,2.7vw,30px)] font-semibold leading-[1.45]"
                   dir="auto"
                 >
