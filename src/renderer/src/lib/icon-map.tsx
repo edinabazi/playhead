@@ -3,6 +3,14 @@
 import type { ComponentType } from "react";
 import {
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  CalendarDays,
+  Columns3,
+  Disc3,
+  Hash,
+  ChevronDown,
   Bell,
   Brain,
   Check,
@@ -102,6 +110,14 @@ export type IconName =
   | "upload"
   | "plus"
   | "arrow-right"
+  | "arrow-up"
+  | "arrow-down"
+  | "arrow-up-down"
+  | "calendar-days"
+  | "columns-3"
+  | "disc-3"
+  | "hash"
+  | "chevron-down"
   | "search"
   | "loader"
   | "users"
@@ -173,6 +189,14 @@ const lucideMap: Record<IconName, IconComponent> = {
   upload: Upload,
   plus: Plus,
   "arrow-right": ArrowRight,
+  "arrow-up": ArrowUp,
+  "arrow-down": ArrowDown,
+  "arrow-up-down": ArrowUpDown,
+  "calendar-days": CalendarDays,
+  "columns-3": Columns3,
+  "disc-3": Disc3,
+  hash: Hash,
+  "chevron-down": ChevronDown,
   search: Search,
   loader: Loader,
   users: Users,

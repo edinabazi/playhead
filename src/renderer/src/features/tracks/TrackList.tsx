@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { useIcons } from "@/lib/icon-context";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
 import { useVirtualList } from "@/lib/virtual-list";
@@ -199,7 +200,16 @@ export function TrackList({
                 )}
               </div>
             ) : (
-              <div className="relative" style={{ height: totalHeight + 32 }}>
+              <motion.div
+                key={
+                  settings.sort ? `${settings.sort.column}:${settings.sort.direction}` : "source"
+                }
+                className="relative"
+                style={{ height: totalHeight + 32 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.14 }}
+              >
                 {rows.map(({ index, start }) => {
                   const track = tracks[index];
                   if (!track) return null;
@@ -313,7 +323,7 @@ export function TrackList({
                     </div>
                   );
                 })}
-              </div>
+              </motion.div>
             )}
           </div>
         </div>

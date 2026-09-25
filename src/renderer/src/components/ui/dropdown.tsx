@@ -82,7 +82,9 @@ const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
           }}
           onKeyDown={(e) => {
             const items = Array.from(
-              containerRef.current?.querySelectorAll('[role="menuitemradio"]') ?? [],
+              containerRef.current?.querySelectorAll(
+                '[role="menuitemradio"]:not([aria-disabled="true"]), [role="menuitemcheckbox"]:not([aria-disabled="true"]), [role="menuitem"]:not([aria-disabled="true"])',
+              ) ?? [],
             ) as HTMLElement[];
             const currentIdx = items.indexOf(e.target as HTMLElement);
             if (currentIdx === -1) return;
