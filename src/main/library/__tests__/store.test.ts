@@ -56,6 +56,23 @@ function namedState(name: string): LibraryState {
 }
 
 describe("library store settings", () => {
+  it("persists columns and sort in the session across a restart", async () => {
+    const state = emptyLibraryState();
+    await writeLibraryState(state);
+    await writeLibrarySessionSettings({
+      ...state.settings.session,
+      trackList: {
+        columns: ["title", "genre", "disc"],
+        sort: { column: "disc", direction: "desc" },
+      },
+    });
+    resetLibraryStoreCache();
+    expect((await readLibraryState()).settings.session.trackList).toEqual({
+      columns: ["title", "genre", "disc"],
+      sort: { column: "disc", direction: "desc" },
+    });
+  });
+
   it("defaults to a flat sidebar and preserves an explicit subfolder preference", async () => {
     expect((await readLibraryState()).settings.library.showSubfolders).toBe(false);
     const state = namedState("Subfolders");
@@ -116,6 +133,7 @@ describe("library store settings", () => {
       sidebarGroupOrder: ["library", "playlists", "tags", "soundcloud"],
       expandedFolderPaths: [],
       levelMeters: { open: false },
+      trackList: { columns: ["title", "duration"], sort: null },
       queue: {
         items: [],
         shuffledItems: [],

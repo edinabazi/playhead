@@ -140,6 +140,7 @@ export async function saveTrackMetadata(
   }
 
   const next = cleanEditableMetadata(metadata);
+  const previous = await readTrackMetadata(filePath);
   const file = TagFile.createFromPath(filePath);
 
   try {
@@ -150,7 +151,11 @@ export async function saveTrackMetadata(
     file.tag.genres = splitList(next.genre);
     file.tag.year = optionalNumber(next.year);
     file.tag.track = optionalNumber(next.trackNumber);
-    file.tag.disc = optionalNumber(next.diskNumber);
+    // Leave the native Disc tag untouched when this field was not edited.
+    // Its parsed numeric value may be empty even though the original tag contains a mood.
+    if (next.diskNumber !== previous.editable.diskNumber) {
+      file.tag.disc = optionalNumber(next.diskNumber);
+    }
     file.tag.composers = splitList(next.composer);
     file.tag.beatsPerMinute = optionalNumber(next.bpm);
     file.tag.comment = next.comment;

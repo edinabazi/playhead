@@ -2,6 +2,8 @@ import type { Dirent, Stats } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { parseFile } from "music-metadata";
+import { libraryTrackMetadataVersion } from "../../shared/library";
+import { getDiscMetadata } from "../metadata/disc";
 import type {
   LibraryArtwork,
   LibraryFolder,
@@ -167,6 +169,7 @@ export async function buildTrack(
     const existingTrack = options.existingTracks?.[trackId];
     if (
       existingTrack?.path === filePath &&
+      existingTrack.metadataVersion === libraryTrackMetadataVersion &&
       existingTrack.fileSize === fileInfo.size &&
       Math.trunc(existingTrack.fileModifiedAt || 0) === Math.trunc(fileInfo.mtimeMs)
     ) {
@@ -199,6 +202,10 @@ export async function buildTrack(
       artist: metadata.common.artist || "Unknown Artist",
       album: metadata.common.album,
       albumArtist: metadata.common.albumartist,
+      genre: metadata.common.genre?.join(", "),
+      composer: metadata.common.composer?.join(", "),
+      disc: getDiscMetadata(metadata),
+      metadataVersion: libraryTrackMetadataVersion,
       trackNumber: metadata.common.track.no || undefined,
       diskNumber: metadata.common.disk.no || undefined,
       year: metadata.common.year,
@@ -220,6 +227,7 @@ export async function buildTrack(
       fileModifiedAt: fileInfo?.mtimeMs,
       title: cleanTitle(filePath),
       artist: "Unknown Artist",
+      metadataVersion: libraryTrackMetadataVersion,
       duration: 0,
       folderId,
     };
@@ -239,6 +247,7 @@ export async function scanFolderPath(
     name: basename(folderPath),
     path: folderPath,
     trackIds: [],
+    metadataVersion: libraryTrackMetadataVersion,
   };
 
   const audioFiles = await findAudioFiles(folderPath, normalizeExtensions(extensions));

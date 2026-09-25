@@ -1,4 +1,6 @@
 export function TrackCell({
+  role = "button",
+  style,
   selected = false,
   dragging = false,
   draggable = false,
@@ -16,6 +18,8 @@ export function TrackCell({
   onDrop,
   className = "",
 }: {
+  role?: "button" | "row";
+  style?: React.CSSProperties;
   selected?: boolean;
   dragging?: boolean;
   draggable?: boolean;
@@ -35,7 +39,8 @@ export function TrackCell({
 }) {
   return (
     <div
-      role="button"
+      role={role}
+      style={style}
       tabIndex={0}
       draggable={draggable}
       data-track-id={trackId}

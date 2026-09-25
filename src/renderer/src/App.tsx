@@ -24,6 +24,7 @@ import {
   type SoundCloudSettings,
   type SoundCloudState,
   type TelemetrySettings,
+  libraryTrackMetadataVersion,
   defaultSessionSettings,
   defaultSoundCloudSettings,
 } from "../../shared/library";
@@ -59,6 +60,8 @@ import { DeleteTagDialog } from "@/features/sidebar/DeleteTagDialog";
 import { RemoveFolderDialog } from "@/features/sidebar/RemoveFolderDialog";
 import { Sidebar } from "@/features/sidebar/Sidebar";
 import { TrackList } from "@/features/tracks/TrackList";
+import { sortTrackList } from "@/features/tracks/track-columns";
+import { normalizeTrackListSettings } from "../../shared/track-list";
 import { RemoveTracksFromPlaylistDialog } from "@/features/tracks/RemoveTracksFromPlaylistDialog";
 import { UpdateMessageDialog, type UpdateMessage } from "@/features/updates/UpdateMessageDialog";
 import { updateMessagesByVersion } from "@/features/updates/update-messages";
@@ -533,7 +536,11 @@ export function App() {
   );
   const libraryArtists = libraryCollections.artists;
   const libraryAlbums = libraryCollections.albums;
-  const tracks = useMemo(() => {
+  const trackListSettings = useMemo(
+    () => normalizeTrackListSettings(library.settings.session.trackList),
+    [library.settings.session.trackList],
+  );
+  const sourceTracks = useMemo(() => {
     if (library.selectedSource?.type === "soundcloud" && library.selectedSource.id) {
       return soundcloudTracksByCollection[library.selectedSource.id] || [];
     }
@@ -554,6 +561,10 @@ export function App() {
     library.tracks,
     soundcloudTracksByCollection,
   ]);
+  const tracks = useMemo(
+    () => sortTrackList(sourceTracks, trackListSettings.sort),
+    [sourceTracks, trackListSettings.sort],
+  );
   const allPlayableTracksById = useMemo(
     () => ({
       ...library.tracks,
@@ -1442,7 +1453,7 @@ export function App() {
   );
 
   const rescanLibrary = useCallback(
-    async (state: LibraryState) => {
+    async (state: LibraryState, options: { preserveView?: boolean } = {}) => {
       if (state.folders.length === 0) {
         await persistLibrary(state);
         return;
@@ -1463,8 +1474,10 @@ export function App() {
         }
         const latest = libraryRef.current;
         const persistedState = mergeScannedLibraryState(latest, nextState, scannedFolderIds, {
-          selectedSource: state.selectedSource,
-          settings: state.settings,
+          ...(options.preserveView ? {} : { selectedSource: state.selectedSource }),
+          settings: options.preserveView
+            ? latest.settings
+            : { ...state.settings, session: latest.settings.session },
         });
         if (activeTrackId && !persistedState.tracks[activeTrackId]) {
           wavesurferRef.current?.stop();
@@ -2654,6 +2667,7 @@ export function App() {
 
     void window.playhead.getLibraryState().then((state) => {
       const nextState = normalizeSourceForMode(state);
+      libraryRef.current = nextState;
       setLibrary(nextState);
       setShuffleEnabled(nextState.settings.session.shuffleEnabled);
       setRepeatMode(nextState.settings.session.repeatMode);
@@ -2662,7 +2676,11 @@ export function App() {
         nextState.settings.library.enabledAudioExtensions,
       );
       if (nextState !== state) void window.playhead.saveLibraryState(nextState);
-      if (nextState.settings.library.rescanOnLaunch) void rescanLibrary(nextState);
+      const needsMetadataRefresh = nextState.folders.some(
+        (folder) => folder.metadataVersion !== libraryTrackMetadataVersion,
+      );
+      if (nextState.settings.library.rescanOnLaunch || needsMetadataRefresh)
+        void rescanLibrary(nextState, { preserveView: true });
     });
   }, [rescanLibrary]);
 
@@ -3358,6 +3376,13 @@ export function App() {
                     )}
                     <TrackList
                       tracks={tracks}
+                      settings={trackListSettings}
+                      onSettingsChange={(trackList) =>
+                        persistSessionSettings({
+                          ...libraryRef.current.settings.session,
+                          trackList,
+                        })
+                      }
                       activeTrackId={activeTrackId}
                       isPlaying={isPlaying}
                       selectedTrackIds={selectedTrackIds}

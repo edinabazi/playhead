@@ -4,6 +4,9 @@ import type { MenuAnchorPoint } from "@/lib/menu-position";
 import { useVirtualList } from "@/lib/virtual-list";
 import type { LibraryPlaylist, LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { TrackListRow } from "./TrackListRow";
+import type { TrackListSettings } from "../../../../shared/track-list";
+import { getTrackListLayout } from "./track-columns";
+import { TrackListControls, TrackListHeader } from "./TrackListHeader";
 import {
   createTrackStackDragImage,
   getDraggedTrackIds,
@@ -29,6 +32,8 @@ function LoadingTracksText() {
 
 export function TrackList({
   tracks,
+  settings,
+  onSettingsChange,
   activeTrackId,
   isPlaying,
   selectedTrackIds,
@@ -61,6 +66,8 @@ export function TrackList({
   onScrolledToTrack,
 }: {
   tracks: LibraryTrack[];
+  settings: TrackListSettings;
+  onSettingsChange: (settings: TrackListSettings) => void;
   activeTrackId: string | null;
   isPlaying: boolean;
   selectedTrackIds: string[];
@@ -92,6 +99,8 @@ export function TrackList({
   onScrollPositionChange: (scrollTop: number) => void;
   onScrolledToTrack: () => void;
 }) {
+  const layout = getTrackListLayout(settings.columns);
+  const canReorder = canReorderTracks && !settings.sort;
   const icons = useIcons();
   const MusicIcon = icons.music;
   const MenuIcon = icons.ellipsis;
@@ -156,132 +165,157 @@ export function TrackList({
   };
 
   return (
-    <section className="-mb-4 flex min-h-0 flex-1 flex-col gap-[14px]">
-      <div className="relative min-h-0 flex-1">
+    <section className="-mb-4 flex min-h-0 flex-1 flex-col gap-1">
+      <TrackListControls settings={settings} onChange={onSettingsChange} />
+      <div className="thin-scrollbar no-drag flex min-h-0 flex-1 overflow-x-auto">
         <div
-          ref={containerRef}
-          className="thin-scrollbar no-drag h-full min-h-0 overflow-y-auto pr-2"
-          onScroll={handleScroll}
+          role="table"
+          aria-label="Tracks"
+          aria-rowcount={tracks.length + 1}
+          className="flex min-h-0 flex-1 flex-col"
+          style={{ minWidth: layout.minWidth }}
         >
-          {tracks.length === 0 ? (
-            <div className="flex h-[calc(100%-1rem)] min-h-[180px] items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.025] text-[14px] text-muted-foreground">
-              {isLoading ? <LoadingTracksText /> : "No tracks here yet. Start by adding something."}
-            </div>
-          ) : (
-            <div className="relative" style={{ height: totalHeight + 32 }}>
-              {rows.map(({ index, start }) => {
-                const track = tracks[index];
-                if (!track) return null;
+          <TrackListHeader
+            settings={settings}
+            gridTemplateColumns={layout.gridTemplateColumns}
+            onChange={(next) => {
+              scrollToOffset(0);
+              onScrollPositionChange(0);
+              onSettingsChange(next);
+            }}
+          />
+          <div
+            ref={containerRef}
+            role="rowgroup"
+            className="thin-scrollbar no-drag min-h-0 flex-1 overflow-y-auto pr-2"
+            onScroll={handleScroll}
+          >
+            {tracks.length === 0 ? (
+              <div className="flex h-[calc(100%-1rem)] min-h-[180px] items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.025] text-[14px] text-muted-foreground">
+                {isLoading ? (
+                  <LoadingTracksText />
+                ) : (
+                  "No tracks here yet. Start by adding something."
+                )}
+              </div>
+            ) : (
+              <div className="relative" style={{ height: totalHeight + 32 }}>
+                {rows.map(({ index, start }) => {
+                  const track = tracks[index];
+                  if (!track) return null;
 
-                const isFavorite = favoriteTrackSet.has(track.id);
-                const isSelected = selectedTrackSet.has(track.id);
-                const showBeforeLine =
-                  dropIndicator?.trackId === track.id && dropIndicator.edge === "before";
-                const showAfterLine =
-                  dropIndicator?.trackId === track.id && dropIndicator.edge === "after";
+                  const isFavorite = favoriteTrackSet.has(track.id);
+                  const isSelected = selectedTrackSet.has(track.id);
+                  const showBeforeLine =
+                    dropIndicator?.trackId === track.id && dropIndicator.edge === "before";
+                  const showAfterLine =
+                    dropIndicator?.trackId === track.id && dropIndicator.edge === "after";
 
-                return (
-                  <div key={track.id} className="absolute inset-x-0" style={{ top: start }}>
-                    {showBeforeLine && <DropIndicator />}
-                    <TrackListRow
-                      track={track}
-                      index={index}
-                      activeTrackId={activeTrackId}
-                      isPlaying={isPlaying}
-                      selected={isSelected}
-                      dragging={draggedTrackSet.has(track.id)}
-                      favorite={isFavorite}
-                      selectedTracks={isSelected ? selectedTracks : [track]}
-                      selectedPlaylist={selectedPlaylist}
-                      selectedTag={selectedTag}
-                      playlists={playlists}
-                      tags={tags}
-                      menuOpen={menuTrackId === track.id}
-                      menuAnchorPoint={menuTrackId === track.id ? contextMenuPoint : null}
-                      menuIcon={MenuIcon}
-                      artworkFallbackIcon={MusicIcon}
-                      onSelect={onSelectTrack}
-                      onPlay={onPlayTrack}
-                      onContextMenu={(nextTrack, point) => {
-                        if (!selectedTrackSet.has(track.id)) onSelectTrack(track);
-                        setContextMenuPoint(point);
-                        setMenuTrackId(nextTrack.id);
-                      }}
-                      onKeyPlay={onPlayTrack}
-                      onDragStart={(dragTrack, event) => {
-                        const draggedIds = selectedTrackSet.has(dragTrack.id)
-                          ? selectedTrackIds
-                          : [dragTrack.id];
-                        const draggedTracks = draggedIds
-                          .map((trackId) => trackById.get(trackId))
-                          .filter((item): item is LibraryTrack => Boolean(item));
-                        setDraggedTrackIds(draggedIds);
-                        event.dataTransfer.effectAllowed = "copyMove";
-                        setDraggedTrackIdsPayload(event.dataTransfer, draggedIds, dragTrack.id);
-                        if (draggedTracks.length > 1) {
-                          const dragImage = createTrackStackDragImage(draggedTracks);
-                          document.body.appendChild(dragImage);
-                          event.dataTransfer.setDragImage(dragImage, 26, 24);
-                          window.setTimeout(() => dragImage.remove(), 0);
-                        }
-                      }}
-                      onDragEnd={() => {
-                        setDraggedTrackIds([]);
-                        setDropIndicator(null);
-                      }}
-                      onToggleFavorite={onToggleFavorite}
-                      onMenuOpenChange={(nextOpen, point) => {
-                        setContextMenuPoint(point);
-                        setMenuTrackId(nextOpen ? track.id : null);
-                      }}
-                      onAddToPlaylist={onAddToPlaylist}
-                      onAddTracksToPlaylist={onAddTracksToPlaylist}
-                      onCreatePlaylist={onCreatePlaylist}
-                      onAddTracksToTag={onAddTracksToTag}
-                      onCreateTag={onCreateTag}
-                      onRemoveFromPlaylist={onRemoveFromPlaylist}
-                      onRemoveFromTag={onRemoveFromTag}
-                      onShowInFolder={onShowInFolder}
-                      onShowMetadata={onShowMetadata}
-                      onViewArtist={onViewArtist}
-                      onViewAlbum={onViewAlbum}
-                      onDragOver={(event) => {
-                        if (!canReorderTracks) return;
-                        event.preventDefault();
-                        event.dataTransfer.dropEffect = "move";
+                  return (
+                    <div key={track.id} className="absolute inset-x-0" style={{ top: start }}>
+                      {showBeforeLine && <DropIndicator />}
+                      <TrackListRow
+                        track={track}
+                        columns={settings.columns}
+                        gridTemplateColumns={layout.gridTemplateColumns}
+                        index={index}
+                        activeTrackId={activeTrackId}
+                        isPlaying={isPlaying}
+                        selected={isSelected}
+                        dragging={draggedTrackSet.has(track.id)}
+                        favorite={isFavorite}
+                        selectedTracks={isSelected ? selectedTracks : [track]}
+                        selectedPlaylist={selectedPlaylist}
+                        selectedTag={selectedTag}
+                        playlists={playlists}
+                        tags={tags}
+                        menuOpen={menuTrackId === track.id}
+                        menuAnchorPoint={menuTrackId === track.id ? contextMenuPoint : null}
+                        menuIcon={MenuIcon}
+                        artworkFallbackIcon={MusicIcon}
+                        onSelect={onSelectTrack}
+                        onPlay={onPlayTrack}
+                        onContextMenu={(nextTrack, point) => {
+                          if (!selectedTrackSet.has(track.id)) onSelectTrack(track);
+                          setContextMenuPoint(point);
+                          setMenuTrackId(nextTrack.id);
+                        }}
+                        onKeyPlay={onPlayTrack}
+                        onDragStart={(dragTrack, event) => {
+                          const draggedIds = selectedTrackSet.has(dragTrack.id)
+                            ? selectedTrackIds
+                            : [dragTrack.id];
+                          const draggedTracks = draggedIds
+                            .map((trackId) => trackById.get(trackId))
+                            .filter((item): item is LibraryTrack => Boolean(item));
+                          setDraggedTrackIds(draggedIds);
+                          event.dataTransfer.effectAllowed = "copyMove";
+                          setDraggedTrackIdsPayload(event.dataTransfer, draggedIds, dragTrack.id);
+                          if (draggedTracks.length > 1) {
+                            const dragImage = createTrackStackDragImage(draggedTracks);
+                            document.body.appendChild(dragImage);
+                            event.dataTransfer.setDragImage(dragImage, 26, 24);
+                            window.setTimeout(() => dragImage.remove(), 0);
+                          }
+                        }}
+                        onDragEnd={() => {
+                          setDraggedTrackIds([]);
+                          setDropIndicator(null);
+                        }}
+                        onToggleFavorite={onToggleFavorite}
+                        onMenuOpenChange={(nextOpen, point) => {
+                          setContextMenuPoint(point);
+                          setMenuTrackId(nextOpen ? track.id : null);
+                        }}
+                        onAddToPlaylist={onAddToPlaylist}
+                        onAddTracksToPlaylist={onAddTracksToPlaylist}
+                        onCreatePlaylist={onCreatePlaylist}
+                        onAddTracksToTag={onAddTracksToTag}
+                        onCreateTag={onCreateTag}
+                        onRemoveFromPlaylist={onRemoveFromPlaylist}
+                        onRemoveFromTag={onRemoveFromTag}
+                        onShowInFolder={onShowInFolder}
+                        onShowMetadata={onShowMetadata}
+                        onViewArtist={onViewArtist}
+                        onViewAlbum={onViewAlbum}
+                        onDragOver={(event) => {
+                          if (!canReorder) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
 
-                        const rect = event.currentTarget.getBoundingClientRect();
-                        const edge =
-                          event.clientY < rect.top + rect.height / 2 ? "before" : "after";
-                        setDropIndicator({ trackId: track.id, edge });
-                      }}
-                      onDragLeave={(event) => {
-                        if (!canReorderTracks) return;
-                        if (event.currentTarget.contains(event.relatedTarget as Node | null))
-                          return;
-                        setDropIndicator((current) =>
-                          current?.trackId === track.id ? null : current,
-                        );
-                      }}
-                      onDrop={(event) => {
-                        if (!canReorderTracks) return;
-                        event.preventDefault();
-                        const draggedTrackIds = getDraggedTrackIds(event.dataTransfer);
-                        if (draggedTrackIds.length > 0) {
+                          const rect = event.currentTarget.getBoundingClientRect();
                           const edge =
-                            dropIndicator?.trackId === track.id ? dropIndicator.edge : "before";
-                          void onReorderTrack(draggedTrackIds, track.id, edge);
-                        }
-                        setDraggedTrackIds([]);
-                        setDropIndicator(null);
-                      }}
-                    />
-                    {showAfterLine && <DropIndicator />}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                            event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+                          setDropIndicator({ trackId: track.id, edge });
+                        }}
+                        onDragLeave={(event) => {
+                          if (!canReorder) return;
+                          if (event.currentTarget.contains(event.relatedTarget as Node | null))
+                            return;
+                          setDropIndicator((current) =>
+                            current?.trackId === track.id ? null : current,
+                          );
+                        }}
+                        onDrop={(event) => {
+                          if (!canReorder) return;
+                          event.preventDefault();
+                          const draggedTrackIds = getDraggedTrackIds(event.dataTransfer);
+                          if (draggedTrackIds.length > 0) {
+                            const edge =
+                              dropIndicator?.trackId === track.id ? dropIndicator.edge : "before";
+                            void onReorderTrack(draggedTrackIds, track.id, edge);
+                          }
+                          setDraggedTrackIds([]);
+                          setDropIndicator(null);
+                        }}
+                      />
+                      {showAfterLine && <DropIndicator />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </section>

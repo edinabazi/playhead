@@ -69,6 +69,12 @@ Playhead supports two display modes, depending on how you like to organize your 
 
 **Folder mode** keeps your imported folders visible as the main structure. This is useful for DJs, producers, download folders, exports, set prep, samples, references, and messy real-world music libraries.
 
+### Metadata columns and sorting
+
+Use **Columns** above the track list to show Artist, Album, Album artist, Genre, Disc, Track no., Year, Composer, BPM, or Time. Click a column heading to sort; click again to reverse it. Column choices and sorting are remembered across launches. Text stored in the Disc tag, such as a mood, is preserved and sortable.
+
+**Reset sort** restores the original source order and enables manual folder or playlist reordering again. Starting playback from a sorted list uses that order for the new queue. Existing libraries refresh their cached metadata on first launch after this update.
+
 ### Local-first playback
 
 Playhead plays audio directly from your machine. Your files stay on disk, and your library state is stored locally.

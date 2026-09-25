@@ -38,6 +38,35 @@ function mockMetadata() {
 }
 
 describe("library scanner", () => {
+  it("refreshes legacy cached tracks once and keeps text Disc and Genre tags", async () => {
+    const directory = await createTempDirectory();
+    await writeFile(join(directory, "track.mp3"), Buffer.from("audio"));
+    mockMetadata();
+    const first = await scanFolderPath(directory);
+    const legacy = { ...first.tracks[0], metadataVersion: undefined };
+    scannerMocks.parseFile.mockResolvedValue({
+      common: {
+        title: "Track",
+        artist: "Artist",
+        track: { no: 2 },
+        disk: { no: null },
+        genre: ["House", "Disco"],
+        composer: ["Writer"],
+      },
+      native: { "ID3v2.4": [{ id: "TPOS", value: "Warm-up" }] },
+      format: { duration: 120 },
+    });
+    const refreshed = await scanFolderPath(directory, undefined, { [legacy.id]: legacy });
+    expect(refreshed.tracks[0]).toMatchObject({
+      genre: "House, Disco",
+      disc: "Warm-up",
+      composer: "Writer",
+      trackNumber: 2,
+    });
+    await scanFolderPath(directory, undefined, { [legacy.id]: refreshed.tracks[0] });
+    expect(scannerMocks.parseFile).toHaveBeenCalledTimes(2);
+  });
+
   it("reuses metadata for unchanged audio files", async () => {
     const directory = await createTempDirectory();
     const filePath = join(directory, "track.mp3");

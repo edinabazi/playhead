@@ -1,3 +1,7 @@
+import { defaultTrackListSettings, type TrackListSettings } from "./track-list";
+
+export const libraryTrackMetadataVersion = 1;
+
 export type LibraryMode = "folder" | "library";
 
 export type SourceType =
@@ -38,6 +42,7 @@ export type LibraryFolder = {
   name: string;
   path: string;
   trackIds: string[];
+  metadataVersion?: number;
 };
 
 export type LibraryTrack = {
@@ -51,6 +56,10 @@ export type LibraryTrack = {
   artist: string;
   album?: string;
   albumArtist?: string;
+  genre?: string;
+  composer?: string;
+  disc?: string;
+  metadataVersion?: number;
   trackNumber?: number;
   diskNumber?: number;
   year?: number;
@@ -282,6 +291,7 @@ export type SessionSettings = {
   sidebarGroupOrder: SidebarGroupId[];
   expandedFolderPaths: string[];
   levelMeters: LevelMeterSettings;
+  trackList: TrackListSettings;
   queue: PlaybackQueue;
 };
 
@@ -519,6 +529,7 @@ export const defaultSessionSettings = (): SessionSettings => ({
   sidebarGroupOrder: ["library", "playlists", "tags", "soundcloud"],
   expandedFolderPaths: [],
   levelMeters: { open: false },
+  trackList: defaultTrackListSettings(),
   queue: {
     items: [],
     shuffledItems: [],
