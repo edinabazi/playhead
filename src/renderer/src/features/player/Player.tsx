@@ -249,7 +249,7 @@ export function Player({
           </div>
         </div>
 
-        <div className="no-drag flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
+        <div className="no-drag flex shrink-0 items-center gap-2 text-[13px] font-medium tabular-nums text-muted-foreground">
           <IconButton
             title="Levels"
             tooltip={levelsOpen ? "Hide levels" : "Show levels"}
