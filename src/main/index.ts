@@ -1,3 +1,4 @@
+import { registerLyricsIpc } from "./lyrics/lyrics-ipc";
 import { join } from "node:path";
 import { electron } from "./electron";
 import { closeFolderWatcher } from "./library/folder-watcher";
@@ -154,6 +155,7 @@ app.whenReady().then(() => {
   }
 
   registerLibraryIpc();
+  registerLyricsIpc();
   registerLastfmIpc();
   registerSoundCloudIpc();
   registerTelemetryIpc();

@@ -28,7 +28,7 @@ export function IconButton({
 
   const button = (
     <motion.button
-      className={`no-drag relative grid size-9 place-items-center overflow-hidden rounded-full outline-none transition-colors duration-150 ${
+      className={`no-drag relative grid size-9 place-items-center overflow-hidden rounded-full outline-none focus-visible:ring-1 focus-visible:ring-primary/60 transition-colors duration-150 ${
         active ? "text-primary" : "text-muted-foreground hover:text-foreground"
       }`}
       title={title}

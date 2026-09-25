@@ -57,3 +57,19 @@ describe("PlaybackClock", () => {
     expect(displayedSeconds).toEqual([59, 60, 125, 12, 0]);
   });
 });
+
+it("notifies precise lyric subscribers within the same second without increasing timer renders", () => {
+  const clock = new PlaybackClock();
+  const precise = vi.fn();
+  const seconds = vi.fn();
+  const unsubscribe = clock.subscribePrecise(precise);
+  clock.subscribe(seconds);
+  clock.setTime(0.1);
+  clock.setTime(0.5);
+  clock.setTime(0.2);
+  expect(precise).toHaveBeenCalledTimes(3);
+  expect(seconds).not.toHaveBeenCalled();
+  unsubscribe();
+  clock.setTime(0.8);
+  expect(precise).toHaveBeenCalledTimes(3);
+});

@@ -94,6 +94,14 @@ Supported formats include:
 
 Playhead generates and caches waveform data for local audio files, giving you a quick visual sense of the track while you listen.
 
+### Lyrics
+
+Open **Lyrics** beside the player's level-meter button to read embedded lyrics or a matching `.lrc` file (for example, `Song.lrc` beside `Song.flac`). The waveform and playback controls stay available above the lyrics.
+
+Timed lyrics follow playback. Click a line to seek, scroll to browse freely, then choose **Follow playback** to resume. Untimed lyrics display as normal text. Reduced Motion also applies to lyric scrolling.
+
+Drop an `.lrc` file into the lyrics view or use **Lyrics options → Choose lyrics file…** to associate one with the current local track. Selections persist between launches; **Use automatic lyrics** restores matching-file/embedded detection. File edits refresh automatically while the view is open. Lyrics stay local; Playhead does not search or download them online.
+
 ### Metadata editing
 
 View and edit track metadata without leaving the app.

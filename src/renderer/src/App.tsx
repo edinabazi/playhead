@@ -1,3 +1,4 @@
+import { LyricsPanel } from "@/features/lyrics/LyricsPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import Hls from "hls.js";
@@ -481,6 +482,7 @@ export function App() {
   const [shuffleEnabled, setShuffleEnabled] = useState(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [lyricsOpen, setLyricsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
   const [isCreateTagOpen, setIsCreateTagOpen] = useState(false);
@@ -2170,6 +2172,21 @@ export function App() {
     setVolume(baseVolume);
   }, []);
 
+  const seekToLyric = useCallback(
+    (time: number) => {
+      const wavesurfer = wavesurferRef.current;
+      if (!wavesurfer) return;
+      wavesurfer.setTime(clamp(time, 0, wavesurfer.getDuration() || 0));
+      playbackClock.setTime(wavesurfer.getCurrentTime());
+    },
+    [playbackClock],
+  );
+
+  const closeLyrics = useCallback(() => {
+    setLyricsOpen(false);
+    document.querySelector<HTMLButtonElement>('button[aria-controls="lyrics-panel"]')?.focus();
+  }, []);
+
   const seekBy = useCallback(
     (offset: number) => {
       const wavesurfer = wavesurferRef.current;
@@ -2378,6 +2395,7 @@ export function App() {
   }, [allPlayableTracksById, selectTrack, selectedTrackIds]);
 
   const selectLibrarySource = useCallback((source: LibraryState["selectedSource"]) => {
+    setLyricsOpen(false);
     setSelectedLibraryBrowserItemIds([]);
     libraryBrowserSelectionAnchorIdRef.current = null;
     setLibrary((current) => {
@@ -3186,6 +3204,8 @@ export function App() {
             ) : (
               <>
                 <Player
+                  lyricsOpen={lyricsOpen}
+                  onToggleLyrics={() => setLyricsOpen((open) => !open)}
                   activeTrack={activeTrack}
                   activeTags={activeTags}
                   isPlaying={isPlaying}
@@ -3315,7 +3335,16 @@ export function App() {
                   />
                 )}
 
-                {selectedSource?.type === "library-artists" ? (
+                {lyricsOpen ? (
+                  <LyricsPanel
+                    key={activeTrack?.id || "empty"}
+                    track={activeTrack}
+                    clock={playbackClock}
+                    reduceMotion={reduceMotion}
+                    onSeek={seekToLyric}
+                    onClose={closeLyrics}
+                  />
+                ) : selectedSource?.type === "library-artists" ? (
                   <LibraryBrowser
                     emptyLabel="No artists to show."
                     artists={libraryArtists}

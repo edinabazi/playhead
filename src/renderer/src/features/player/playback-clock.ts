@@ -3,9 +3,18 @@ import { useSyncExternalStore } from "react";
 type Listener = () => void;
 
 // Holds the playhead position outside React state. The waveform reports it on every animation
-// frame, but the UI only shows whole seconds, so subscribers are notified only when the displayed second changes.
+// frame. Elapsed-time labels subscribe by second; lyrics use precise updates with a line-index snapshot.
 export class PlaybackClock {
   private time = 0;
+  private readonly preciseListeners = new Set<Listener>();
+
+  subscribePrecise = (listener: Listener): (() => void) => {
+    this.preciseListeners.add(listener);
+    return () => {
+      this.preciseListeners.delete(listener);
+    };
+  };
+
   private readonly listeners = new Set<Listener>();
 
   getTime = (): number => this.time;
@@ -24,6 +33,7 @@ export class PlaybackClock {
     if (nextTime === this.time) return;
     const previousSecond = this.getWholeSeconds();
     this.time = nextTime;
+    this.preciseListeners.forEach((listener) => listener());
     if (this.getWholeSeconds() === previousSecond) return;
     this.listeners.forEach((listener) => listener());
   }

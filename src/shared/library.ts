@@ -1,3 +1,4 @@
+import type { TrackLyrics } from "./lyrics";
 import { defaultTrackListSettings, type TrackListSettings } from "./track-list";
 
 export const libraryTrackMetadataVersion = 1;
@@ -377,6 +378,10 @@ export type BpmCacheEntry = {
 export type BpmCacheWrite = BpmCacheRequest & BpmCacheEntry;
 
 export type PlayheadApi = {
+  getTrackLyrics: (trackId: string) => Promise<TrackLyrics>;
+  selectTrackLyrics: (trackId: string, filePath?: string | null) => Promise<TrackLyrics | null>;
+  watchTrackLyrics: (trackId: string | null) => Promise<void>;
+  onLyricsChanged: (callback: (trackId: string) => void) => () => void;
   getAppVersion: () => Promise<string>;
   getLibraryState: () => Promise<LibraryState>;
   saveLibraryState: (state: LibraryState) => Promise<LibraryState>;

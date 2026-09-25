@@ -58,6 +58,8 @@ export function Player({
   limiterActive,
   equalizer,
   levelsOpen,
+  lyricsOpen,
+  onToggleLyrics,
   onTogglePlayback,
   onPreviousTrack,
   onNextTrack,
@@ -91,6 +93,8 @@ export function Player({
   limiterActive: boolean;
   equalizer: EqualizerSettings;
   levelsOpen: boolean;
+  lyricsOpen: boolean;
+  onToggleLyrics: () => void;
   onTogglePlayback: () => void;
   onPreviousTrack: () => void;
   onNextTrack: () => void;
@@ -113,6 +117,7 @@ export function Player({
   const VolumeIcon = icons["volume-2"];
   const SoundIcon = icons["sliders-horizontal"];
   const LevelsIcon = icons.gauge;
+  const LyricsIcon = icons.captions;
   const soundPanelId = useId();
   const soundControlsRef = useRef<HTMLDivElement>(null);
   const [soundPanelOpen, setSoundPanelOpen] = useState(false);
@@ -253,6 +258,17 @@ export function Player({
             onClick={onToggleLevels}
           >
             <LevelsIcon size={19} strokeWidth={1.8} />
+          </IconButton>
+          <IconButton
+            title="Lyrics"
+            tooltip={lyricsOpen ? "Hide lyrics" : "Show lyrics"}
+            active={lyricsOpen}
+            ariaExpanded={lyricsOpen}
+            ariaControls="lyrics-panel"
+            disabled={!activeTrack}
+            onClick={onToggleLyrics}
+          >
+            <LyricsIcon size={19} strokeWidth={1.8} />
           </IconButton>
           <FavoriteHeartButton
             active={isFavorite}

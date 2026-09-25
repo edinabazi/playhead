@@ -7,6 +7,7 @@ import {
   ArrowDown,
   ArrowUpDown,
   CalendarDays,
+  Captions,
   Columns3,
   Disc3,
   Hash,
@@ -113,6 +114,7 @@ export type IconName =
   | "arrow-up"
   | "arrow-down"
   | "arrow-up-down"
+  | "captions"
   | "calendar-days"
   | "columns-3"
   | "disc-3"
@@ -192,6 +194,7 @@ const lucideMap: Record<IconName, IconComponent> = {
   "arrow-up": ArrowUp,
   "arrow-down": ArrowDown,
   "arrow-up-down": ArrowUpDown,
+  captions: Captions,
   "calendar-days": CalendarDays,
   "columns-3": Columns3,
   "disc-3": Disc3,
