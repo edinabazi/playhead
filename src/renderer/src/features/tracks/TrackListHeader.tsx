@@ -75,7 +75,7 @@ export function TrackListHeader({
           <button
             type="button"
             aria-label="Restore source order"
-            className="grid h-7 w-full place-items-center rounded-md transition-colors hover:bg-white/[0.05] hover:text-foreground focus-visible:outline focus-visible:outline-primary"
+            className="grid h-7 w-full place-items-center rounded-md transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-primary"
             onClick={() => onChange({ ...settings, sort: null })}
           >
             <OrderIcon size={12} strokeWidth={1.6} />
@@ -103,7 +103,7 @@ export function TrackListHeader({
               type="button"
               aria-label={`Sort by ${column.label}`}
               title={`Sort by ${column.label}, ${direction === "asc" ? "descending" : "ascending"}`}
-              className={`group flex h-7 w-full items-center gap-1 rounded-md transition-colors hover:bg-white/[0.04] hover:text-foreground focus-visible:outline focus-visible:outline-primary ${column.numeric ? "justify-end" : ""} ${direction ? "text-foreground" : ""}`}
+              className={`group flex h-7 w-full items-center gap-1 rounded-md transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-primary ${column.numeric ? "justify-end" : ""} ${direction ? "text-foreground" : ""}`}
               onClick={() =>
                 onChange({
                   ...settings,
