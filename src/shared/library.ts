@@ -1,3 +1,4 @@
+import type { PlaybackCopyResult } from "./playback";
 import type { TrackLyrics } from "./lyrics";
 import { defaultTrackListSettings, type TrackListSettings } from "./track-list";
 
@@ -378,6 +379,8 @@ export type BpmCacheEntry = {
 export type BpmCacheWrite = BpmCacheRequest & BpmCacheEntry;
 
 export type PlayheadApi = {
+  preparePlaybackCopy: (path: string, requestId: number) => Promise<PlaybackCopyResult>;
+  cancelPlaybackCopy: (requestId: number) => Promise<void>;
   getTrackLyrics: (trackId: string) => Promise<TrackLyrics>;
   selectTrackLyrics: (trackId: string, filePath?: string | null) => Promise<TrackLyrics | null>;
   watchTrackLyrics: (trackId: string | null) => Promise<void>;

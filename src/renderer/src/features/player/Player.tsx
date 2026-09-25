@@ -1,3 +1,5 @@
+import type { PlaybackFailure } from "../../../../shared/playback";
+import { PlaybackError } from "./PlaybackError";
 import type { EqualizerSettings, LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useId, useRef, useState } from "react";
@@ -43,6 +45,9 @@ export function Player({
   activeTags,
   isPlaying,
   isLoading,
+  playbackError,
+  preparingPlayback,
+  onRetryPlayback,
   hasWaveform,
   shouldAnimateWaveform,
   reduceMotion,
@@ -78,6 +83,9 @@ export function Player({
   activeTags: LibraryTag[];
   isPlaying: boolean;
   isLoading: boolean;
+  playbackError: PlaybackFailure | null;
+  preparingPlayback: boolean;
+  onRetryPlayback: () => void;
   hasWaveform: boolean;
   shouldAnimateWaveform: boolean;
   reduceMotion: boolean;
@@ -286,7 +294,7 @@ export function Player({
               className="h-full origin-left"
               animate={{
                 clipPath: hasWaveform ? "inset(0% 0% 0% 0%)" : "inset(0% 100% 0% 0%)",
-                opacity: hasWaveform ? 1 : 0,
+                opacity: hasWaveform && !playbackError ? 1 : 0,
               }}
               transition={{
                 clipPath: {
@@ -306,14 +314,23 @@ export function Player({
           </motion.div>
 
           <AnimatePresence mode="wait">
-            {!hasWaveform && (
+            {!hasWaveform && !playbackError && (
               <WaveformEmptyState
                 key={activeTrack ? "loading-waveform" : "empty-waveform"}
-                isLoading={(isLoading && shouldAnimateWaveform) || !activeTrack}
+                isLoading={isLoading || !activeTrack}
                 reduceMotion={reduceMotion}
               />
             )}
           </AnimatePresence>
+          {preparingPlayback && !playbackError && (
+            <div
+              role="status"
+              className="no-drag absolute inset-0 grid place-items-center bg-background/60 text-[12px] text-muted-foreground"
+            >
+              Preparing playback…
+            </div>
+          )}
+          {playbackError && <PlaybackError failure={playbackError} onRetry={onRetryPlayback} />}
         </div>
         <div className="flex items-center justify-between pt-1 text-[10px] font-medium leading-none tabular-nums text-muted-foreground">
           <ElapsedTime clock={playbackClock} />

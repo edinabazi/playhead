@@ -94,6 +94,12 @@ Supported formats include:
 
 Playhead generates and caches waveform data for local audio files, giving you a quick visual sense of the track while you listen.
 
+### Network and external drives
+
+If direct playback fails, Playhead tries a temporary local copy before reporting an error. Copies stay on disk, are reused while the source is unchanged, and are removed when the app quits. Retained copies are limited to two tracks and 512 MB, with room for a single larger recording.
+
+If the source still can't be read, the waveform area shows the problem and a **Retry** button. Reconnect the drive or restore access, then retry. Switching tracks cancels pending recovery; seeking and paused playback are preserved when a loaded track recovers.
+
 ### Lyrics
 
 Open **Lyrics** beside the player's level-meter button to read embedded lyrics or a matching `.lrc` file (for example, `Song.lrc` beside `Song.flac`). The waveform and playback controls stay available above the lyrics.

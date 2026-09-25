@@ -1,3 +1,9 @@
+import { playbackFailure, type PlaybackFailure } from "../../shared/playback";
+import {
+  loadLocalPlayback,
+  PlaybackLoadError,
+  waitForPlayback,
+} from "@/features/player/local-playback";
 import { LyricsPanel } from "@/features/lyrics/LyricsPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
@@ -452,6 +458,12 @@ export function App() {
   const selectionAnchorTrackIdRef = useRef<string | null>(null);
   const libraryBrowserSelectionAnchorIdRef = useRef<string | null>(null);
   const trackLoadRequestIdRef = useRef(0);
+  const isPlayingRef = useRef(false);
+  const playbackAbortRef = useRef<AbortController | null>(null);
+  const playbackStatusRef = useRef({ loading: false, copied: false });
+  const recoverPlaybackRef = useRef<(track: LibraryTrack, time: number, autoplay: boolean) => void>(
+    () => {},
+  );
   const trackLoadQueueRef = useRef(Promise.resolve());
   const bpmAnalysisQueueRef = useRef(Promise.resolve());
   const bpmAnalysisTrackIdsRef = useRef(new Set<string>());
@@ -476,6 +488,8 @@ export function App() {
   const [volume, setVolume] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [playbackError, setPlaybackError] = useState<PlaybackFailure | null>(null);
+  const [preparingPlayback, setPreparingPlayback] = useState(false);
   const [isLoadingTrack, setIsLoadingTrack] = useState(false);
   const [, setError] = useState("");
   const [metadataDialog, setMetadataDialog] = useState<MetadataDialogState>(null);
@@ -1142,14 +1156,23 @@ export function App() {
       allowSkipUnavailable = true,
       queueMode: "preserve" | "source" = "preserve",
       activeQueueItemId?: string,
+      forceLocalCopy = false,
     ) => {
       const wavesurfer = wavesurferRef.current;
       if (!wavesurfer) return;
+      playbackAbortRef.current?.abort();
+      const playbackAbort = new AbortController();
+      playbackAbortRef.current = playbackAbort;
+      playbackStatusRef.current = { loading: true, copied: forceLocalCopy };
+      setPlaybackError(null);
+      setPreparingPlayback(false);
       const requestId = trackLoadRequestIdRef.current + 1;
       trackLoadRequestIdRef.current = requestId;
       loadedTrackIdRef.current = null;
-      lastfmPlaybackSessionRef.current = null;
-      lastfmNowPlayingTrackIdRef.current = null;
+      if (!forceLocalCopy) {
+        lastfmPlaybackSessionRef.current = null;
+        lastfmNowPlayingTrackIdRef.current = null;
+      }
 
       wavesurfer.pause();
       setIsLoadingTrack(true);
@@ -1229,7 +1252,11 @@ export function App() {
         };
         const cachedWaveform = remoteTrack
           ? null
-          : await window.playhead.getWaveformCache(waveformCacheRequest);
+          : await waitForPlayback(
+              window.playhead.getWaveformCache(waveformCacheRequest),
+              playbackAbort.signal,
+              2000,
+            ).catch(() => null);
         if (requestId !== trackLoadRequestIdRef.current) return;
         setShouldAnimateWaveform(!cachedWaveform);
         if (!cachedWaveform) setHasWaveform(false);
@@ -1248,17 +1275,28 @@ export function App() {
               );
               return;
             }
-            await wavesurfer.load(
-              audioUrl,
-              cachedWaveform?.peaks,
-              cachedWaveform?.duration || track.duration || undefined,
-            );
+            const result = await loadLocalPlayback({
+              player: wavesurfer,
+              url: audioUrl,
+              path: track.path,
+              requestId,
+              duration: track.duration,
+              cached: cachedWaveform,
+              startTime,
+              autoplay,
+              signal: playbackAbort.signal,
+              forceCopy: forceLocalCopy,
+              api: window.playhead,
+              onPreparing: () => {
+                if (requestId === trackLoadRequestIdRef.current) setPreparingPlayback(true);
+              },
+            });
+            if (requestId === trackLoadRequestIdRef.current)
+              playbackStatusRef.current.copied = result.copied;
           }));
         if (requestId !== trackLoadRequestIdRef.current) return;
 
         loadedTrackIdRef.current = track.id;
-        lastfmPlaybackSessionRef.current = null;
-        lastfmNowPlayingTrackIdRef.current = null;
         setHasWaveform(remoteTrack ? remoteHasWaveform : true);
         setDuration(wavesurfer.getDuration() || track.duration || 0);
         if (!cachedWaveform && !remoteTrack) {
@@ -1285,23 +1323,22 @@ export function App() {
         });
         if (remoteTrack) void analyzeSoundCloudTrackBpm(track);
         else void analyzeTrackBpm(track);
-        if (startTime > 0) {
+        if (remoteTrack && startTime > 0) {
           wavesurfer.setTime(clamp(startTime, 0, wavesurfer.getDuration() || startTime));
           playbackClock.setTime(wavesurfer.getCurrentTime());
         }
 
-        if (autoplay) {
-          try {
-            await wavesurfer.play();
-          } catch {
-            setIsPlaying(false);
-            setError("Playback could not start.");
-          }
-        }
+        playbackClock.setTime(wavesurfer.getCurrentTime());
+        if (autoplay && remoteTrack) await wavesurfer.play();
       } catch (loadError) {
         if (requestId !== trackLoadRequestIdRef.current) return;
         console.error("Failed to load track", { path: track.path, error: loadError });
-        const loadErrorMessage = getErrorMessage(loadError, track.artist);
+        const failure =
+          loadError instanceof PlaybackLoadError ? loadError.failure : playbackFailure(loadError);
+        setPlaybackError(failure);
+        setIsPlaying(false);
+        wavesurfer.pause();
+        const loadErrorMessage = getErrorMessage(loadError, "This track could not be loaded.");
         const soundCloudPlaybackStop =
           remoteTrack && isSoundCloudPlaybackStopError(loadErrorMessage);
         loadedTrackIdRef.current = null;
@@ -1312,7 +1349,8 @@ export function App() {
           autoplay &&
           allowSkipUnavailable &&
           library.settings.playback.skipUnavailableTracks &&
-          !soundCloudPlaybackStop
+          !soundCloudPlaybackStop &&
+          (remoteTrack || failure.kind === "decode")
         ) {
           showTrackActionToast({
             action: "Skipped unavailable track",
@@ -1324,7 +1362,11 @@ export function App() {
           showSimpleActionToast(loadErrorMessage, "error");
         }
       } finally {
-        if (requestId === trackLoadRequestIdRef.current) setIsLoadingTrack(false);
+        if (requestId === trackLoadRequestIdRef.current) {
+          playbackStatusRef.current.loading = false;
+          setPreparingPlayback(false);
+          setIsLoadingTrack(false);
+        }
       }
     },
     [
@@ -1340,6 +1382,12 @@ export function App() {
       tracks,
     ],
   );
+
+  useEffect(() => {
+    recoverPlaybackRef.current = (track, time, autoplay) => {
+      void selectTrack(track, autoplay, time, false, "preserve", undefined, true);
+    };
+  }, [selectTrack]);
 
   const playSearchResult = useCallback(
     async (track: LibraryTrack) => {
@@ -1482,6 +1530,13 @@ export function App() {
             : { ...state.settings, session: latest.settings.session },
         });
         if (activeTrackId && !persistedState.tracks[activeTrackId]) {
+          playbackAbortRef.current?.abort();
+          trackLoadRequestIdRef.current++;
+          loadedTrackIdRef.current = null;
+          playbackStatusRef.current.loading = false;
+          setPlaybackError(null);
+          setPreparingPlayback(false);
+          setIsLoadingTrack(false);
           wavesurferRef.current?.stop();
           wavesurferRef.current?.empty();
           setActiveTrackId(null);
@@ -1787,6 +1842,13 @@ export function App() {
 
   const clearPlaybackState = useCallback(() => {
     destroyHls();
+    playbackAbortRef.current?.abort();
+    trackLoadRequestIdRef.current++;
+    loadedTrackIdRef.current = null;
+    playbackStatusRef.current.loading = false;
+    setPlaybackError(null);
+    setPreparingPlayback(false);
+    setIsLoadingTrack(false);
     wavesurferRef.current?.stop();
     wavesurferRef.current?.empty();
     setActiveTrackId(null);
@@ -1875,6 +1937,13 @@ export function App() {
           : library.selectedSource;
 
       if (activeTrackId && removedTrackIds.has(activeTrackId)) {
+        playbackAbortRef.current?.abort();
+        trackLoadRequestIdRef.current++;
+        loadedTrackIdRef.current = null;
+        playbackStatusRef.current.loading = false;
+        setPlaybackError(null);
+        setPreparingPlayback(false);
+        setIsLoadingTrack(false);
         wavesurferRef.current?.stop();
         wavesurferRef.current?.empty();
         setActiveTrackId(null);
@@ -2163,7 +2232,17 @@ export function App() {
       return;
     }
 
-    await wavesurfer.playPause();
+    try {
+      await wavesurfer.playPause();
+    } catch (error) {
+      if (activeTrack && !isSoundCloudTrack(activeTrack) && !playbackStatusRef.current.copied) {
+        recoverPlaybackRef.current(activeTrack, wavesurfer.getCurrentTime(), true);
+      } else {
+        loadedTrackIdRef.current = null;
+        setIsPlaying(false);
+        setPlaybackError(playbackFailure(error));
+      }
+    }
   }, [activeTrack, activeTrackId, allPlayableTracksById, selectTrack, selectedTrackIds, tracks]);
 
   const setPlayerVolume = useCallback((nextVolume: number) => {
@@ -2912,6 +2991,7 @@ export function App() {
         if (session) lastfmPlaybackSessionRef.current = { ...session, lastTime: time };
       }),
       wavesurfer.on("play", () => {
+        isPlayingRef.current = true;
         setIsPlaying(true);
         updateMediaPosition(wavesurfer.getDuration(), wavesurfer.getCurrentTime());
         const track = activeTrackRef.current;
@@ -2930,6 +3010,7 @@ export function App() {
         void window.playhead.updateLastfmNowPlaying(payload).then(setLastfmState);
       }),
       wavesurfer.on("pause", () => {
+        isPlayingRef.current = false;
         setIsPlaying(false);
         updateMediaPosition(wavesurfer.getDuration(), wavesurfer.getCurrentTime());
       }),
@@ -2938,15 +3019,26 @@ export function App() {
         lastfmPlaybackSessionRef.current = null;
         if (!playNextTrackOnEndRef.current()) setIsPlaying(false);
       }),
-      wavesurfer.on("error", () => {
-        setError("This track could not be loaded.");
-        setHasWaveform(false);
-        setShouldAnimateWaveform(false);
-        setIsLoadingTrack(false);
+      wavesurfer.on("error", (error) => {
+        if (playbackStatusRef.current.loading || error?.name === "AbortError") return;
+        const track = activeTrackRef.current;
+        if (!track || loadedTrackIdRef.current !== track.id) return;
+        const time = wavesurfer.getCurrentTime();
+        const autoplay = isPlayingRef.current;
+        loadedTrackIdRef.current = null;
+        wavesurfer.pause();
+        setIsPlaying(false);
+        if (!isSoundCloudTrack(track) && !playbackStatusRef.current.copied) {
+          recoverPlaybackRef.current(track, time, autoplay);
+        } else {
+          setPlaybackError(playbackFailure(error));
+          setIsLoadingTrack(false);
+        }
       }),
     ];
 
     return () => {
+      playbackAbortRef.current?.abort();
       destroyHls();
       unsubscribers.forEach((unsubscribe) => unsubscribe());
       restoreProgressRendering();
@@ -3204,6 +3296,12 @@ export function App() {
             ) : (
               <>
                 <Player
+                  playbackError={playbackError}
+                  preparingPlayback={preparingPlayback}
+                  onRetryPlayback={() => {
+                    if (activeTrack)
+                      void selectTrack(activeTrack, true, playbackClock.getTime(), false);
+                  }}
                   lyricsOpen={lyricsOpen}
                   onToggleLyrics={() => setLyricsOpen((open) => !open)}
                   activeTrack={activeTrack}

@@ -20,6 +20,8 @@ import { electron } from "./electron";
 const { contextBridge, ipcRenderer, webUtils } = electron;
 
 const api: PlayheadApi = {
+  preparePlaybackCopy: (path, id) => ipcRenderer.invoke("library:prepare-playback-copy", path, id),
+  cancelPlaybackCopy: (id) => ipcRenderer.invoke("library:cancel-playback-copy", id),
   getTrackLyrics: (id) => ipcRenderer.invoke("lyrics:get", id),
   selectTrackLyrics: (id, path) => ipcRenderer.invoke("lyrics:select", id, path),
   watchTrackLyrics: (id) => ipcRenderer.invoke("lyrics:watch", id),

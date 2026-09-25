@@ -53,9 +53,9 @@ it("highlights within a second, seeks without a playback toggle and yields scrol
   );
   const first = await view.findByRole("button", { name: /First line/ });
   const second = view.getByRole("button", { name: /Second line/ });
-  act(() => clock.setTime(0.3));
+  await act(async () => clock.setTime(0.3));
   expect(first.getAttribute("aria-current")).toBe("true");
-  act(() => clock.setTime(0.65));
+  await act(async () => clock.setTime(0.65));
   expect(second.getAttribute("aria-current")).toBe("true");
   expect(first.getAttribute("aria-current")).toBeNull();
   fireEvent.click(first);

@@ -1,6 +1,9 @@
+import { fileResponse } from "../media/file-response";
+import { PlaybackCopies } from "../media/playback-copy";
+import { playbackFailure } from "../../shared/playback";
 import { createReadStream } from "node:fs";
 import { readFile, rm, stat, writeFile } from "node:fs/promises";
-import { extname, join, resolve, sep } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import type {
   EditableTrackMetadata,
@@ -79,27 +82,6 @@ function decodeMediaPath(url: string): string {
   return Buffer.from(encodedPath, "base64url").toString("utf8");
 }
 
-const audioMimeTypes: Record<string, string> = {
-  ".aac": "audio/aac",
-  ".aif": "audio/aiff",
-  ".aiff": "audio/aiff",
-  ".flac": "audio/flac",
-  ".m4a": "audio/mp4",
-  ".mp3": "audio/mpeg",
-  ".ogg": "audio/ogg",
-  ".opus": "audio/ogg",
-  ".wav": "audio/wav",
-};
-
-function getAudioMimeType(filePath: string): string {
-  return audioMimeTypes[extname(filePath).toLowerCase()] || "application/octet-stream";
-}
-
-const mediaHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Accept-Ranges": "bytes",
-};
-
 const artworkHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Cache-Control": "public, max-age=31536000, immutable",
@@ -107,61 +89,7 @@ const artworkHeaders = {
 };
 
 async function handleMediaRequest(request: Request): Promise<Response> {
-  const filePath = decodeMediaPath(request.url);
-  const fileInfo = await stat(filePath);
-  const fileSize = fileInfo.size;
-  const contentType = getAudioMimeType(filePath);
-  const range = request.headers.get("range");
-
-  if (!range) {
-    return new Response(Readable.toWeb(createReadStream(filePath)) as BodyInit, {
-      headers: {
-        ...mediaHeaders,
-        "Content-Length": String(fileSize),
-        "Content-Type": contentType,
-      },
-    });
-  }
-
-  const match = /^bytes=(\d*)-(\d*)$/.exec(range);
-  if (!match) {
-    return new Response(null, {
-      status: 416,
-      headers: {
-        ...mediaHeaders,
-        "Content-Range": `bytes */${fileSize}`,
-      },
-    });
-  }
-
-  const start = match[1] ? Number.parseInt(match[1], 10) : 0;
-  const requestedEnd = match[2] ? Number.parseInt(match[2], 10) : fileSize - 1;
-  if (
-    !Number.isFinite(start) ||
-    !Number.isFinite(requestedEnd) ||
-    start < 0 ||
-    start > requestedEnd ||
-    start >= fileSize
-  ) {
-    return new Response(null, {
-      status: 416,
-      headers: {
-        ...mediaHeaders,
-        "Content-Range": `bytes */${fileSize}`,
-      },
-    });
-  }
-
-  const end = Math.min(requestedEnd, fileSize - 1);
-  return new Response(Readable.toWeb(createReadStream(filePath, { start, end })) as BodyInit, {
-    status: 206,
-    headers: {
-      ...mediaHeaders,
-      "Content-Length": String(end - start + 1),
-      "Content-Range": `bytes ${start}-${end}/${fileSize}`,
-      "Content-Type": contentType,
-    },
-  });
+  return fileResponse(decodeMediaPath(request.url), request);
 }
 
 function getArtworkDirectory(): string {
@@ -194,6 +122,45 @@ async function handleArtworkRequest(request: Request): Promise<Response> {
 }
 
 export function registerLibraryIpc(): void {
+  const copies = new PlaybackCopies(app.getPath("temp"));
+  const preparations = new Map<number, { id: number; controller: AbortController }>();
+  ipcMain.handle("library:prepare-playback-copy", async (event, path: string, id: number) => {
+    preparations.get(event.sender.id)?.controller.abort();
+    const controller = new AbortController();
+    preparations.set(event.sender.id, { id, controller });
+    const cancel = () => controller.abort();
+    event.sender.once("destroyed", cancel);
+    const timeout = setTimeout(cancel, 45_000);
+    try {
+      const pending = copies.prepare(path, controller.signal);
+      const localPath = await new Promise<string>((resolve, reject) => {
+        const aborted = () =>
+          reject(Object.assign(new Error("Playback preparation cancelled"), { code: "ETIMEDOUT" }));
+        controller.signal.addEventListener("abort", aborted, { once: true });
+        pending
+          .then(resolve, reject)
+          .finally(() => controller.signal.removeEventListener("abort", aborted));
+      });
+      return { url: `playhead-media://audio/${encodeMediaPath(localPath)}` };
+    } catch (error) {
+      return {
+        failure: playbackFailure(controller.signal.aborted ? { code: "ETIMEDOUT" } : error),
+      };
+    } finally {
+      clearTimeout(timeout);
+      event.sender.removeListener("destroyed", cancel);
+      if (preparations.get(event.sender.id)?.id === id) preparations.delete(event.sender.id);
+    }
+  });
+  ipcMain.handle("library:cancel-playback-copy", (event, id: number) => {
+    const preparation = preparations.get(event.sender.id);
+    if (preparation?.id === id) preparation.controller.abort();
+  });
+  app.once("before-quit", () => {
+    for (const preparation of preparations.values()) preparation.controller.abort();
+    void copies.dispose().catch(() => {});
+  });
+
   if (protocol.isProtocolHandled("playhead-media")) {
     protocol.unhandle("playhead-media");
   }
