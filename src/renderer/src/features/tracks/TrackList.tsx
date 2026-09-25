@@ -5,7 +5,7 @@ import type { MenuAnchorPoint } from "@/lib/menu-position";
 import { useVirtualList } from "@/lib/virtual-list";
 import type { LibraryPlaylist, LibraryTag, LibraryTrack } from "../../../../shared/library";
 import { TrackListRow } from "./TrackListRow";
-import type { TrackListSettings } from "../../../../shared/track-list";
+import type { TrackListSettings, TrackColumnWidths } from "../../../../shared/track-list";
 import { getTrackListLayout } from "./track-columns";
 import { TrackListHeader } from "./TrackListHeader";
 import {
@@ -100,7 +100,8 @@ export function TrackList({
   onScrollPositionChange: (scrollTop: number) => void;
   onScrolledToTrack: () => void;
 }) {
-  const layout = getTrackListLayout(settings.columns);
+  const [previewWidths, setPreviewWidths] = useState<TrackColumnWidths | null>(null);
+  const layout = getTrackListLayout(settings.columns, previewWidths ?? settings.widths);
   const canReorder = canReorderTracks && !settings.sort;
   const icons = useIcons();
   const MusicIcon = icons.music;
@@ -177,6 +178,7 @@ export function TrackList({
         >
           <TrackListHeader
             settings={settings}
+            onPreviewWidths={setPreviewWidths}
             gridTemplateColumns={layout.gridTemplateColumns}
             onChange={(next) => {
               if (

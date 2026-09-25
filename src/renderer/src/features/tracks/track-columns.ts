@@ -1,5 +1,9 @@
 import type { LibraryTrack } from "../../../../shared/library";
-import type { TrackColumnId, TrackListSort } from "../../../../shared/track-list";
+import type {
+  TrackColumnId,
+  TrackColumnWidths,
+  TrackListSort,
+} from "../../../../shared/track-list";
 import { formatTime } from "@/lib/format";
 
 export const trackColumns: Record<
@@ -52,14 +56,14 @@ export function sortTrackList(tracks: LibraryTrack[], sort: TrackListSort | null
   });
 }
 
-export function getTrackListLayout(columns: TrackColumnId[]) {
+export function getTrackListLayout(columns: TrackColumnId[], widths: TrackColumnWidths = {}) {
   return {
-    gridTemplateColumns: `20px ${columns.map((id) => (id === "title" ? "minmax(180px, 1fr)" : `${trackColumns[id].width}px`)).join(" ")} 64px`,
+    gridTemplateColumns: `20px ${columns.map((id) => (id === "title" && widths.title === undefined ? "minmax(180px, 1fr)" : `${widths[id] ?? trackColumns[id].width}px`)).join(" ")} ${widths.title === undefined ? "64px" : "minmax(64px, 1fr)"}`,
     minWidth:
       20 +
       64 +
       28 +
-      columns.reduce((sum, id) => sum + trackColumns[id].width, 0) +
+      columns.reduce((sum, id) => sum + (widths[id] ?? trackColumns[id].width), 0) +
       (columns.length + 1) * 8,
   };
 }

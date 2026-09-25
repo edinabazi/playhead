@@ -1,10 +1,22 @@
 import { useState } from "react";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { TrackListHeader } from "../TrackListHeader";
 import { defaultTrackListSettings } from "../../../../../shared/track-list";
 
-afterEach(cleanup);
+beforeEach(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+});
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 function Header() {
   const [settings, setSettings] = useState(defaultTrackListSettings);
   return (

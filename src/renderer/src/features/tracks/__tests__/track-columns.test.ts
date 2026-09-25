@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LibraryTrack } from "../../../../../shared/library";
 import { normalizeTrackListSettings } from "../../../../../shared/track-list";
-import { formatTrackColumn, sortTrackList } from "../track-columns";
+import { formatTrackColumn, getTrackListLayout, sortTrackList } from "../track-columns";
 
 function track(id: string, metadata: Partial<LibraryTrack> = {}): LibraryTrack {
   return {
@@ -91,4 +91,15 @@ it("normalizes old, malformed and hidden-column preferences", () => {
   expect(
     normalizeTrackListSettings({ columns: [], sort: { column: "title", direction: "bad" } }),
   ).toEqual({ columns: ["title"], sort: null });
+});
+
+it("clamps saved widths, ignores invalid values and retains hidden column sizes", () => {
+  const normalized = normalizeTrackListSettings({
+    columns: ["title", "duration"],
+    widths: { title: 10, genre: 205.4, duration: 9000, artist: "200", album: NaN, unknown: 200 },
+  });
+  expect(normalized.widths).toEqual({ title: 180, genre: 205, duration: 1200 });
+  const layout = getTrackListLayout(["title", "genre"], { title: 420, genre: 205 });
+  expect(layout.gridTemplateColumns).toBe("20px 420px 205px minmax(64px, 1fr)");
+  expect(layout.minWidth).toBe(761);
 });

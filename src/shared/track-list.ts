@@ -14,7 +14,15 @@ export const trackColumnIds = [
 
 export type TrackColumnId = (typeof trackColumnIds)[number];
 export type TrackListSort = { column: TrackColumnId; direction: "asc" | "desc" };
-export type TrackListSettings = { columns: TrackColumnId[]; sort: TrackListSort | null };
+export type TrackColumnWidths = Partial<Record<TrackColumnId, number>>;
+export const minimumTrackColumnWidth = (id: TrackColumnId) => (id === "title" ? 180 : 60);
+export const clampTrackColumnWidth = (id: TrackColumnId, width: number) =>
+  Math.round(Math.min(1200, Math.max(minimumTrackColumnWidth(id), width)));
+export type TrackListSettings = {
+  columns: TrackColumnId[];
+  sort: TrackListSort | null;
+  widths?: TrackColumnWidths;
+};
 
 export const defaultTrackListSettings = (): TrackListSettings => ({
   columns: ["title", "duration"],
@@ -28,8 +36,15 @@ export function normalizeTrackListSettings(value: unknown): TrackListSettings {
     ? trackColumnIds.filter((id) => id === "title" || stored.columns?.includes(id))
     : defaultTrackListSettings().columns;
   const sort = stored.sort;
+  const widths: TrackColumnWidths = {};
+  for (const id of trackColumnIds) {
+    const width = stored.widths?.[id];
+    if (typeof width === "number" && Number.isFinite(width))
+      widths[id] = clampTrackColumnWidth(id, width);
+  }
   return {
     columns,
+    ...(Object.keys(widths).length ? { widths } : {}),
     sort:
       sort &&
       columns.includes(sort.column) &&

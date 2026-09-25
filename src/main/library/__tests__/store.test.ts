@@ -56,7 +56,7 @@ function namedState(name: string): LibraryState {
 }
 
 describe("library store settings", () => {
-  it("persists columns and sort in the session across a restart", async () => {
+  it("persists columns, widths and sort in the session across a restart", async () => {
     const state = emptyLibraryState();
     await writeLibraryState(state);
     await writeLibrarySessionSettings({
@@ -64,12 +64,14 @@ describe("library store settings", () => {
       trackList: {
         columns: ["title", "genre", "disc"],
         sort: { column: "disc", direction: "desc" },
+        widths: { title: 420, disc: 180 },
       },
     });
     resetLibraryStoreCache();
     expect((await readLibraryState()).settings.session.trackList).toEqual({
       columns: ["title", "genre", "disc"],
       sort: { column: "disc", direction: "desc" },
+      widths: { title: 420, disc: 180 },
     });
   });
 

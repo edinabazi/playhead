@@ -3,7 +3,12 @@ import { AnimatePresence, MotionConfigContext, useReducedMotion } from "framer-m
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
-import type { TrackListSettings } from "../../../../shared/track-list";
+import type {
+  TrackListSettings,
+  TrackColumnWidths,
+  TrackColumnId,
+} from "../../../../shared/track-list";
+import { ColumnResizeHandle } from "./ColumnResizeHandle";
 import { trackColumns } from "./track-columns";
 import { getColumnMenuPosition, TrackListColumnMenu } from "./TrackListColumnMenu";
 
@@ -15,11 +20,23 @@ export function TrackListHeader({
   settings,
   gridTemplateColumns,
   onChange,
+  onPreviewWidths,
 }: {
+  onPreviewWidths?: (widths: TrackColumnWidths | null) => void;
   settings: TrackListSettings;
   gridTemplateColumns: string;
   onChange: (settings: TrackListSettings) => void;
 }) {
+  const headerRef = useRef<HTMLDivElement>(null);
+  const resizedWidths = (id: TrackColumnId, width: number) => {
+    const widths = { ...settings.widths, [id]: width };
+    // Freeze the flexible title so other dividers follow the pointer directly.
+    if (id !== "title" && widths.title === undefined) {
+      const title = headerRef.current?.querySelector('[aria-label="Sort by Title"]');
+      if (title) widths.title = Math.round(title.getBoundingClientRect().width);
+    }
+    return widths;
+  };
   const icons = useIcons();
   const ColumnsIcon = icons["columns-3"];
   const OrderIcon = icons.hash;
@@ -61,6 +78,7 @@ export function TrackListHeader({
 
   return (
     <div
+      ref={headerRef}
       role="row"
       onKeyDown={stopPlaybackShortcut}
       onContextMenu={(event) => {
@@ -95,6 +113,8 @@ export function TrackListHeader({
           <div
             key={id}
             role="columnheader"
+            aria-label={column.label}
+            className="relative min-w-0"
             aria-sort={
               direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"
             }
@@ -119,6 +139,21 @@ export function TrackListHeader({
                 <SortIcon size={12} strokeWidth={1.8} />
               </span>
             </button>
+            <ColumnResizeHandle
+              id={id}
+              label={column.label}
+              width={settings.widths?.[id] ?? column.width}
+              onPreview={(width) =>
+                onPreviewWidths?.(width === null ? null : resizedWidths(id, width))
+              }
+              onCommit={(width) => {
+                const widths =
+                  width === undefined ? { ...settings.widths } : resizedWidths(id, width);
+                if (width === undefined) delete widths[id];
+                else widths[id] = width;
+                onChange({ ...settings, widths });
+              }}
+            />
           </div>
         );
       })}

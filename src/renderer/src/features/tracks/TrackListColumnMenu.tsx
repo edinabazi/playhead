@@ -142,6 +142,7 @@ export function TrackListColumnMenu({
                 column === id ? !settings.columns.includes(id) : settings.columns.includes(column),
               );
               onChange({
+                ...settings,
                 columns,
                 sort:
                   settings.sort && columns.includes(settings.sort.column) ? settings.sort : null,
