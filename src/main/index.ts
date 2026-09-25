@@ -13,7 +13,17 @@ import { revealPlaybackWindow } from "./window/background-playback";
 import { createWindow, getWindowIconPath } from "./window/create-window";
 import { registerWindowControlsIpc } from "./window/window-controls";
 
-const { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, protocol, Tray } = electron;
+const {
+  app,
+  autoUpdater,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  nativeImage,
+  protocol,
+  Tray,
+} = electron;
 
 let isQuitting = false;
 let tray: Electron.Tray | null = null;
@@ -174,6 +184,12 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => {
+  isQuitting = true;
+});
+
+// Native updates close windows before app's before-quit event. Allow that close
+// instead of hiding the player and preventing the installer from restarting it.
+autoUpdater.on("before-quit-for-update", () => {
   isQuitting = true;
 });
 
