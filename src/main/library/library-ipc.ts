@@ -21,7 +21,7 @@ import { electron } from "../electron";
 import { decodeArtworkPath } from "../artwork";
 import { readTrackMetadata, saveTrackMetadata } from "../metadata/metadata";
 import { watchLibraryFolders } from "./folder-watcher";
-import { scanFolderPath } from "./scanner";
+import { registerScanIpc } from "./scan-ipc";
 import {
   normalizeLibraryState,
   readLibraryState,
@@ -45,34 +45,6 @@ import {
 } from "./playlist-export";
 
 const { app, dialog, ipcMain, protocol, shell } = electron;
-const folderScanConcurrency = 2;
-
-async function scanFolderPathsWithConcurrency(
-  folderPaths: string[],
-  extensions: string[] | undefined,
-  existingTracks: LibraryState["tracks"],
-): Promise<Awaited<ReturnType<typeof scanFolderPath>>[]> {
-  const scannedFolders = new Array<Awaited<ReturnType<typeof scanFolderPath>>>(folderPaths.length);
-  let nextIndex = 0;
-  const workers = Array.from(
-    { length: Math.min(folderScanConcurrency, folderPaths.length) },
-    async () => {
-      while (nextIndex < folderPaths.length) {
-        const index = nextIndex;
-        nextIndex += 1;
-        scannedFolders[index] = await scanFolderPath(
-          folderPaths[index],
-          extensions,
-          existingTracks,
-        );
-      }
-    },
-  );
-
-  await Promise.all(workers);
-  return scannedFolders;
-}
-
 function encodeMediaPath(filePath: string): string {
   return Buffer.from(filePath, "utf8").toString("base64url");
 }
@@ -173,74 +145,28 @@ export function registerLibraryIpc(): void {
   ipcMain.handle("library:get-state", () => readLibraryState());
 
   ipcMain.handle("library:save-state", async (_event, state: LibraryState) => {
-    return writeLibraryState(state);
+    await writeLibraryState(state);
   });
 
   ipcMain.handle(
     "library:save-session-settings",
     async (_event, session: LibraryState["settings"]["session"]) => {
-      return writeLibrarySessionSettings(session);
+      await writeLibrarySessionSettings(session);
     },
   );
 
   ipcMain.handle("library:save-track-analysis", async (_event, trackId: string, bpm: number) => {
-    return writeLibraryTrackAnalysis(trackId, bpm);
+    await writeLibraryTrackAnalysis(trackId, bpm);
   });
 
   ipcMain.handle(
     "library:save-selected-source",
     async (_event, selectedSource: SelectedSource | null) => {
-      return writeLibrarySelectedSource(selectedSource);
+      await writeLibrarySelectedSource(selectedSource);
     },
   );
 
-  ipcMain.handle("library:select-folder", async (_event, extensions?: string[]) => {
-    const result = await dialog.showOpenDialog({
-      properties: ["openDirectory", "multiSelections"],
-      title: "Add music folder",
-    });
-
-    if (result.canceled || result.filePaths.length === 0) return [];
-
-    const existingState = await readLibraryState();
-    return scanFolderPathsWithConcurrency(result.filePaths, extensions, existingState.tracks);
-  });
-
-  ipcMain.handle(
-    "library:scan-folder",
-    async (_event, folder: LibraryFolder, extensions?: string[]) => {
-      const existingState = await readLibraryState();
-      return scanFolderPath(folder.path, extensions, existingState.tracks);
-    },
-  );
-
-  ipcMain.handle(
-    "library:scan-folder-path",
-    async (_event, folderPath: string, extensions?: string[]) => {
-      const existingState = await readLibraryState();
-      return scanFolderPath(folderPath, extensions, existingState.tracks);
-    },
-  );
-
-  ipcMain.handle(
-    "library:scan-folders",
-    async (_event, folders: LibraryFolder[], extensions?: string[]) => {
-      const existingState = await readLibraryState();
-      return scanFolderPathsWithConcurrency(
-        folders.map((folder) => folder.path),
-        extensions,
-        existingState.tracks,
-      );
-    },
-  );
-
-  ipcMain.handle(
-    "library:scan-folder-paths",
-    async (_event, folderPaths: string[], extensions?: string[]) => {
-      const existingState = await readLibraryState();
-      return scanFolderPathsWithConcurrency(folderPaths, extensions, existingState.tracks);
-    },
-  );
+  registerScanIpc();
 
   ipcMain.handle(
     "library:watch-folders",

@@ -1,5 +1,5 @@
-import type { Dirent, Stats } from "node:fs";
-import { readdir, stat } from "node:fs/promises";
+import type { Stats } from "node:fs";
+import { opendir, stat } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { parseFile } from "music-metadata";
 import { libraryTrackMetadataVersion } from "../../shared/library";
@@ -11,12 +11,7 @@ import type {
   LibraryTrack,
   ScannedFolder,
 } from "../../shared/library";
-import {
-  getArtwork,
-  getAvailableArtwork,
-  getContentAddressedArtwork,
-  getStoredArtwork,
-} from "../artwork";
+import type { ScanProgress } from "../../shared/library-scan";
 import { audioExtensions } from "./constants";
 import { cleanTitle, makeId } from "./ids";
 
@@ -57,77 +52,77 @@ const blockedFileNames = new Set([
   "requirements.txt",
   "yarn.lock",
 ]);
-const maxVisitedDirectories = 5_000;
-const maxVisitedEntries = 75_000;
 const directoryReadConcurrency = 8;
 const metadataParseConcurrency = 4;
 
+export type ScanArtwork = Pick<
+  typeof import("../artwork"),
+  "getArtwork" | "getAvailableArtwork" | "getContentAddressedArtwork" | "getStoredArtwork"
+>;
+export type ScanOptions = {
+  signal?: AbortSignal;
+  onProgress?: (progress: ScanProgress) => void;
+  artwork?: ScanArtwork;
+};
 type BuildTrackOptions = {
   reuseStoredArtwork?: boolean;
   existingTracks?: LibraryState["tracks"];
   artworkCache?: Map<string, Promise<LibraryArtwork | undefined>>;
-};
+} & ScanOptions;
 
 function normalizeExtensions(extensions?: string[]): Set<string> {
   if (!extensions || extensions.length === 0) return audioExtensions;
   return new Set(extensions.map((extension) => extension.toLowerCase()));
 }
 
-async function findAudioFiles(folderPath: string, extensions = audioExtensions): Promise<string[]> {
+async function findAudioFiles(
+  folderPath: string,
+  extensions: Set<string>,
+  options: ScanOptions,
+  progress: ScanProgress,
+  report: (force?: boolean) => void,
+): Promise<string[]> {
   const audioFiles: string[] = [];
   const pendingDirectories = [folderPath];
-  let visitedDirectories = 0;
-  let visitedEntries = 0;
 
   while (pendingDirectories.length > 0) {
+    options.signal?.throwIfAborted();
     const directoryBatch = pendingDirectories.splice(-directoryReadConcurrency);
-    visitedDirectories += directoryBatch.length;
-    if (visitedDirectories > maxVisitedDirectories) {
-      throw new Error("That folder is too broad to scan. Choose a dedicated music folder instead.");
-    }
+    await Promise.all(
+      directoryBatch.map(async (currentDirectory) => {
+        // Stream directory entries instead of allocating an entire NAS directory at once.
+        // Do not swallow read errors: an incomplete rescan must never look successful.
+        const directory = await opendir(currentDirectory, { bufferSize: 128 });
+        for await (const entry of directory) {
+          options.signal?.throwIfAborted();
+          const entryPath = join(currentDirectory, entry.name);
 
-    const directoryEntries = await Promise.all(
-      directoryBatch.map(async (currentDirectory): Promise<[string, Dirent[]]> => {
-        try {
-          return [currentDirectory, await readdir(currentDirectory, { withFileTypes: true })];
-        } catch {
-          return [currentDirectory, []];
-        }
-      }),
-    );
+          if (entry.isDirectory()) {
+            if (blockedDirectoryNames.has(entry.name)) {
+              throw new Error(
+                "That looks like a code folder. Choose a dedicated music folder instead.",
+              );
+            }
+            if (!ignoredDirectoryNames.has(entry.name)) pendingDirectories.push(entryPath);
+            continue;
+          }
 
-    for (const [currentDirectory, entries] of directoryEntries) {
-      for (const entry of entries) {
-        visitedEntries += 1;
-        if (visitedEntries > maxVisitedEntries) {
-          throw new Error(
-            "That folder contains too many files to scan safely. Choose a dedicated music folder instead.",
-          );
-        }
-
-        const entryPath = join(currentDirectory, entry.name);
-
-        if (entry.isDirectory()) {
-          if (blockedDirectoryNames.has(entry.name)) {
+          if (entry.isFile() && blockedFileNames.has(entry.name)) {
             throw new Error(
-              "That looks like a code folder. Choose a dedicated music folder instead.",
+              "That looks like a project folder. Choose a dedicated music folder instead.",
             );
           }
-          if (!ignoredDirectoryNames.has(entry.name)) pendingDirectories.push(entryPath);
-          continue;
-        }
 
-        if (entry.isFile() && blockedFileNames.has(entry.name)) {
-          throw new Error(
-            "That looks like a project folder. Choose a dedicated music folder instead.",
-          );
+          if (entry.isFile() && extensions.has(extname(entry.name).toLowerCase())) {
+            audioFiles.push(entryPath);
+            progress.discovered++;
+          }
+          report();
         }
-
-        if (entry.isFile() && extensions.has(extname(entry.name).toLowerCase())) {
-          audioFiles.push(entryPath);
-        }
-      }
-    }
+        progress.directories++;
+        report();
+      }),
+    );
   }
 
   return audioFiles.sort((a, b) => a.localeCompare(b));
@@ -137,6 +132,7 @@ async function buildTracksWithConcurrency(
   filePaths: string[],
   folderId: string,
   options: BuildTrackOptions = {},
+  onProcessed?: () => void,
 ): Promise<LibraryTrack[]> {
   const tracks = new Array<LibraryTrack>(filePaths.length);
   let nextIndex = 0;
@@ -144,9 +140,11 @@ async function buildTracksWithConcurrency(
     { length: Math.min(metadataParseConcurrency, filePaths.length) },
     async () => {
       while (nextIndex < filePaths.length) {
+        options.signal?.throwIfAborted();
         const index = nextIndex;
         nextIndex += 1;
         tracks[index] = await buildTrack(filePaths[index], folderId, options);
+        onProcessed?.();
       }
     },
   );
@@ -165,7 +163,9 @@ export async function buildTrack(
   let fileInfo: Stats | undefined;
 
   try {
+    options.signal?.throwIfAborted();
     fileInfo = await stat(filePath);
+    options.signal?.throwIfAborted();
     const existingTrack = options.existingTracks?.[trackId];
     if (
       existingTrack?.path === filePath &&
@@ -176,9 +176,10 @@ export async function buildTrack(
       return existingTrack.folderId === folderId ? existingTrack : { ...existingTrack, folderId };
     }
 
+    const artworkApi = options.artwork || (await import("../artwork"));
     const storedArtwork = options.reuseStoredArtwork
-      ? (await getAvailableArtwork(options.existingTracks?.[trackId]?.artwork)) ||
-        (await getStoredArtwork(trackId))
+      ? (await artworkApi.getAvailableArtwork(options.existingTracks?.[trackId]?.artwork)) ||
+        (await artworkApi.getStoredArtwork(trackId))
       : undefined;
     const metadata = await parseFile(filePath, {
       duration: true,
@@ -189,8 +190,8 @@ export async function buildTrack(
     const artwork =
       storedArtwork ||
       (options.artworkCache
-        ? await getContentAddressedArtwork(metadata.common.picture, options.artworkCache)
-        : await getArtwork(trackId, metadata.common.picture));
+        ? await artworkApi.getContentAddressedArtwork(metadata.common.picture, options.artworkCache)
+        : await artworkApi.getArtwork(trackId, metadata.common.picture));
 
     return {
       id: trackId,
@@ -218,7 +219,16 @@ export async function buildTrack(
       bpmSource: bpm ? "metadata" : undefined,
       folderId,
     };
-  } catch {
+  } catch (error) {
+    options.signal?.throwIfAborted();
+    // Keep the last known metadata when a previously imported file cannot be read.
+    const existing = options.existingTracks?.[trackId];
+    if (existing) return { ...existing, folderId };
+    if (
+      (error as NodeJS.ErrnoException)?.code &&
+      !(error as NodeJS.ErrnoException).code?.startsWith("ERR_")
+    )
+      throw error;
     return {
       id: trackId,
       path: filePath,
@@ -238,7 +248,9 @@ export async function scanFolderPath(
   folderPath: string,
   extensions?: string[],
   existingTracks: LibraryState["tracks"] = {},
+  options: ScanOptions = {},
 ): Promise<ScannedFolder> {
+  options.signal?.throwIfAborted();
   const folderInfo = await stat(folderPath);
   if (!folderInfo.isDirectory()) throw new Error("Selected path is not a folder.");
 
@@ -250,12 +262,45 @@ export async function scanFolderPath(
     metadataVersion: libraryTrackMetadataVersion,
   };
 
-  const audioFiles = await findAudioFiles(folderPath, normalizeExtensions(extensions));
-  const tracks = await buildTracksWithConcurrency(audioFiles, folder.id, {
-    reuseStoredArtwork: true,
-    existingTracks,
-    artworkCache: new Map(),
-  });
+  const progress: ScanProgress = {
+    phase: "discovering",
+    discovered: 0,
+    processed: 0,
+    directories: 0,
+  };
+  let lastReport = 0;
+  const report = (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastReport < 200) return;
+    lastReport = now;
+    options.onProgress?.({ ...progress });
+  };
+  report(true);
+  const audioFiles = await findAudioFiles(
+    folderPath,
+    normalizeExtensions(extensions),
+    options,
+    progress,
+    report,
+  );
+  progress.phase = "reading";
+  report(true);
+  const tracks = await buildTracksWithConcurrency(
+    audioFiles,
+    folder.id,
+    {
+      ...options,
+      reuseStoredArtwork: true,
+      existingTracks,
+      artworkCache: new Map(),
+    },
+    () => {
+      progress.processed++;
+      report();
+    },
+  );
+  options.signal?.throwIfAborted();
+  report(true);
   folder.trackIds = tracks.map((track) => track.id);
 
   return { folder, tracks };

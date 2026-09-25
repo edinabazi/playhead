@@ -1,3 +1,4 @@
+import { useVirtualList } from "@/lib/virtual-list";
 import { useEffect, useRef, useState } from "react";
 import { Dropdown } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
@@ -47,12 +48,18 @@ export function LibraryBrowser({
     point: MenuAnchorPoint;
     trackIds: string[];
   } | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const {
+    container,
+    containerRef,
+    rows: virtualRows,
+    totalHeight,
+    onScroll,
+    scrollToOffset,
+  } = useVirtualList({ itemCount: rows.length, itemHeight: 56 });
 
   useEffect(() => {
-    if (!scrollContainerRef.current) return;
-    scrollContainerRef.current.scrollTop = initialScrollTop;
-  }, [initialScrollTop, scrollKey]);
+    if (container) scrollToOffset(initialScrollTop);
+  }, [container, initialScrollTop, scrollKey, scrollToOffset]);
 
   const startCollectionDrag = (
     item: LibraryArtist | LibraryAlbum,
@@ -95,106 +102,118 @@ export function LibraryBrowser({
     <section className="-mb-4 flex min-h-0 flex-1 flex-col gap-[14px]">
       <div className="relative min-h-0 flex-1">
         <div
-          ref={scrollContainerRef}
+          ref={containerRef}
           className="thin-scrollbar no-drag h-full min-h-0 overflow-y-auto pr-2"
-          onScroll={(event) => onScrollPositionChange(event.currentTarget.scrollTop)}
+          onScroll={(event) => {
+            onScroll(event);
+            onScrollPositionChange(event.currentTarget.scrollTop);
+          }}
         >
           {rows.length === 0 ? (
             <div className="flex h-full min-h-[180px] items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.025] text-[14px] text-muted-foreground">
               {emptyLabel}
             </div>
           ) : (
-            <div className="flex flex-col gap-0.5 pb-8">
-              {artists?.map((artist) => (
-                <TrackCell
-                  key={artist.id}
-                  draggable
-                  selected={selectedItemIdSet.has(artist.id)}
-                  onClick={(event) => onSelectArtist?.(artist, event)}
-                  onDoubleClick={() => onActivateArtist?.(artist)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") onActivateArtist?.(artist);
-                  }}
-                  onContextMenu={(event) => {
-                    if (!selectedItemIdSet.has(artist.id)) onSelectArtist?.(artist);
-                    openContextMenu(artist, artists, event);
-                  }}
-                  onDragStart={(event) => startCollectionDrag(artist, artists, event)}
-                >
-                  <div className="flex min-w-0 flex-1 items-center gap-3 pr-6">
-                    <ArtistArtwork artist={artist} fallbackIcon={icons.user} />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[14px] font-semibold leading-[1.18] text-foreground">
-                        {artist.name}
-                      </span>
-                      <span className="mt-1 block truncate text-[13px] font-medium leading-[1.25] text-muted-foreground">
-                        Artist
-                      </span>
-                    </span>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-0 text-[13px] font-medium tabular-nums text-muted-foreground">
-                    <span>
-                      {artist.trackIds.length} {artist.trackIds.length === 1 ? "track" : "tracks"}
-                    </span>
-                    <span className="grid size-8 place-items-center rounded-full text-muted-foreground transition group-hover:text-foreground">
-                      <ChevronRightIcon size={17} strokeWidth={1.8} />
-                    </span>
-                  </div>
-                </TrackCell>
-              ))}
-              {albums?.map((album) => {
-                const artworkSrc = album.artwork?.dataUrl || album.artwork?.src || null;
-                const subtitle = [album.artist, album.year].filter(Boolean).join(" · ");
+            <div className="relative" style={{ height: totalHeight + 32 }}>
+              {artists &&
+                virtualRows.map(({ index, start }) => {
+                  const artist = artists[index];
+                  return (
+                    <TrackCell
+                      key={artist.id}
+                      style={{ position: "absolute", top: start, height: 54 }}
+                      draggable
+                      selected={selectedItemIdSet.has(artist.id)}
+                      onClick={(event) => onSelectArtist?.(artist, event)}
+                      onDoubleClick={() => onActivateArtist?.(artist)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") onActivateArtist?.(artist);
+                      }}
+                      onContextMenu={(event) => {
+                        if (!selectedItemIdSet.has(artist.id)) onSelectArtist?.(artist);
+                        openContextMenu(artist, artists, event);
+                      }}
+                      onDragStart={(event) => startCollectionDrag(artist, artists, event)}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-3 pr-6">
+                        <ArtistArtwork artist={artist} fallbackIcon={icons.user} />
+                        <span className="min-w-0">
+                          <span className="block truncate text-[14px] font-semibold leading-[1.18] text-foreground">
+                            {artist.name}
+                          </span>
+                          <span className="mt-1 block truncate text-[13px] font-medium leading-[1.25] text-muted-foreground">
+                            Artist
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-0 text-[13px] font-medium tabular-nums text-muted-foreground">
+                        <span>
+                          {artist.trackIds.length}{" "}
+                          {artist.trackIds.length === 1 ? "track" : "tracks"}
+                        </span>
+                        <span className="grid size-8 place-items-center rounded-full text-muted-foreground transition group-hover:text-foreground">
+                          <ChevronRightIcon size={17} strokeWidth={1.8} />
+                        </span>
+                      </div>
+                    </TrackCell>
+                  );
+                })}
+              {albums &&
+                virtualRows.map(({ index, start }) => {
+                  const album = albums[index];
+                  const artworkSrc = album.artwork?.dataUrl || album.artwork?.src || null;
+                  const subtitle = [album.artist, album.year].filter(Boolean).join(" · ");
 
-                return (
-                  <TrackCell
-                    key={album.id}
-                    draggable
-                    selected={selectedItemIdSet.has(album.id)}
-                    onClick={(event) => onSelectAlbum?.(album, event)}
-                    onDoubleClick={() => onActivateAlbum?.(album)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") onActivateAlbum?.(album);
-                    }}
-                    onContextMenu={(event) => {
-                      if (!selectedItemIdSet.has(album.id)) onSelectAlbum?.(album);
-                      openContextMenu(album, albums, event);
-                    }}
-                    onDragStart={(event) => startCollectionDrag(album, albums, event)}
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-3 pr-6">
-                      <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[12px] bg-white/10 text-muted-foreground">
-                        {artworkSrc ? (
-                          <img
-                            className="size-full object-contain"
-                            src={artworkSrc}
-                            alt=""
-                            draggable={false}
-                          />
-                        ) : (
-                          <MusicIcon size={18} strokeWidth={1.8} />
-                        )}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-[14px] font-semibold leading-[1.18] text-foreground">
-                          {album.title}
+                  return (
+                    <TrackCell
+                      key={album.id}
+                      style={{ position: "absolute", top: start, height: 54 }}
+                      draggable
+                      selected={selectedItemIdSet.has(album.id)}
+                      onClick={(event) => onSelectAlbum?.(album, event)}
+                      onDoubleClick={() => onActivateAlbum?.(album)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") onActivateAlbum?.(album);
+                      }}
+                      onContextMenu={(event) => {
+                        if (!selectedItemIdSet.has(album.id)) onSelectAlbum?.(album);
+                        openContextMenu(album, albums, event);
+                      }}
+                      onDragStart={(event) => startCollectionDrag(album, albums, event)}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-3 pr-6">
+                        <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[12px] bg-white/10 text-muted-foreground">
+                          {artworkSrc ? (
+                            <img
+                              className="size-full object-contain"
+                              src={artworkSrc}
+                              alt=""
+                              draggable={false}
+                            />
+                          ) : (
+                            <MusicIcon size={18} strokeWidth={1.8} />
+                          )}
                         </span>
-                        <span className="mt-1 block truncate text-[13px] font-medium leading-[1.25] text-muted-foreground">
-                          {subtitle}
+                        <span className="min-w-0">
+                          <span className="block truncate text-[14px] font-semibold leading-[1.18] text-foreground">
+                            {album.title}
+                          </span>
+                          <span className="mt-1 block truncate text-[13px] font-medium leading-[1.25] text-muted-foreground">
+                            {subtitle}
+                          </span>
                         </span>
-                      </span>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
-                      <span>
-                        {album.trackIds.length} {album.trackIds.length === 1 ? "track" : "tracks"}
-                      </span>
-                      <span className="grid size-8 place-items-center rounded-full text-muted-foreground transition group-hover:text-foreground">
-                        <ChevronRightIcon size={17} strokeWidth={1.8} />
-                      </span>
-                    </div>
-                  </TrackCell>
-                );
-              })}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
+                        <span>
+                          {album.trackIds.length} {album.trackIds.length === 1 ? "track" : "tracks"}
+                        </span>
+                        <span className="grid size-8 place-items-center rounded-full text-muted-foreground transition group-hover:text-foreground">
+                          <ChevronRightIcon size={17} strokeWidth={1.8} />
+                        </span>
+                      </div>
+                    </TrackCell>
+                  );
+                })}
             </div>
           )}
         </div>

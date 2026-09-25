@@ -1,3 +1,4 @@
+import type { LibraryScanProgress, LibraryScanRequest, LibraryScanResult } from "./library-scan";
 import type { PlaybackCopyResult } from "./playback";
 import type { TrackLyrics } from "./lyrics";
 import { defaultTrackListSettings, type TrackListSettings } from "./track-list";
@@ -379,6 +380,9 @@ export type BpmCacheEntry = {
 export type BpmCacheWrite = BpmCacheRequest & BpmCacheEntry;
 
 export type PlayheadApi = {
+  scanLibrary: (request: LibraryScanRequest) => Promise<LibraryScanResult>;
+  cancelLibraryScan: (id: string) => Promise<void>;
+  onLibraryScanProgress: (callback: (progress: LibraryScanProgress) => void) => () => void;
   preparePlaybackCopy: (path: string, requestId: number) => Promise<PlaybackCopyResult>;
   cancelPlaybackCopy: (requestId: number) => Promise<void>;
   getTrackLyrics: (trackId: string) => Promise<TrackLyrics>;
@@ -387,10 +391,10 @@ export type PlayheadApi = {
   onLyricsChanged: (callback: (trackId: string) => void) => () => void;
   getAppVersion: () => Promise<string>;
   getLibraryState: () => Promise<LibraryState>;
-  saveLibraryState: (state: LibraryState) => Promise<LibraryState>;
-  saveLibrarySessionSettings: (session: SessionSettings) => Promise<LibraryState>;
-  saveLibraryTrackAnalysis: (trackId: string, bpm: number) => Promise<LibraryState>;
-  saveLibrarySelectedSource: (selectedSource: SelectedSource | null) => Promise<LibraryState>;
+  saveLibraryState: (state: LibraryState) => Promise<void>;
+  saveLibrarySessionSettings: (session: SessionSettings) => Promise<void>;
+  saveLibraryTrackAnalysis: (trackId: string, bpm: number) => Promise<void>;
+  saveLibrarySelectedSource: (selectedSource: SelectedSource | null) => Promise<void>;
   selectMusicFolder: (extensions?: string[]) => Promise<ScannedFolder[]>;
   scanFolder: (folder: LibraryFolder, extensions?: string[]) => Promise<ScannedFolder>;
   scanFolders: (folders: LibraryFolder[], extensions?: string[]) => Promise<ScannedFolder[]>;

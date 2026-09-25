@@ -94,6 +94,12 @@ Supported formats include:
 
 Playhead generates and caches waveform data for local audio files, giving you a quick visual sense of the track while you listen.
 
+### Large libraries
+
+Folder imports and rescans run in a background worker, without a fixed file-count or folder-count limit. A compact progress card shows discovery and metadata-reading progress, with a **Cancel** button. Cancelling or failing a scan leaves the existing library unchanged; imports are applied after the scan completes. Unchanged files reuse their cached metadata on subsequent scans.
+
+Disk activity is bounded, and track, artist, and album lists render only the visible rows. macOS and Windows use native recursive folder notifications where available, avoiding a separate watcher for every audio file. Project-folder safeguards remain in place, and scans do not follow directory symlinks.
+
 ### Network and external drives
 
 If direct playback fails, Playhead tries a temporary local copy before reporting an error. Copies stay on disk, are reused while the source is unchanged, and are removed when the app quits. Retained copies are limited to two tracks and 512 MB, with room for a single larger recording.

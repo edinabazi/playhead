@@ -1,3 +1,5 @@
+import { LibraryScanStatus } from "@/features/library/LibraryScanStatus";
+import { useLibraryScan } from "@/features/library/use-library-scan";
 import { playbackFailure, type PlaybackFailure } from "../../shared/playback";
 import {
   loadLocalPlayback,
@@ -487,7 +489,7 @@ export function App() {
   const [shouldAnimateWaveform, setShouldAnimateWaveform] = useState(false);
   const [volume, setVolume] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
+  const { scanId, isScanning, startScan, finishScan } = useLibraryScan();
   const [playbackError, setPlaybackError] = useState<PlaybackFailure | null>(null);
   const [preparingPlayback, setPreparingPlayback] = useState(false);
   const [isLoadingTrack, setIsLoadingTrack] = useState(false);
@@ -1407,13 +1409,17 @@ export function App() {
   );
 
   const addFolder = useCallback(async () => {
-    setIsScanning(true);
+    const scanId = startScan();
+    if (!scanId) return;
     setError("");
 
     try {
-      const scannedFolders = await window.playhead.selectMusicFolder(
-        library.settings.library.enabledAudioExtensions,
-      );
+      const result = await window.playhead.scanLibrary({
+        id: scanId,
+        extensions: library.settings.library.enabledAudioExtensions,
+      });
+      if (result.status === "cancelled") return;
+      const scannedFolders = result.folders;
       if (scannedFolders.length === 0) return;
       let nextState = libraryRef.current;
       let lastScannedFolderId: string | null = null;
@@ -1447,16 +1453,17 @@ export function App() {
       setError(message);
       showSimpleActionToast(message, "error");
     } finally {
-      setIsScanning(false);
+      finishScan(scanId);
     }
-  }, [library, persistLibrary]);
+  }, [library, persistLibrary, startScan, finishScan]);
 
   const addFolderPaths = useCallback(
     async (folderPaths: string[]) => {
       const uniqueFolderPaths = Array.from(new Set(folderPaths));
       if (uniqueFolderPaths.length === 0) return;
 
-      setIsScanning(true);
+      const scanId = startScan();
+      if (!scanId) return;
       setError("");
 
       try {
@@ -1464,10 +1471,13 @@ export function App() {
         let lastScannedFolderId: string | null = null;
         const scannedFolderIds: string[] = [];
 
-        const scannedFolders = await window.playhead.scanFolderPaths(
-          uniqueFolderPaths,
-          library.settings.library.enabledAudioExtensions,
-        );
+        const result = await window.playhead.scanLibrary({
+          id: scanId,
+          paths: uniqueFolderPaths,
+          extensions: library.settings.library.enabledAudioExtensions,
+        });
+        if (result.status === "cancelled") return;
+        const scannedFolders = result.folders;
         for (const scanned of scannedFolders) {
           nextState = mergeScannedFolder(nextState, scanned);
           lastScannedFolderId = scanned.folder.id;
@@ -1496,10 +1506,10 @@ export function App() {
         setError(message);
         showSimpleActionToast(message, "error");
       } finally {
-        setIsScanning(false);
+        finishScan(scanId);
       }
     },
-    [library, persistLibrary],
+    [library, persistLibrary, startScan, finishScan],
   );
 
   const rescanLibrary = useCallback(
@@ -1509,16 +1519,20 @@ export function App() {
         return;
       }
 
-      setIsScanning(true);
+      const scanId = startScan();
+      if (!scanId) return;
       setError("");
 
       try {
         let nextState = state;
         const scannedFolderIds = state.folders.map((folder) => folder.id);
-        const scannedFolders = await window.playhead.scanFolders(
-          state.folders,
-          state.settings.library.enabledAudioExtensions,
-        );
+        const result = await window.playhead.scanLibrary({
+          id: scanId,
+          paths: state.folders.map((folder) => folder.path),
+          extensions: state.settings.library.enabledAudioExtensions,
+        });
+        if (result.status === "cancelled") return;
+        const scannedFolders = result.folders;
         for (const scanned of scannedFolders) {
           nextState = mergeScannedFolder(nextState, scanned);
         }
@@ -1549,12 +1563,14 @@ export function App() {
 
         await persistLibrary(persistedState);
       } catch (error) {
-        setError(getErrorMessage(error, "Could not rescan the library."));
+        const message = getErrorMessage(error, "Could not rescan the library.");
+        setError(message);
+        showSimpleActionToast(message, "error");
       } finally {
-        setIsScanning(false);
+        finishScan(scanId);
       }
     },
-    [activeTrackId, persistLibrary, playbackClock],
+    [activeTrackId, persistLibrary, playbackClock, startScan, finishScan],
   );
 
   const updateLibrarySettings = useCallback(
@@ -2847,22 +2863,46 @@ export function App() {
   }, [backFromLibraryDetail, library.selectedSource, library.settings.library.mode]);
 
   useEffect(() => {
-    return window.playhead.onFolderChanged((folderId) => {
-      const current = libraryRef.current;
-      const folder = current.folders.find((item) => item.id === folderId);
-      if (!folder) return;
-
-      void window.playhead
-        .scanFolder(folder, current.settings.library.enabledAudioExtensions)
-        .then((scanned) => {
-          const latest = libraryRef.current;
-          const scannedState = mergeScannedFolder(latest, scanned);
-          return persistLibrary(
-            mergeScannedLibraryState(latest, scannedState, [scanned.folder.id]),
+    const pending = new Set<string>();
+    const running = new Set<string>();
+    let disposed = false;
+    const scanChangedFolder = async (folderId: string) => {
+      if (running.has(folderId)) {
+        pending.add(folderId);
+        return;
+      }
+      running.add(folderId);
+      try {
+        do {
+          pending.delete(folderId);
+          const current = libraryRef.current;
+          const folder = current.folders.find((item) => item.id === folderId);
+          if (!folder || disposed) return;
+          const scanned = await window.playhead.scanFolder(
+            folder,
+            current.settings.library.enabledAudioExtensions,
           );
-        })
-        .catch((error) => setError(getErrorMessage(error, "Could not rescan changed folder.")));
+          if (!scanned || disposed) return;
+          const latest = libraryRef.current;
+          await persistLibrary(
+            mergeScannedLibraryState(latest, mergeScannedFolder(latest, scanned), [
+              scanned.folder.id,
+            ]),
+          );
+        } while (pending.has(folderId) && !disposed);
+      } catch (error) {
+        setError(getErrorMessage(error, "Could not rescan changed folder."));
+      } finally {
+        running.delete(folderId);
+      }
+    };
+    const unsubscribe = window.playhead.onFolderChanged((id) => {
+      void scanChangedFolder(id);
     });
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
   }, [persistLibrary]);
 
   useEffect(() => {
@@ -3180,6 +3220,7 @@ export function App() {
           reduceMotion ? "reduce-motion" : ""
         }`}
       >
+        {scanId && <LibraryScanStatus key={scanId} scanId={scanId} />}
         <section
           className="app-shell app-drag relative flex size-full gap-4 overflow-hidden p-4"
           style={{ "--app-transparency": appTransparency } as React.CSSProperties}

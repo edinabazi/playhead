@@ -1,6 +1,8 @@
 import type { FSWatcher } from "chokidar";
 import chokidar from "chokidar";
-import { extname } from "node:path";
+import { watch, type FSWatcher as NativeWatcher } from "node:fs";
+import { platform } from "node:os";
+import { extname, sep } from "node:path";
 import type { LibraryFolder } from "../../shared/library";
 import { electron } from "../electron";
 import { audioExtensions } from "./constants";
@@ -29,6 +31,7 @@ const ignoredDirectoryNames = new Set([
 ]);
 
 let watcher: FSWatcher | null = null;
+let nativeWatchers: NativeWatcher[] = [];
 let watchedFolders: LibraryFolder[] = [];
 let watchedExtensions = audioExtensions;
 let watcherSignature = "";
@@ -55,7 +58,10 @@ export async function watchLibraryFolders(
   watchedFolders = folders;
   watchedExtensions = nextExtensions;
 
-  if (watcher && watcherSignature === nextSignature) return;
+  if ((watcher || nativeWatchers.length) && watcherSignature === nextSignature) return;
+
+  for (const nativeWatcher of nativeWatchers) nativeWatcher.close();
+  nativeWatchers = [];
 
   if (watcher) {
     await watcher.close();
@@ -72,6 +78,34 @@ export async function watchLibraryFolders(
 
   watcherSignature = nextSignature;
 
+  // macOS and Windows provide a recursive OS subscription. Avoid a separate watcher
+  // and startup stat for every track, which is expensive for six-figure libraries.
+  if (platform() === "darwin" || platform() === "win32") {
+    try {
+      for (const folder of folders) {
+        const nativeWatcher = watch(folder.path, { recursive: true }, (event, filename) => {
+          const name = filename?.toString();
+          if (name?.split(/[\\/]/).some((part) => ignoredDirectoryNames.has(part))) return;
+          // Renames also cover moving an entire album into or out of the library.
+          if (!name || event === "rename" || watchedExtensions.has(extname(name).toLowerCase()))
+            notifyFolder(folder.id);
+        });
+        nativeWatcher.on("error", (error) => {
+          console.warn("Music folder watching interrupted", error);
+          nativeWatcher.close();
+          nativeWatchers = nativeWatchers.filter((item) => item !== nativeWatcher);
+          watcherSignature = "";
+        });
+        nativeWatchers.push(nativeWatcher);
+      }
+      return;
+    } catch {
+      for (const nativeWatcher of nativeWatchers) nativeWatcher.close();
+      nativeWatchers = [];
+      // Retain the existing watcher on filesystems without recursive notifications.
+    }
+  }
+
   watcher = chokidar.watch(
     folders.map((folder) => folder.path),
     {
@@ -80,6 +114,7 @@ export async function watchLibraryFolders(
         pollInterval: 100,
       },
       ignoreInitial: true,
+      followSymlinks: false,
       ignored: (filePath, stats) => {
         if (
           stats?.isDirectory() &&
@@ -96,10 +131,13 @@ export async function watchLibraryFolders(
   watcher
     .on("add", notifyFolderForPath)
     .on("unlink", notifyFolderForPath)
-    .on("change", notifyFolderForPath);
+    .on("change", notifyFolderForPath)
+    .on("error", (error) => console.warn("Music folder watching interrupted", error));
 }
 
 export async function closeFolderWatcher(): Promise<void> {
+  for (const nativeWatcher of nativeWatchers) nativeWatcher.close();
+  nativeWatchers = [];
   if (watcher) await watcher.close();
   watcher = null;
   watcherSignature = "";
@@ -110,18 +148,25 @@ export async function closeFolderWatcher(): Promise<void> {
 }
 
 function notifyFolderForPath(filePath: string) {
-  const folder = watchedFolders.find((item) => filePath.startsWith(item.path));
-  if (!folder) return;
+  for (const folder of watchedFolders) {
+    if (
+      filePath === folder.path ||
+      filePath.startsWith(folder.path.endsWith(sep) ? folder.path : `${folder.path}${sep}`)
+    )
+      notifyFolder(folder.id);
+  }
+}
 
-  const previousTimeout = pendingNotifications.get(folder.id);
+function notifyFolder(folderId: string) {
+  const previousTimeout = pendingNotifications.get(folderId);
   if (previousTimeout) clearTimeout(previousTimeout);
 
   pendingNotifications.set(
-    folder.id,
+    folderId,
     setTimeout(() => {
-      pendingNotifications.delete(folder.id);
+      pendingNotifications.delete(folderId);
       for (const window of BrowserWindow.getAllWindows()) {
-        window.webContents.send("library:folder-changed", folder.id);
+        window.webContents.send("library:folder-changed", folderId);
       }
     }, notifyDelayMs),
   );
