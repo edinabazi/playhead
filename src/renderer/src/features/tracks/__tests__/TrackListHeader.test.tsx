@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { TrackListControls, TrackListHeader } from "../TrackListHeader";
+import { TrackListHeader } from "../TrackListHeader";
 import { defaultTrackListSettings } from "../../../../../shared/track-list";
 
 afterEach(cleanup);
@@ -9,17 +9,16 @@ function Header() {
   const [settings, setSettings] = useState(defaultTrackListSettings);
   return (
     <>
-      <TrackListControls settings={settings} onChange={setSettings} />
       <TrackListHeader settings={settings} onChange={setSettings} gridTemplateColumns="" />
     </>
   );
 }
 it("lets users show, sort, reverse, reset and hide a metadata column", async () => {
   const view = render(<Header />);
-  fireEvent.click(view.getByRole("button", { name: "Columns" }));
+  fireEvent.click(view.getByRole("button", { name: "Choose columns" }));
   fireEvent.click(view.getByRole("menuitemcheckbox", { name: "Genre" }));
   fireEvent.keyDown(view.getByRole("menuitemcheckbox", { name: "Genre" }), { key: "Escape" });
-  expect(document.activeElement).toBe(view.getByRole("button", { name: "Columns" }));
+  expect(document.activeElement).toBe(view.getByRole("button", { name: "Choose columns" }));
   fireEvent.click(view.getByRole("button", { name: "Sort by Genre" }));
   expect(view.getByRole("columnheader", { name: "Genre" }).getAttribute("aria-sort")).toBe(
     "ascending",
@@ -28,13 +27,14 @@ it("lets users show, sort, reverse, reset and hide a metadata column", async () 
   expect(view.getByRole("columnheader", { name: "Genre" }).getAttribute("aria-sort")).toBe(
     "descending",
   );
-  fireEvent.click(view.getByRole("button", { name: "Reset sort" }));
-  await waitFor(() => expect(view.queryByRole("button", { name: "Reset sort" })).toBeNull());
+  fireEvent.click(view.getByRole("button", { name: "Choose columns" }));
+  fireEvent.click(view.getByRole("menuitem", { name: "Reset sort" }));
+  await waitFor(() => expect(view.queryByRole("menuitem", { name: "Reset sort" })).toBeNull());
   fireEvent.click(view.getByRole("button", { name: "Sort by Genre" }));
-  fireEvent.click(view.getByRole("button", { name: "Columns" }));
+  fireEvent.click(view.getByRole("button", { name: "Choose columns" }));
   fireEvent.click(view.getByRole("menuitemcheckbox", { name: "Genre" }));
   expect(view.queryByRole("button", { name: "Sort by Genre" })).toBeNull();
-  await waitFor(() => expect(view.queryByRole("button", { name: "Reset sort" })).toBeNull());
+  await waitFor(() => expect(view.queryByRole("menuitem", { name: "Reset sort" })).toBeNull());
 });
 
 it("keeps Enter and Space on column controls out of global playback shortcuts", () => {
@@ -42,7 +42,7 @@ it("keeps Enter and Space on column controls out of global playback shortcuts", 
   window.addEventListener("keydown", globalKeyDown);
   try {
     const view = render(<Header />);
-    for (const name of ["Columns", "Sort by Title"]) {
+    for (const name of ["Choose columns", "Sort by Title"]) {
       const button = view.getByRole("button", { name });
       fireEvent.keyDown(button, { key: "Enter", code: "Enter" });
       fireEvent.keyDown(button, { key: " ", code: "Space" });
@@ -55,13 +55,15 @@ it("keeps Enter and Space on column controls out of global playback shortcuts", 
 
 it("keeps the menu open when toggling a row's text or empty space", () => {
   const view = render(<Header />);
-  fireEvent.click(view.getByRole("button", { name: "Columns" }));
+  fireEvent.click(view.getByRole("button", { name: "Choose columns" }));
   const genre = view.getByRole("menuitemcheckbox", { name: "Genre" });
   const label = genre.querySelector("span.flex-1 > span:last-child")!;
   fireEvent.pointerDown(label);
   fireEvent.click(label);
   expect(genre.getAttribute("aria-checked")).toBe("true");
-  expect(view.getByRole("button", { name: "Columns" }).getAttribute("aria-expanded")).toBe("true");
+  expect(view.getByRole("button", { name: "Choose columns" }).getAttribute("aria-expanded")).toBe(
+    "true",
+  );
   fireEvent.pointerDown(genre);
   fireEvent.click(genre);
   expect(genre.getAttribute("aria-checked")).toBe("false");
@@ -70,7 +72,7 @@ it("keeps the menu open when toggling a row's text or empty space", () => {
 
 it("supports keyboard navigation, toggling, dismissal and focus restoration", () => {
   const view = render(<Header />);
-  const trigger = view.getByRole("button", { name: "Columns" });
+  const trigger = view.getByRole("button", { name: "Choose columns" });
   trigger.focus();
   fireEvent.keyDown(trigger, { key: "ArrowDown" });
   const artist = view.getByRole("menuitemcheckbox", { name: "Artist" });
@@ -89,7 +91,7 @@ it("supports keyboard navigation, toggling, dismissal and focus restoration", ()
 
 it("resets columns without closing the menu and dismisses on an outside click", () => {
   const view = render(<Header />);
-  fireEvent.click(view.getByRole("button", { name: "Columns" }));
+  fireEvent.click(view.getByRole("button", { name: "Choose columns" }));
   fireEvent.click(view.getByRole("menuitemcheckbox", { name: "Genre" }));
   fireEvent.click(view.getByRole("menuitem", { name: "Reset columns" }));
   expect(view.getByRole("menuitemcheckbox", { name: "Genre" }).getAttribute("aria-checked")).toBe(
@@ -102,5 +104,15 @@ it("resets columns without closing the menu and dismisses on an outside click", 
     "true",
   );
   fireEvent.pointerDown(document.body);
-  expect(view.getByRole("button", { name: "Columns" }).getAttribute("aria-expanded")).toBe("false");
+  expect(view.getByRole("button", { name: "Choose columns" }).getAttribute("aria-expanded")).toBe(
+    "false",
+  );
+});
+
+it("opens the same picker from a column heading's context menu", () => {
+  const view = render(<Header />);
+  fireEvent.contextMenu(view.getByRole("columnheader", { name: "Title" }));
+  expect(view.getByRole("menu", { name: "Visible columns" })).toBeTruthy();
+  fireEvent.click(view.getByRole("menuitemcheckbox", { name: "Disc" }));
+  expect(view.getByRole("button", { name: "Sort by Disc" })).toBeTruthy();
 });

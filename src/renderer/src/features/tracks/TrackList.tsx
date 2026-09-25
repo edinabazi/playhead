@@ -7,7 +7,7 @@ import type { LibraryPlaylist, LibraryTag, LibraryTrack } from "../../../../shar
 import { TrackListRow } from "./TrackListRow";
 import type { TrackListSettings } from "../../../../shared/track-list";
 import { getTrackListLayout } from "./track-columns";
-import { TrackListControls, TrackListHeader } from "./TrackListHeader";
+import { TrackListHeader } from "./TrackListHeader";
 import {
   createTrackStackDragImage,
   getDraggedTrackIds,
@@ -166,8 +166,7 @@ export function TrackList({
   };
 
   return (
-    <section className="-mb-4 flex min-h-0 flex-1 flex-col gap-1">
-      <TrackListControls settings={settings} onChange={onSettingsChange} />
+    <section className="-mb-4 flex min-h-0 flex-1 flex-col">
       <div className="thin-scrollbar no-drag flex min-h-0 flex-1 overflow-x-auto">
         <div
           role="table"
@@ -180,8 +179,13 @@ export function TrackList({
             settings={settings}
             gridTemplateColumns={layout.gridTemplateColumns}
             onChange={(next) => {
-              scrollToOffset(0);
-              onScrollPositionChange(0);
+              if (
+                next.sort?.column !== settings.sort?.column ||
+                next.sort?.direction !== settings.sort?.direction
+              ) {
+                scrollToOffset(0);
+                onScrollPositionChange(0);
+              }
               onSettingsChange(next);
             }}
           />

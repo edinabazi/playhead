@@ -150,6 +150,20 @@ export function TrackListColumnMenu({
           />
         ))}
         <DropdownSeparator />
+        {settings.sort && (
+          <MenuItem
+            role="menuitem"
+            aria-checked={undefined}
+            icon={icons["list-music"]}
+            label="Reset sort"
+            index={trackColumnIds.length + 1}
+            className="cursor-pointer"
+            onSelect={() => {
+              onChange({ ...settings, sort: null });
+              onClose(true);
+            }}
+          />
+        )}
         <MenuItem
           role="menuitem"
           aria-checked={undefined}

@@ -1,9 +1,8 @@
 import { useCallback, useContext, useEffect, useId, useRef, useState } from "react";
-import { AnimatePresence, MotionConfigContext, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, MotionConfigContext, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
-import { springs } from "@/lib/springs";
 import type { TrackListSettings } from "../../../../shared/track-list";
 import { trackColumns } from "./track-columns";
 import { getColumnMenuPosition, TrackListColumnMenu } from "./TrackListColumnMenu";
@@ -12,17 +11,21 @@ function stopPlaybackShortcut(event: React.KeyboardEvent) {
   if (event.key === "Enter" || event.key === " ") event.stopPropagation();
 }
 
-export function TrackListControls({
+export function TrackListHeader({
   settings,
+  gridTemplateColumns,
   onChange,
 }: {
   settings: TrackListSettings;
+  gridTemplateColumns: string;
   onChange: (settings: TrackListSettings) => void;
 }) {
   const icons = useIcons();
-  const ChevronDownIcon = icons["chevron-down"];
-  const ClearIcon = icons.x;
-  const SortIcon = icons[settings.sort?.direction === "desc" ? "arrow-down" : "arrow-up"];
+  const ColumnsIcon = icons["columns-3"];
+  const OrderIcon = icons.hash;
+  const AscendingIcon = icons["arrow-up"];
+  const DescendingIcon = icons["arrow-down"];
+  const UnsortedIcon = icons["arrow-up-down"];
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
   const [menu, setMenu] = useState<{
@@ -58,110 +61,13 @@ export function TrackListControls({
 
   return (
     <div
-      className="no-drag flex h-9 shrink-0 items-center justify-end gap-2 pr-2"
-      onKeyDown={stopPlaybackShortcut}
-    >
-      <AnimatePresence initial={false}>
-        {settings.sort && (
-          <motion.div
-            key="active-sort"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
-          >
-            <Tooltip
-              content={`Sorted by ${trackColumns[settings.sort.column].label}, ${settings.sort.direction === "asc" ? "ascending" : "descending"}. Reset to source order.`}
-            >
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-label="Reset sort"
-                leadingIcon={SortIcon}
-                trailingIcon={ClearIcon}
-                className="h-7 gap-1.5 bg-white/[0.04] text-[11px] hover:bg-white/[0.08] focus-visible:ring-2 focus-visible:ring-primary/70"
-                onClick={() => onChange({ ...settings, sort: null })}
-              >
-                {trackColumns[settings.sort.column].label}
-              </Button>
-            </Tooltip>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <Button
-        ref={triggerRef}
-        type="button"
-        variant="ghost"
-        size="sm"
-        leadingIcon={icons["columns-3"]}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        className={`h-8 gap-1.5 px-2.5 focus-visible:ring-2 focus-visible:ring-primary/70 ${open ? "bg-white/[0.08] text-foreground" : ""}`}
-        onClick={(event) => (open ? closeMenu() : openMenu(event.detail === 0 ? "first" : null))}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            event.preventDefault();
-            event.stopPropagation();
-            openMenu(event.key === "ArrowUp" ? "last" : "first");
-          } else if (event.key === "Escape" && open) {
-            event.preventDefault();
-            event.stopPropagation();
-            closeMenu(true);
-          }
-        }}
-      >
-        <span className="flex items-center gap-1.5">
-          Columns
-          <motion.span
-            aria-hidden="true"
-            className="inline-flex"
-            animate={{ rotate: open ? 180 : 0 }}
-            transition={reduceMotion ? { duration: 0 } : springs.moderate}
-          >
-            <ChevronDownIcon size={12} strokeWidth={1.8} />
-          </motion.span>
-        </span>
-      </Button>
-      <AnimatePresence>
-        {menu && (
-          <TrackListColumnMenu
-            key="columns"
-            id={menuId}
-            settings={settings}
-            position={menu.position}
-            initialFocus={menu.initialFocus}
-            reduceMotion={reduceMotion}
-            trigger={triggerRef}
-            onChange={onChange}
-            onClose={closeMenu}
-          />
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-export function TrackListHeader({
-  settings,
-  gridTemplateColumns,
-  onChange,
-}: {
-  settings: TrackListSettings;
-  gridTemplateColumns: string;
-  onChange: (settings: TrackListSettings) => void;
-}) {
-  const icons = useIcons();
-  const OrderIcon = icons.hash;
-  const AscendingIcon = icons["arrow-up"];
-  const DescendingIcon = icons["arrow-down"];
-  const UnsortedIcon = icons["arrow-up-down"];
-  return (
-    <div
       role="row"
       onKeyDown={stopPlaybackShortcut}
-      className="mr-2 grid h-9 shrink-0 items-center gap-2 border-b border-white/[0.08] px-[10px] text-[11px] font-medium text-muted-foreground"
+      onContextMenu={(event) => {
+        event.preventDefault();
+        openMenu("first");
+      }}
+      className="no-drag mr-2 grid h-9 shrink-0 items-center gap-2 border-b border-white/[0.08] px-[10px] text-[11px] font-medium text-muted-foreground"
       style={{ gridTemplateColumns }}
     >
       <span role="columnheader" aria-label="Source order">
@@ -216,7 +122,56 @@ export function TrackListHeader({
           </div>
         );
       })}
-      <span role="columnheader" aria-label="Track actions" />
+      <span
+        role="columnheader"
+        aria-label="Track actions"
+        className="sticky right-0 flex justify-end"
+      >
+        <Tooltip content="Choose columns">
+          <Button
+            ref={triggerRef}
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Choose columns"
+            aria-haspopup="menu"
+            aria-expanded={open}
+            aria-controls={open ? menuId : undefined}
+            className={`!h-7 !w-7 focus-visible:ring-2 focus-visible:ring-primary/70 ${open ? "bg-white/[0.08] text-foreground" : ""}`}
+            onClick={(event) =>
+              open ? closeMenu() : openMenu(event.detail === 0 ? "first" : null)
+            }
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                event.stopPropagation();
+                openMenu(event.key === "ArrowUp" ? "last" : "first");
+              } else if (event.key === "Escape" && open) {
+                event.preventDefault();
+                event.stopPropagation();
+                closeMenu(true);
+              }
+            }}
+          >
+            <ColumnsIcon size={14} strokeWidth={1.5} />
+          </Button>
+        </Tooltip>
+      </span>
+      <AnimatePresence>
+        {menu && (
+          <TrackListColumnMenu
+            key="columns"
+            id={menuId}
+            settings={settings}
+            position={menu.position}
+            initialFocus={menu.initialFocus}
+            reduceMotion={reduceMotion}
+            trigger={triggerRef}
+            onChange={onChange}
+            onClose={closeMenu}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
