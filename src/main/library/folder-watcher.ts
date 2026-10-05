@@ -131,6 +131,8 @@ export async function watchLibraryFolders(
   watcher
     .on("add", notifyFolderForPath)
     .on("unlink", notifyFolderForPath)
+    .on("addDir", notifyFolderForPath)
+    .on("unlinkDir", notifyFolderForPath)
     .on("change", notifyFolderForPath)
     .on("error", (error) => console.warn("Music folder watching interrupted", error));
 }

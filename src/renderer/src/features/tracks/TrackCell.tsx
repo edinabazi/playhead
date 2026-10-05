@@ -40,6 +40,7 @@ export function TrackCell({
   return (
     <div
       role={role}
+      aria-selected={role === "row" ? selected : undefined}
       style={style}
       tabIndex={0}
       draggable={draggable}

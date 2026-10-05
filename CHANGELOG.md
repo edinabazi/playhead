@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.7
+
+- Fixed “Install update and restart” hiding the window instead of restarting Playhead.
+- Remember window size and position after quitting. Thanks @wex288! ([#15](https://github.com/edinabazi/playhead/issues/15))
+- Click the playing cover or press Cmd/Ctrl+J to reveal and select the current song. Thanks @wex288! ([#16](https://github.com/edinabazi/playhead/issues/16))
+- Keep keyboard selection visible as you navigate tracks. Thanks @wex288! ([#18](https://github.com/edinabazi/playhead/issues/18))
+- Fixed automatic playback skipping the next song. Thanks @wex288! ([#19](https://github.com/edinabazi/playhead/issues/19))
+- Remove deleted files during folder watching, rebuilds, and launch rescans. Thanks @wex288! ([#20](https://github.com/edinabazi/playhead/issues/20))
+
 ## 0.2.6
 
 - Customizable, resizable track columns with metadata sorting. Thanks @stripedgoat! ([#14](https://github.com/edinabazi/playhead/issues/14))

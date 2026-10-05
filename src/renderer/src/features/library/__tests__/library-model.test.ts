@@ -8,6 +8,7 @@ import {
   getTrackAlbumId,
   getTrackArtistId,
   mergeScannedFolder,
+  mergeScannedLibraryState,
 } from "../library-model";
 import {
   defaultAppSettings,
@@ -154,7 +155,7 @@ describe("library model", () => {
     ).toBe("artist::unknown album");
   });
 
-  it("preserves playlist and tag track ids when rescanning a folder", () => {
+  it("removes deleted tracks and their collection and session references after a completed rescan", () => {
     const scanned: ScannedFolder = {
       folder: { id: "folder-1", name: "Music", path: "/music", trackIds: ["track-2"] },
       tracks: [
@@ -170,12 +171,110 @@ describe("library model", () => {
       ],
     };
 
-    const next = mergeScannedFolder(baseState, scanned);
-    expect(Object.keys(next.tracks)).toEqual(["track-1", "track-2"]);
-    expect(next.folders[0].trackIds).toEqual(["track-1", "track-2"]);
-    expect(next.playlists[0].trackIds).toEqual(["track-1"]);
-    expect(next.tags[0].trackIds).toEqual(["track-1"]);
+    const state = structuredClone(baseState);
+    state.settings.session.activeTrackId = "track-1";
+    state.settings.session.selectedTrackIds = ["track-1", "track-2"];
+    state.settings.session.trackPositions = { "track-1": 30, "track-2": 40 };
+    state.settings.session.queue.items = [
+      { id: "q1", trackId: "track-1" },
+      { id: "q2", trackId: "track-2" },
+      { id: "remote", trackId: "soundcloud-1" },
+    ];
+    state.settings.session.queue.shuffledItems = state.settings.session.queue.items.slice();
+    state.settings.session.queue.activeItemId = "q1";
+    const next = mergeScannedFolder(state, scanned);
+    expect(Object.keys(next.tracks)).toEqual(["track-2"]);
+    expect(next.folders[0].trackIds).toEqual(["track-2"]);
+    expect(next.playlists[0].trackIds).toEqual([]);
+    expect(next.tags[0].trackIds).toEqual([]);
+    expect(next.favoriteTrackIds).toEqual([]);
+    expect(next.settings.session.activeTrackId).toBeNull();
+    expect(next.settings.session.selectedTrackIds).toEqual(["track-2"]);
+    expect(next.settings.session.trackPositions).toEqual({ "track-2": 40 });
+    expect(next.settings.session.queue.activeItemId).toBeNull();
+    expect(next.settings.session.queue.items.map((item) => item.id)).toEqual(["q2", "remote"]);
+    expect(next.settings.session.queue.shuffledItems.map((item) => item.id)).toEqual([
+      "q2",
+      "remote",
+    ]);
     expect(next.selectedSource).toEqual({ type: "folder", id: "folder-1" });
+  });
+
+  it("keeps the custom order and collection membership of surviving tracks", () => {
+    const state = {
+      ...baseState,
+      folders: [{ ...baseState.folders[0], trackIds: ["track-2", "track-1"] }],
+    };
+    const next = mergeScannedFolder(state, {
+      folder: { ...state.folders[0], trackIds: ["track-1", "track-2"] },
+      tracks: Object.values(state.tracks),
+    });
+    expect(next.folders[0].trackIds).toEqual(["track-2", "track-1"]);
+    expect(next.playlists).toEqual(baseState.playlists);
+    expect(next.tags).toEqual(baseState.tags);
+    expect(next.favoriteTrackIds).toEqual(baseState.favoriteTrackIds);
+  });
+
+  it("applies deletions to the latest state without undoing playlist edits or removing other roots", () => {
+    const otherTrack = {
+      ...baseState.tracks["track-1"],
+      id: "other",
+      folderId: "other-folder",
+      path: "/other/song.mp3",
+    };
+    const latest: LibraryState = {
+      ...baseState,
+      selectedSource: { type: "playlist", id: "new" },
+      folders: [
+        ...baseState.folders,
+        { id: "other-folder", path: "/other", name: "Other", trackIds: ["other"] },
+      ],
+      tracks: { ...baseState.tracks, other: otherTrack },
+      playlists: [
+        ...baseState.playlists,
+        {
+          id: "new",
+          name: "New",
+          trackIds: ["track-1", "track-2", "other"],
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    };
+    const scanned = mergeScannedFolder(baseState, {
+      folder: { ...baseState.folders[0], trackIds: ["track-2"] },
+      tracks: [baseState.tracks["track-2"]],
+    });
+    const next = mergeScannedLibraryState(latest, scanned, ["folder-1"]);
+    expect(Object.keys(next.tracks)).toEqual(["track-2", "other"]);
+    expect(next.playlists[1].trackIds).toEqual(["track-2", "other"]);
+    expect(next.selectedSource).toEqual(latest.selectedSource);
+    expect(next.folders[1]).toEqual(latest.folders[1]);
+  });
+
+  it("does not resurrect a root removed while its scan was running", () => {
+    const next = mergeScannedLibraryState({ ...baseState, folders: [], tracks: {} }, baseState, [
+      "folder-1",
+    ]);
+    expect(next.folders).toEqual([]);
+    expect(next.tracks).toEqual({});
+  });
+
+  it("retains tracks that are still indexed by an overlapping root", () => {
+    const state: LibraryState = {
+      ...baseState,
+      folders: [
+        ...baseState.folders,
+        { id: "other", name: "Parent", path: "/", trackIds: ["track-1"] },
+      ],
+    };
+    const next = mergeScannedFolder(state, {
+      folder: { ...baseState.folders[0], trackIds: [] },
+      tracks: [],
+    });
+    expect(next.tracks["track-1"]).toEqual(baseState.tracks["track-1"]);
+    expect(next.folders.find((folder) => folder.id === "folder-1")?.trackIds).toEqual([]);
+    expect(next.playlists[0].trackIds).toEqual(["track-1"]);
   });
 
   it("preserves analyzed bpm when rescanned metadata has no bpm", () => {

@@ -211,6 +211,7 @@ export function SettingsDialog({
       secondaryKeys: [`${modifierLabel} F`],
     },
     { action: "Open settings", keys: [`${modifierLabel} ,`] },
+    { action: "Jump to currently playing song", keys: [`${modifierLabel} J`] },
     {
       action: "Seek backward",
       keys: ["←"],

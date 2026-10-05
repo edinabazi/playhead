@@ -107,6 +107,7 @@ import {
   getTrackAlbumId,
   getTrackArtistId,
   mergeScannedFolder,
+  mergeScannedLibraryState,
 } from "@/features/library/library-model";
 import { getPathName } from "@/features/library/folder-tree";
 import { useLibraryActions } from "@/features/library/use-library-actions";
@@ -114,6 +115,7 @@ import { EmptyLibraryState } from "@/features/library/EmptyLibraryState";
 import { LibraryDetailHeader } from "@/features/library/LibraryDetailHeader";
 import { LibraryBrowser } from "@/features/library/LibraryBrowser";
 import { normalizeSourceForMode } from "@/features/library/source";
+import { getPlayingTrackSource } from "@/features/library/playing-track-source";
 import { usePlayerKeyboardShortcuts } from "@/hooks/use-player-keyboard-shortcuts";
 import { useWindowDrag } from "@/hooks/use-window-drag";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
@@ -195,49 +197,6 @@ function getQueueSourceTitle(library: LibraryState): string {
 function getSourceScrollKey(source: LibraryState["selectedSource"]): string {
   if (!source) return "none";
   return `${source.type}:${source.id || ""}${source.path ? `:${source.path}` : ""}`;
-}
-
-function mergeScannedLibraryState(
-  latest: LibraryState,
-  scannedState: LibraryState,
-  scannedFolderIds: Iterable<string>,
-  options: {
-    allowNewFolders?: boolean;
-    selectedSource?: LibraryState["selectedSource"];
-    settings?: LibraryState["settings"];
-  } = {},
-): LibraryState {
-  const scannedIds = new Set(scannedFolderIds);
-  const scannedFoldersById = new Map(
-    scannedState.folders
-      .filter((folder) => scannedIds.has(folder.id))
-      .map((folder) => [folder.id, folder]),
-  );
-  const latestFolderIds = new Set(latest.folders.map((folder) => folder.id));
-  const folders = latest.folders.map((folder) => scannedFoldersById.get(folder.id) || folder);
-
-  if (options.allowNewFolders) {
-    for (const folder of scannedFoldersById.values()) {
-      if (!latestFolderIds.has(folder.id)) folders.push(folder);
-    }
-  }
-
-  const persistedScannedFolderIds = new Set(
-    folders.filter((folder) => scannedIds.has(folder.id)).map((folder) => folder.id),
-  );
-  const tracks = { ...latest.tracks };
-
-  for (const track of Object.values(scannedState.tracks)) {
-    if (persistedScannedFolderIds.has(track.folderId)) tracks[track.id] = track;
-  }
-
-  return {
-    ...latest,
-    folders,
-    tracks,
-    settings: options.settings || latest.settings,
-    selectedSource: options.selectedSource ?? latest.selectedSource,
-  };
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -518,7 +477,18 @@ export function App() {
   const [selectedLibraryBrowserItemIds, setSelectedLibraryBrowserItemIds] = useState<string[]>([]);
   const [renamingPlaylistId, setRenamingPlaylistId] = useState<string | null>(null);
   const [renamingTagId, setRenamingTagId] = useState<string | null>(null);
-  const [scrollToTrackId, setScrollToTrackId] = useState<string | null>(null);
+  const [trackScrollRequest, setTrackScrollRequest] = useState<{
+    trackId: string;
+    align: "center" | "nearest";
+    focus: boolean;
+  } | null>(null);
+  const setScrollToTrackId = useCallback(
+    (trackId: string | null, align: "center" | "nearest" = "center", focus = false) => {
+      setTrackScrollRequest(trackId ? { trackId, align, focus } : null);
+    },
+    [],
+  );
+  const scrollToTrackId = trackScrollRequest?.trackId ?? null;
   const [previewAppTransparency, setPreviewAppTransparency] = useState<number | null>(null);
   const [updateState, setUpdateState] = useState<AppUpdateState>({ status: "idle" });
   const [updateMessage, setUpdateMessage] = useState<{
@@ -1405,7 +1375,7 @@ export function App() {
       });
       await selectTrack(track, true);
     },
-    [library, persistLibrary, selectTrack],
+    [library, persistLibrary, selectTrack, setScrollToTrackId],
   );
 
   const addFolder = useCallback(async () => {
@@ -1877,7 +1847,11 @@ export function App() {
     setIsPlaying(false);
     setIsLoadingTrack(false);
     setError("");
-  }, [destroyHls, playbackClock]);
+  }, [destroyHls, playbackClock, setScrollToTrackId]);
+
+  useEffect(() => {
+    if (activeTrackId && !allPlayableTracksById[activeTrackId]) clearPlaybackState();
+  }, [activeTrackId, allPlayableTracksById, clearPlaybackState]);
 
   const runAdvancedSettingsAction = useCallback(
     async (action: AdvancedSettingsAction) => {
@@ -2479,9 +2453,9 @@ export function App() {
       const nextTrack = tracks[nextIndex];
       selectionAnchorTrackIdRef.current = nextTrack.id;
       setSelectedTrackIds([nextTrack.id]);
-      setScrollToTrackId(nextTrack.id);
+      setScrollToTrackId(nextTrack.id, "nearest");
     },
-    [activeTrackId, selectedTrackIds, tracks],
+    [activeTrackId, selectedTrackIds, tracks, setScrollToTrackId],
   );
 
   const playSelectedTrack = useCallback(() => {
@@ -2500,6 +2474,15 @@ export function App() {
       return nextState;
     });
   }, []);
+
+  const revealPlayingTrack = useCallback(() => {
+    if (!activeTrack) return;
+    const source = getPlayingTrackSource(library, activeTrack, soundcloudTracksByCollection);
+    selectLibrarySource(source);
+    setSelectedTrackIds([activeTrack.id]);
+    selectionAnchorTrackIdRef.current = activeTrack.id;
+    setScrollToTrackId(activeTrack.id, "center", true);
+  }, [activeTrack, library, selectLibrarySource, soundcloudTracksByCollection, setScrollToTrackId]);
 
   const selectSoundCloudSource = useCallback(
     async (collectionId: string) => {
@@ -2701,6 +2684,7 @@ export function App() {
       selectedTrackIds,
       shuffleEnabled,
       tracks,
+      setScrollToTrackId,
     ],
   );
 
@@ -2752,6 +2736,7 @@ export function App() {
     selectTrack,
     shuffleEnabled,
     tracks,
+    setScrollToTrackId,
   ]);
 
   useEffect(() => {
@@ -2809,7 +2794,7 @@ export function App() {
     setSelectedTrackIds(library.settings.session.selectedTrackIds);
     setScrollToTrackId(track.id);
     void selectTrack(track, false, library.settings.session.trackPositions[track.id] || 0);
-  }, [allPlayableTracksById, isWaveformEngineReady, library, selectTrack]);
+  }, [allPlayableTracksById, isWaveformEngineReady, library, selectTrack, setScrollToTrackId]);
 
   useEffect(() => {
     const onSelectAll = (event: KeyboardEvent) => {
@@ -3055,6 +3040,15 @@ export function App() {
         updateMediaPosition(wavesurfer.getDuration(), wavesurfer.getCurrentTime());
       }),
       wavesurfer.on("finish", () => {
+        // Ignore a repeated/stale ended event while the next source is loading or playing.
+        // The HTML media element is authoritative; React may already show the next track.
+        if (
+          !wavesurfer.getMediaElement().ended ||
+          playbackStatusRef.current.loading ||
+          !loadedTrackIdRef.current ||
+          loadedTrackIdRef.current !== activeTrackIdRef.current
+        )
+          return;
         if (activeTrackIdRef.current) clearTrackPositionRef.current(activeTrackIdRef.current);
         lastfmPlaybackSessionRef.current = null;
         if (!playNextTrackOnEndRef.current()) setIsPlaying(false);
@@ -3104,6 +3098,7 @@ export function App() {
   usePlayerKeyboardShortcuts({
     playbackSettings: library.settings.playback,
     onToggleQueue: playbackQueue.togglePanel,
+    onRevealPlayingTrack: revealPlayingTrack,
     onOpenSearch: () => setIsSearchOpen(true),
     onOpenSettings: () => setIsSettingsOpen(true),
     onTogglePlayback: () => void togglePlayback(),
@@ -3398,6 +3393,7 @@ export function App() {
                     }
                   }}
                   onTrackInfoContextMenu={setPlayerTrackMenuPoint}
+                  onRevealPlayingTrack={revealPlayingTrack}
                   maxVolume={maxVolume}
                   volumeBoostEnabled={volumeBoostEnabled}
                   limiterActive={limiterActive}
@@ -3559,6 +3555,8 @@ export function App() {
                         sourceScrollPositionsRef.current[selectedSourceScrollKey] || 0
                       }
                       scrollToTrackId={scrollToTrackId}
+                      scrollToTrackAlign={trackScrollRequest?.align}
+                      focusScrolledTrack={trackScrollRequest?.focus}
                       selectedPlaylist={selectedPlaylist}
                       selectedTag={selectedTag}
                       canReorderTracks={

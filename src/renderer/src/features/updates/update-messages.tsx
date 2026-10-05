@@ -1,6 +1,46 @@
 import type { UpdateMessage } from "./UpdateMessageDialog";
 
 export const updateMessagesByVersion: Record<string, UpdateMessage> = {
+  "0.2.7": {
+    title: "Playhead has been updated",
+    description: (
+      <ul>
+        <li>
+          Fixed “Install update and restart” hiding the window instead of restarting Playhead.
+        </li>
+        {[
+          { issue: 15, text: "Remember window size and position after quitting." },
+          {
+            issue: 16,
+            text: "Click the playing cover or press Cmd/Ctrl+J to reveal and select the current song.",
+          },
+          { issue: 18, text: "Keep keyboard selection visible as you navigate tracks." },
+          { issue: 19, text: "Fixed automatic playback skipping the next song." },
+          {
+            issue: 20,
+            text: "Remove deleted files during folder watching, rebuilds, and launch rescans.",
+          },
+        ].map(({ issue, text }) => (
+          <li key={issue}>
+            {text} Thanks{" "}
+            <a href="https://github.com/wex288" target="_blank" rel="noreferrer">
+              @wex288
+            </a>
+            ! (
+            <a
+              href={`https://github.com/edinabazi/playhead/issues/${issue}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              #{issue}
+            </a>
+            )
+          </li>
+        ))}
+      </ul>
+    ),
+    buttonLabel: "Got it",
+  },
   "0.2.6": {
     title: "Playhead has been updated",
     description: (

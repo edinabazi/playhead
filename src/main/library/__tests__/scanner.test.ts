@@ -14,6 +14,11 @@ vi.mock("../../artwork", () => ({
 }));
 
 import { scanFolderPath } from "../scanner";
+import {
+  emptyLibraryState,
+  mergeScannedFolder,
+  mergeScannedLibraryState,
+} from "../../../renderer/src/features/library/library-model";
 
 const tempDirectories: string[] = [];
 
@@ -38,6 +43,25 @@ function mockMetadata() {
 }
 
 describe("library scanner", () => {
+  it("removes a deleted file from the library on a rescan, including an empty folder", async () => {
+    const directory = await createTempDirectory();
+    const filePath = join(directory, "track.mp3");
+    await writeFile(filePath, Buffer.from("audio"));
+    mockMetadata();
+    const initial = await scanFolderPath(directory);
+    const state = mergeScannedFolder(emptyLibraryState(), initial);
+    await rm(filePath);
+    const scanned = await scanFolderPath(directory, undefined, state.tracks);
+    const next = mergeScannedLibraryState(state, mergeScannedFolder(state, scanned), [
+      scanned.folder.id,
+    ]);
+    expect(next.folders[0].trackIds).toEqual([]);
+    expect(next.tracks).toEqual({});
+    await expect(
+      scanFolderPath(join(directory, "offline"), undefined, state.tracks),
+    ).rejects.toThrow();
+    expect(Object.keys(state.tracks)).toEqual(initial.folder.trackIds);
+  });
   it("refreshes legacy cached tracks once and keeps text Disc and Genre tags", async () => {
     const directory = await createTempDirectory();
     await writeFile(join(directory, "track.mp3"), Buffer.from("audio"));

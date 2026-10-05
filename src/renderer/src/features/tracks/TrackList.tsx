@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useIcons } from "@/lib/icon-context";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
@@ -41,6 +41,8 @@ export function TrackList({
   scrollKey,
   initialScrollTop = 0,
   scrollToTrackId,
+  scrollToTrackAlign = "center",
+  focusScrolledTrack = false,
   selectedPlaylist,
   selectedTag,
   canReorderTracks = true,
@@ -75,6 +77,8 @@ export function TrackList({
   scrollKey: string;
   initialScrollTop?: number;
   scrollToTrackId: string | null;
+  scrollToTrackAlign?: "center" | "nearest";
+  focusScrolledTrack?: boolean;
   selectedPlaylist: LibraryPlaylist | null;
   selectedTag: LibraryTag | null;
   canReorderTracks?: boolean;
@@ -137,9 +141,14 @@ export function TrackList({
     scrollToOffset,
     totalHeight,
   } = virtualList;
+  const restoredScroll = useRef<{ container: HTMLDivElement; key: string } | null>(null);
 
   useEffect(() => {
-    if (!container || scrollToTrackId) return;
+    if (!container) return;
+    if (restoredScroll.current?.container === container && restoredScroll.current.key === scrollKey)
+      return;
+    restoredScroll.current = { container, key: scrollKey };
+    if (scrollToTrackId) return;
     scrollToOffset(initialScrollTop);
   }, [container, initialScrollTop, scrollKey, scrollToOffset, scrollToTrackId]);
 
@@ -148,8 +157,9 @@ export function TrackList({
 
     const index = tracks.findIndex((track) => track.id === scrollToTrackId);
     if (index >= 0) {
-      scrollToIndex(index, "center");
-      window.requestAnimationFrame(() => onScrollPositionChange(container.scrollTop));
+      scrollToIndex(index, scrollToTrackAlign);
+      onScrollPositionChange(container.scrollTop);
+      if (focusScrolledTrack) container.focus({ preventScroll: true });
     }
     onScrolledToTrack();
   }, [
@@ -158,6 +168,8 @@ export function TrackList({
     onScrolledToTrack,
     scrollToIndex,
     scrollToTrackId,
+    scrollToTrackAlign,
+    focusScrolledTrack,
     tracks,
   ]);
 
@@ -194,6 +206,7 @@ export function TrackList({
           <div
             ref={containerRef}
             role="rowgroup"
+            tabIndex={-1}
             className="thin-scrollbar no-drag min-h-0 flex-1 overflow-y-auto pr-2"
             onScroll={handleScroll}
           >

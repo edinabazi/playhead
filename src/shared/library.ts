@@ -189,6 +189,7 @@ export type SelectedSource = {
 };
 
 export type PlaybackQueueSource = {
+  path?: string;
   type: SourceType;
   id?: string;
   title?: string;

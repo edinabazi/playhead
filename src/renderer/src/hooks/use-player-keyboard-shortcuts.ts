@@ -6,6 +6,7 @@ import { isMacPlatform } from "@/lib/platform";
 export function usePlayerKeyboardShortcuts({
   playbackSettings,
   onToggleQueue,
+  onRevealPlayingTrack,
   onOpenSearch,
   onOpenSettings,
   onTogglePlayback,
@@ -17,6 +18,7 @@ export function usePlayerKeyboardShortcuts({
 }: {
   playbackSettings: PlaybackSettings;
   onToggleQueue: () => void;
+  onRevealPlayingTrack: () => void;
   onOpenSearch: () => void;
   onOpenSettings: () => void;
   onTogglePlayback: () => void;
@@ -40,6 +42,11 @@ export function usePlayerKeyboardShortcuts({
       }
 
       const primaryModifier = isMacPlatform() ? event.metaKey : event.ctrlKey;
+      if (primaryModifier && event.key.toLowerCase() === "j" && !event.altKey && !event.shiftKey) {
+        event.preventDefault();
+        onRevealPlayingTrack();
+        return;
+      }
       if (primaryModifier && event.key.toLowerCase() === "l") {
         event.preventDefault();
         onToggleQueue();
@@ -120,6 +127,7 @@ export function usePlayerKeyboardShortcuts({
     onSeekBy,
     onSelectAdjacentTrack,
     onToggleQueue,
+    onRevealPlayingTrack,
     onTogglePlayback,
     onToggleSelectedTrackFavorite,
     playbackSettings,

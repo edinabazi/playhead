@@ -67,6 +67,17 @@ afterEach(async () => {
 });
 
 describe("folder watcher", () => {
+  it("notifies the root when an album directory is removed", async () => {
+    vi.useFakeTimers();
+    await watchLibraryFolders([folder]);
+    const unlinkDirectory = watcherMocks.on.mock.calls.find(
+      ([event]) => event === "unlinkDir",
+    )?.[1];
+    expect(unlinkDirectory).toBeTypeOf("function");
+    unlinkDirectory("/music/album");
+    await vi.advanceTimersByTimeAsync(651);
+    expect(watcherMocks.send).toHaveBeenCalledExactlyOnceWith("library:folder-changed", folder.id);
+  });
   it("keeps the existing watcher when folder configuration is unchanged", async () => {
     await watchLibraryFolders([folder], [".mp3", ".flac"]);
     await watchLibraryFolders([{ ...folder, trackIds: ["track-1"] }], [".flac", ".mp3"]);

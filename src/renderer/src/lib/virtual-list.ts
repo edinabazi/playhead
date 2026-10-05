@@ -71,9 +71,15 @@ export function useVirtualList({
 
       if (align === "nearest" && itemTop >= viewTop && itemBottom <= viewBottom) return;
 
+      const offset =
+        align === "center"
+          ? itemTop - (container.clientHeight - itemHeight) / 2
+          : itemTop < viewTop
+            ? itemTop
+            : itemBottom - container.clientHeight;
       const nextScrollTop = Math.max(
         0,
-        itemTop - (align === "center" ? (container.clientHeight - itemHeight) / 2 : 0),
+        Math.min(offset, itemCount * itemHeight - container.clientHeight),
       );
       setScrollTop(nextScrollTop);
       container.scrollTop = nextScrollTop;

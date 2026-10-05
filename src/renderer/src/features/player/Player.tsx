@@ -72,6 +72,7 @@ export function Player({
   onCycleRepeat,
   onToggleFavorite,
   onTrackInfoContextMenu,
+  onRevealPlayingTrack,
   onVolumeChange,
   onVolumeBoostChange,
   onEqualizerPreview,
@@ -110,6 +111,7 @@ export function Player({
   onCycleRepeat: () => void;
   onToggleFavorite: () => void;
   onTrackInfoContextMenu: (point: MenuAnchorPoint) => void;
+  onRevealPlayingTrack: () => void;
   onVolumeChange: (volume: number) => void;
   onVolumeBoostChange: (enabled: boolean) => void;
   onEqualizerPreview: (equalizer: EqualizerSettings) => void;
@@ -173,7 +175,14 @@ export function Player({
             onTrackInfoContextMenu({ x: event.clientX, y: event.clientY, align: "left" });
           }}
         >
-          <div className="relative size-16 shrink-0 rounded-[12px]">
+          <button
+            type="button"
+            className="relative size-16 shrink-0 rounded-[12px] outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            disabled={!activeTrack}
+            aria-label="Jump to currently playing song"
+            title="Jump to currently playing song"
+            onClick={onRevealPlayingTrack}
+          >
             <AnimatePresence mode="popLayout" initial={false}>
               <motion.div
                 key={activeTrack?.id || "empty-artwork"}
@@ -199,7 +208,7 @@ export function Player({
                 )}
               </motion.div>
             </AnimatePresence>
-          </div>
+          </button>
 
           <div className="min-w-0 flex-1">
             <AnimatePresence mode="wait" initial={false}>

@@ -86,17 +86,121 @@ export function mergeScannedFolder(state: LibraryState, scanned: ScannedFolder):
   }
 
   const existingFolder = state.folders.find((folder) => folder.id === scanned.folder.id);
+  const scannedTrackIds = new Set(scanned.folder.trackIds);
   const folderTrackIds = Array.from(
-    new Set([...(existingFolder?.trackIds || []), ...scanned.folder.trackIds]),
+    new Set([
+      ...(existingFolder?.trackIds || []).filter((trackId) => scannedTrackIds.has(trackId)),
+      ...scanned.folder.trackIds,
+    ]),
   ).filter((trackId) => Boolean(tracks[trackId]));
   const folder = { ...scanned.folder, trackIds: folderTrackIds };
   const folders = [...state.folders.filter((folder) => folder.id !== scanned.folder.id), folder];
 
-  return {
-    ...state,
+  return mergeScannedLibraryState(state, { ...state, folders, tracks }, [scanned.folder.id], {
+    allowNewFolders: true,
+    selectedSource: { type: "folder", id: scanned.folder.id },
+  });
+}
+
+// Apply only completed folder snapshots to the latest state, preserving edits made during a scan.
+export function mergeScannedLibraryState(
+  latest: LibraryState,
+  scannedState: LibraryState,
+  scannedFolderIds: Iterable<string>,
+  options: {
+    allowNewFolders?: boolean;
+    selectedSource?: LibraryState["selectedSource"];
+    settings?: LibraryState["settings"];
+  } = {},
+): LibraryState {
+  const scannedIds = new Set(scannedFolderIds);
+  const scannedFolders = new Map(
+    scannedState.folders
+      .filter((folder) => scannedIds.has(folder.id))
+      .map((folder) => [folder.id, folder]),
+  );
+  const latestFolderIds = new Set(latest.folders.map((folder) => folder.id));
+  const folders = latest.folders.map((folder) => scannedFolders.get(folder.id) || folder);
+  if (options.allowNewFolders) {
+    for (const folder of scannedFolders.values()) {
+      if (!latestFolderIds.has(folder.id)) folders.push(folder);
+    }
+  }
+  const persistedIds = new Set(
+    folders.filter((folder) => scannedIds.has(folder.id)).map((folder) => folder.id),
+  );
+  const previousTrackIds = new Set(
+    latest.folders
+      .filter((folder) => persistedIds.has(folder.id))
+      .flatMap((folder) => folder.trackIds),
+  );
+  const retainedTrackIds = new Set(folders.flatMap((folder) => folder.trackIds));
+  const tracks = { ...latest.tracks };
+  const removedIds = new Set<string>();
+  for (const track of Object.values(latest.tracks)) {
+    if (
+      (persistedIds.has(track.folderId) || previousTrackIds.has(track.id)) &&
+      !retainedTrackIds.has(track.id)
+    ) {
+      delete tracks[track.id];
+      removedIds.add(track.id);
+    }
+  }
+  for (const folder of folders) {
+    if (!persistedIds.has(folder.id)) continue;
+    for (const trackId of folder.trackIds) {
+      const track = scannedState.tracks[trackId];
+      if (!track) continue;
+      const existing = latest.tracks[trackId];
+      tracks[trackId] =
+        !track.bpm && existing?.bpmSource === "analysis"
+          ? { ...track, bpm: existing.bpm, bpmSource: "analysis" }
+          : track;
+    }
+  }
+  const next = {
+    ...latest,
     folders,
     tracks,
-    selectedSource: { type: "folder", id: scanned.folder.id },
+    settings: options.settings || latest.settings,
+    selectedSource:
+      options.selectedSource === undefined ? latest.selectedSource : options.selectedSource,
+  };
+  if (!removedIds.size) return next;
+
+  const keep = (id: string) => !removedIds.has(id);
+  const session = next.settings.session;
+  const queue = session.queue;
+  const items = queue.items.filter((item) => keep(item.trackId));
+  const activeItemId = items.some((item) => item.id === queue.activeItemId)
+    ? queue.activeItemId
+    : null;
+  return {
+    ...next,
+    playlists: next.playlists.map((playlist) => ({
+      ...playlist,
+      trackIds: playlist.trackIds.filter(keep),
+    })),
+    tags: (next.tags || []).map((tag) => ({ ...tag, trackIds: tag.trackIds.filter(keep) })),
+    favoriteTrackIds: next.favoriteTrackIds.filter(keep),
+    settings: {
+      ...next.settings,
+      session: {
+        ...session,
+        activeTrackId:
+          session.activeTrackId && keep(session.activeTrackId) ? session.activeTrackId : null,
+        selectedTrackIds: session.selectedTrackIds.filter(keep),
+        trackPositions: Object.fromEntries(
+          Object.entries(session.trackPositions).filter(([id]) => keep(id)),
+        ),
+        queue: {
+          ...queue,
+          items,
+          shuffledItems: queue.shuffledItems.filter((item) => keep(item.trackId)),
+          activeItemId,
+        },
+      },
+    },
   };
 }
 
