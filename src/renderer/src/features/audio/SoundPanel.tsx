@@ -15,12 +15,17 @@ import {
 } from "./equalizer";
 import { EqualizerBandSlider, EqualizerCurve } from "./EqualizerControls";
 
+const playbackRates = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2];
+
 export function SoundPanel({
   open,
   id,
   extraHeaderHeight = 0,
   equalizer,
   volumeBoostEnabled,
+  playbackRate,
+  preservePitch,
+  onPlaybackRateChange,
   onEqualizerPreview,
   onEqualizerChange,
   onVolumeBoostChange,
@@ -30,6 +35,9 @@ export function SoundPanel({
   extraHeaderHeight?: number;
   equalizer: EqualizerSettings;
   volumeBoostEnabled: boolean;
+  playbackRate: number;
+  preservePitch: boolean;
+  onPlaybackRateChange: (playbackRate: number, preservePitch: boolean) => void;
   onEqualizerPreview: (equalizer: EqualizerSettings) => void;
   onEqualizerChange: (equalizer: EqualizerSettings) => void;
   onVolumeBoostChange: (enabled: boolean) => void;
@@ -190,6 +198,36 @@ export function SoundPanel({
               aria-label="Volume boost"
               onCheckedChange={onVolumeBoostChange}
             />
+          </div>
+
+          <div className="mt-4 border-t border-white/[0.08] pt-3">
+            <div className="flex items-center justify-between gap-4">
+              <h4 className="text-[13px] font-semibold leading-5 text-foreground">Speed</h4>
+              <label className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
+                Keep pitch
+                <Switch
+                  checked={preservePitch}
+                  aria-label="Keep pitch"
+                  onCheckedChange={(checked) => onPlaybackRateChange(playbackRate, checked)}
+                />
+              </label>
+            </div>
+            <div className="mt-2 flex rounded-full bg-white/[0.06] p-1">
+              {playbackRates.map((rate) => (
+                <button
+                  key={rate}
+                  type="button"
+                  className={`h-7 flex-1 rounded-full text-[12px] font-medium tabular-nums transition ${
+                    playbackRate === rate
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  onClick={() => onPlaybackRateChange(rate, preservePitch)}
+                >
+                  {rate}×
+                </button>
+              ))}
+            </div>
           </div>
         </motion.div>
       )}

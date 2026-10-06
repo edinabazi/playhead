@@ -69,6 +69,9 @@ export function Player({
   onSeek,
   sleepTimer,
   onSleepTimerChange,
+  playbackRate,
+  preservePitch,
+  onPlaybackRateChange,
   limiterActive,
   equalizer,
   levelsOpen,
@@ -113,6 +116,9 @@ export function Player({
   onSeek: (time: number) => void;
   sleepTimer: SleepTimer;
   onSleepTimerChange: (timer: SleepTimer) => void;
+  playbackRate: number;
+  preservePitch: boolean;
+  onPlaybackRateChange: (playbackRate: number, preservePitch: boolean) => void;
   limiterActive: boolean;
   equalizer: EqualizerSettings;
   levelsOpen: boolean;
@@ -294,7 +300,7 @@ export function Player({
               tooltip={soundPanelOpen ? "Hide equalizer" : "Show equalizer"}
               ariaExpanded={soundPanelOpen}
               ariaControls={soundPanelId}
-              active={soundPanelOpen || equalizer.enabled}
+              active={soundPanelOpen || equalizer.enabled || playbackRate !== 1}
               onClick={() => setSoundPanelOpen((value) => !value)}
             >
               <SoundIcon size={19} strokeWidth={1.8} />
@@ -306,6 +312,9 @@ export function Player({
               extraHeaderHeight={levelsOpen ? 68 : 0}
               equalizer={equalizer}
               volumeBoostEnabled={volumeBoostEnabled}
+              playbackRate={playbackRate}
+              preservePitch={preservePitch}
+              onPlaybackRateChange={onPlaybackRateChange}
               onEqualizerPreview={onEqualizerPreview}
               onEqualizerChange={onEqualizerChange}
               onVolumeBoostChange={onVolumeBoostChange}

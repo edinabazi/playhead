@@ -259,6 +259,10 @@ export type PlaybackSettings = {
   skipUnavailableTracks: boolean;
   volumeBoostEnabled: boolean;
   equalizer: EqualizerSettings;
+  /** 1 is normal speed. */
+  playbackRate: number;
+  /** Keep the original pitch when the speed changes. */
+  preservePitch: boolean;
 };
 
 export type AppearanceSettings = {
@@ -560,6 +564,8 @@ export const defaultPlaybackSettings = (): PlaybackSettings => ({
   skipUnavailableTracks: true,
   volumeBoostEnabled: false,
   equalizer: defaultEqualizerSettings(),
+  playbackRate: 1,
+  preservePitch: true,
 });
 
 export const defaultWindowCornerRadius = 49;

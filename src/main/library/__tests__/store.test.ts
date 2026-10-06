@@ -110,6 +110,8 @@ describe("library store settings", () => {
         customPreampDb: 0,
         customGainsDb: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       },
+      playbackRate: 1,
+      preservePitch: true,
     });
   });
 

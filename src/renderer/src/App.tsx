@@ -3323,6 +3323,22 @@ export function App() {
     return () => window.clearTimeout(timeout);
   }, [sleepTimer]);
 
+  const playbackRate = library.settings.playback.playbackRate;
+  const preservePitch = library.settings.playback.preservePitch;
+  useEffect(() => {
+    const wavesurfer = wavesurferRef.current;
+    if (!isWaveformEngineReady || !wavesurfer) return;
+    const apply = () => {
+      const media = wavesurfer.getMediaElement();
+      // media.load() resets playbackRate to defaultPlaybackRate, so set both.
+      media.defaultPlaybackRate = playbackRate;
+      media.playbackRate = playbackRate;
+      media.preservesPitch = preservePitch;
+    };
+    apply();
+    return wavesurfer.on("ready", apply);
+  }, [isWaveformEngineReady, playbackRate, preservePitch]);
+
   const queueTracks = useCallback(
     (tracksToQueue: LibraryTrack[], position: "next" | "later") =>
       playbackQueue.addTracks(
@@ -3603,6 +3619,15 @@ export function App() {
                   onSeek={seekToLyric}
                   sleepTimer={sleepTimer}
                   onSleepTimerChange={setSleepTimer}
+                  playbackRate={library.settings.playback.playbackRate}
+                  preservePitch={library.settings.playback.preservePitch}
+                  onPlaybackRateChange={(playbackRate, preservePitch) =>
+                    void updatePlaybackSettings({
+                      ...library.settings.playback,
+                      playbackRate,
+                      preservePitch,
+                    })
+                  }
                   playbackError={playbackError}
                   preparingPlayback={preparingPlayback}
                   onRetryPlayback={() => {
