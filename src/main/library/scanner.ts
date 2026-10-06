@@ -217,6 +217,9 @@ export async function buildTrack(
       bitRate: metadata.format.bitrate,
       bpm,
       bpmSource: bpm ? "metadata" : undefined,
+      replayGainDb: Number.isFinite(metadata.common.replaygain_track_gain?.dB)
+        ? metadata.common.replaygain_track_gain?.dB
+        : undefined,
       folderId,
     };
   } catch (error) {

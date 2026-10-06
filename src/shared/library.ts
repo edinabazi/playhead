@@ -3,7 +3,7 @@ import type { PlaybackCopyResult } from "./playback";
 import type { TrackLyrics } from "./lyrics";
 import { defaultTrackListSettings, type TrackListSettings } from "./track-list";
 
-export const libraryTrackMetadataVersion = 1;
+export const libraryTrackMetadataVersion = 2;
 
 export type LibraryMode = "folder" | "library";
 
@@ -73,6 +73,8 @@ export type LibraryTrack = {
   bitRate?: number;
   bpm?: number;
   bpmSource?: "metadata" | "analysis";
+  /** ReplayGain track gain from the file's tags, in dB. */
+  replayGainDb?: number;
   folderId: string;
   soundcloud?: {
     id: number;

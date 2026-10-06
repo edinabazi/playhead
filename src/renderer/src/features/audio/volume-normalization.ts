@@ -1,5 +1,10 @@
 import type { AudioFileRevision, LibraryTrack } from "../../../../shared/library";
-import { decodeAudioBytes, decodeAudioTrack, getLoudnessNormalizationGain } from "./audio-analysis";
+import {
+  decodeAudioBytes,
+  decodeAudioTrack,
+  getLoudnessNormalizationGain,
+  volumeNormalizationTargetLoudnessDb,
+} from "./audio-analysis";
 import { analyzeLoudnessOffThread } from "./loudness-worker-client";
 
 const normalizationCacheStorageKey = "playhead:volume-normalization-cache:v2";
@@ -123,10 +128,28 @@ function getCachedGain(cached: CachedNormalization | undefined, maxGainDb?: numb
   return Number.isFinite(cached.gain) ? cached.gain : null;
 }
 
+/**
+ * ReplayGain 2 targets -18 LUFS, the same as normalization, so a tagged track gain stands in
+ * for measured loudness and the file never needs decoding.
+ */
+export function getReplayGainNormalizationGain(
+  track: LibraryTrack,
+  maxGainDb?: number,
+): number | null {
+  if (track.replayGainDb === undefined || !Number.isFinite(track.replayGainDb)) return null;
+  return getLoudnessNormalizationGain(
+    volumeNormalizationTargetLoudnessDb - track.replayGainDb,
+    undefined,
+    maxGainDb,
+  );
+}
+
 export async function getCachedTrackNormalizationGain(
   track: LibraryTrack,
   maxGainDb?: number,
 ): Promise<number | null> {
+  const replayGain = getReplayGainNormalizationGain(track, maxGainDb);
+  if (replayGain !== null) return replayGain;
   const cacheKey = await resolveTrackCacheKey(track);
   if (!cacheKey) return null;
   return getCachedGain(getNormalizationCache()[cacheKey], maxGainDb);
@@ -137,6 +160,8 @@ export async function analyzeTrackNormalizationGain(
   signal?: AbortSignal,
   maxGainDb?: number,
 ): Promise<number> {
+  const replayGain = getReplayGainNormalizationGain(track, maxGainDb);
+  if (replayGain !== null) return replayGain;
   const cacheKey = await resolveTrackCacheKey(track);
   if (signal?.aborted) return 1;
   if (cacheKey) {

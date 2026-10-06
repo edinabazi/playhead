@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { LibraryTrack } from "../../../../../shared/library";
-import { buildTrackNormalizationCacheKey } from "../volume-normalization";
+import {
+  buildTrackNormalizationCacheKey,
+  getReplayGainNormalizationGain,
+} from "../volume-normalization";
 
 const track: LibraryTrack = {
   id: "track-1",
@@ -18,5 +21,20 @@ describe("volume normalization cache", () => {
     const replaced = buildTrackNormalizationCacheKey(track, { size: 1_200, mtimeMs: 200 });
 
     expect(replaced).not.toBe(original);
+  });
+});
+
+describe("ReplayGain", () => {
+  it("uses the tagged track gain, clamped like measured loudness", () => {
+    expect(getReplayGainNormalizationGain(track)).toBeNull();
+    // Turning a loud track down by 6 dB.
+    expect(getReplayGainNormalizationGain({ ...track, replayGainDb: -6 })).toBeCloseTo(
+      10 ** (-6 / 20),
+    );
+    // Boosts are capped at 0 dB unless a higher ceiling is allowed.
+    expect(getReplayGainNormalizationGain({ ...track, replayGainDb: 4 })).toBe(1);
+    expect(getReplayGainNormalizationGain({ ...track, replayGainDb: 4 }, 6)).toBeCloseTo(
+      10 ** (4 / 20),
+    );
   });
 });
