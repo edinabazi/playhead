@@ -88,7 +88,13 @@ export function TrackRowMenu({
   // Streamed tracks have no file to reveal or retag.
   const hasFileActions = fileActionsEnabled && !track.soundcloud;
   const canRemove = Boolean(selectedPlaylist) || canRemoveFromPlaylist;
-  const soundCloudOpenIndex = 2 + (canRemove ? 1 : 0) + (selectedTag ? 1 : 0);
+  const showNewSoundCloudPlaylist =
+    Boolean(onCreateSoundCloudPlaylist) && tracksForAction.every((item) => item.soundcloud);
+  // Menu items are tracked by index for hover and keyboard focus, so each needs its own.
+  const removeTagIndex = 2 + (canRemove ? 1 : 0);
+  const trailingIndex = removeTagIndex + (selectedTag ? 1 : 0);
+  const newSoundCloudPlaylistIndex = trailingIndex;
+  const soundCloudOpenIndex = trailingIndex + (showNewSoundCloudPlaylist ? 1 : 0);
 
   useEffect(() => {
     if (!open) return;
@@ -290,18 +296,18 @@ export function TrackRowMenu({
                 <MenuItem
                   icon={icons.x}
                   label="Remove from Tag"
-                  index={canRemove ? 3 : 2}
+                  index={removeTagIndex}
                   onSelect={() => {
                     onRemoveFromTag(tracksForAction.map((item) => item.id));
                     onOpenChange(false, null);
                   }}
                 />
               )}
-              {onCreateSoundCloudPlaylist && tracksForAction.every((item) => item.soundcloud) && (
+              {showNewSoundCloudPlaylist && onCreateSoundCloudPlaylist && (
                 <MenuItem
                   icon={icons.plus}
                   label="New SoundCloud Playlist…"
-                  index={soundCloudOpenIndex - 1}
+                  index={newSoundCloudPlaylistIndex}
                   onSelect={() => {
                     onCreateSoundCloudPlaylist(tracksForAction);
                     onOpenChange(false, null);
@@ -329,7 +335,7 @@ export function TrackRowMenu({
                     <MenuItem
                       icon={UserIcon}
                       label="View Artist"
-                      index={4}
+                      index={trailingIndex}
                       onSelect={() => {
                         onViewArtist(track);
                         onOpenChange(false, null);
@@ -340,7 +346,7 @@ export function TrackRowMenu({
                     <MenuItem
                       icon={AlbumIcon}
                       label="View Album"
-                      index={5}
+                      index={trailingIndex + 1}
                       onSelect={() => {
                         onViewAlbum(track);
                         onOpenChange(false, null);
@@ -351,7 +357,7 @@ export function TrackRowMenu({
                   <MenuItem
                     icon={FinderIcon}
                     label={`Show in ${fileManagerName}`}
-                    index={6}
+                    index={trailingIndex + 2}
                     onSelect={() => {
                       onShowInFolder(track);
                       onOpenChange(false, null);
@@ -360,7 +366,7 @@ export function TrackRowMenu({
                   <MenuItem
                     icon={InfoIcon}
                     label="Metadata"
-                    index={7}
+                    index={trailingIndex + 3}
                     onSelect={() => {
                       onShowMetadata(track);
                       onOpenChange(false, null);
