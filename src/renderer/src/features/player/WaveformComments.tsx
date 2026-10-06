@@ -67,9 +67,6 @@ export function WaveformComments({
 
   return (
     <div ref={containerRef} className="pointer-events-none absolute inset-0 z-[1]">
-      {slots.length > 0 && (
-        <div className="absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-black/55 to-transparent" />
-      )}
       {slots.map((slot) => {
         const left = slot.position * width;
         const title = `${slot.comment.username} at ${formatTime(slot.comment.time)}${
