@@ -309,6 +309,7 @@ export async function normalizeLibraryState(state: Partial<LibraryState>): Promi
     ...state,
     tags: state.tags || [],
     favoriteTrackIds: state.favoriteTrackIds || [],
+    trackMarkers: state.trackMarkers || {},
     settings,
   });
 }

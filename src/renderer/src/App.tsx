@@ -30,6 +30,7 @@ import {
   type PlaylistExportFormat,
   type PlaylistImportTrack,
   type SoundCloudCollection,
+  type TrackMarker,
   type PlaybackQueue,
   type SoundCloudSettings,
   type SoundCloudState,
@@ -40,6 +41,7 @@ import {
 } from "../../shared/library";
 import { getMediaArtworkSrc } from "@/lib/artwork";
 import { isEditableTarget } from "@/lib/dom";
+import { formatTime } from "@/lib/format";
 import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
@@ -520,6 +522,7 @@ export function App() {
   const [soundcloudCollections, setSoundCloudCollections] = useState<SoundCloudCollection[]>([]);
   const [sleepTimer, setSleepTimer] = useState<SleepTimer>(null);
   const [playbackLoop, setPlaybackLoop] = useState<PlaybackLoop | null>(null);
+  const [markerPendingRename, setMarkerPendingRename] = useState<TrackMarker | null>(null);
   const playbackLoopRef = useRef<PlaybackLoop | null>(null);
   useEffect(() => {
     playbackLoopRef.current = playbackLoop;
@@ -3369,6 +3372,28 @@ export function App() {
     });
   }, [playbackClock, playbackLoop]);
 
+  const updateTrackMarkers = useCallback(
+    (trackId: string, change: (markers: TrackMarker[]) => TrackMarker[]) => {
+      const current = libraryRef.current;
+      const markers = change(current.trackMarkers?.[trackId] || []).sort((a, b) => a.time - b.time);
+      const trackMarkers = { ...current.trackMarkers, [trackId]: markers };
+      if (markers.length === 0) delete trackMarkers[trackId];
+      void persistLibrary({ ...current, trackMarkers });
+    },
+    [persistLibrary],
+  );
+
+  const addMarker = useCallback(() => {
+    const track = activeTrack;
+    if (!track || !duration) return;
+    const time = playbackClock.getTime();
+    updateTrackMarkers(track.id, (markers) => [
+      ...markers,
+      { id: crypto.randomUUID(), time, label: `Marker ${markers.length + 1}` },
+    ]);
+    showSimpleActionToast(`Marker added at ${formatTime(time)}`);
+  }, [activeTrack, duration, playbackClock, updateTrackMarkers]);
+
   const queueTracks = useCallback(
     (tracksToQueue: LibraryTrack[], position: "next" | "later") =>
       playbackQueue.addTracks(
@@ -3391,6 +3416,7 @@ export function App() {
     onSelectAdjacentTrack: selectAdjacentTrackInList,
     onPlaySelectedTrack: playSelectedTrack,
     onToggleSelectedTrackFavorite: toggleSelectedTrackFavorite,
+    onAddMarker: addMarker,
   });
 
   useEffect(() => {
@@ -3649,6 +3675,14 @@ export function App() {
                   onSeek={seekToLyric}
                   sleepTimer={sleepTimer}
                   onSleepTimerChange={setSleepTimer}
+                  markers={activeTrack ? library.trackMarkers?.[activeTrack.id] || [] : []}
+                  onRenameMarker={setMarkerPendingRename}
+                  onDeleteMarker={(marker) =>
+                    activeTrack &&
+                    updateTrackMarkers(activeTrack.id, (markers) =>
+                      markers.filter((item) => item.id !== marker.id),
+                    )
+                  }
                   loop={playbackLoop}
                   onLoopChange={setPlaybackLoop}
                   playbackRate={library.settings.playback.playbackRate}
@@ -4086,6 +4120,23 @@ export function App() {
                 void removeFolderFromPlayhead(folderId);
               }}
               onClose={() => setFolderPendingRemoval(null)}
+            />
+          )}
+          {markerPendingRename && activeTrack && (
+            <CreatePlaylistDialog
+              key="rename-marker"
+              title="Rename Marker"
+              description={`At ${formatTime(markerPendingRename.time)} in ${activeTrack.title}.`}
+              initialName={markerPendingRename.label}
+              submitLabel="Rename"
+              onCreate={(label) => {
+                const marker = markerPendingRename;
+                setMarkerPendingRename(null);
+                updateTrackMarkers(activeTrack.id, (markers) =>
+                  markers.map((item) => (item.id === marker.id ? { ...item, label } : item)),
+                );
+              }}
+              onClose={() => setMarkerPendingRename(null)}
             />
           )}
           {soundcloudPlaylistPendingDeletion && (

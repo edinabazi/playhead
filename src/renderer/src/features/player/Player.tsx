@@ -1,6 +1,11 @@
 import type { PlaybackFailure } from "../../../../shared/playback";
 import { PlaybackError } from "./PlaybackError";
-import type { EqualizerSettings, LibraryTag, LibraryTrack } from "../../../../shared/library";
+import type {
+  EqualizerSettings,
+  LibraryTag,
+  LibraryTrack,
+  TrackMarker,
+} from "../../../../shared/library";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useId, useRef, useState } from "react";
 import { SliderComfortable } from "@/components/ui/slider";
@@ -19,6 +24,7 @@ import { usePlaybackSeconds, type PlaybackClock } from "./playback-clock";
 import { WaveformEmptyState } from "./WaveformEmptyState";
 import { CommentComposer } from "./CommentComposer";
 import { LoopRegion, type PlaybackLoop } from "./LoopRegion";
+import { WaveformMarkers } from "./WaveformMarkers";
 import { SleepTimerButton, type SleepTimer } from "./SleepTimerButton";
 import { WaveformComments } from "./WaveformComments";
 import { useSoundCloudComments } from "./use-soundcloud-comments";
@@ -75,6 +81,9 @@ export function Player({
   onPlaybackRateChange,
   loop,
   onLoopChange,
+  markers,
+  onRenameMarker,
+  onDeleteMarker,
   limiterActive,
   equalizer,
   levelsOpen,
@@ -124,6 +133,9 @@ export function Player({
   onPlaybackRateChange: (playbackRate: number, preservePitch: boolean) => void;
   loop: PlaybackLoop | null;
   onLoopChange: (loop: PlaybackLoop | null) => void;
+  markers: TrackMarker[];
+  onRenameMarker: (marker: TrackMarker) => void;
+  onDeleteMarker: (marker: TrackMarker) => void;
   limiterActive: boolean;
   equalizer: EqualizerSettings;
   levelsOpen: boolean;
@@ -411,6 +423,15 @@ export function Player({
                 />
               )}
             </AnimatePresence>
+            {hasWaveform && !playbackError && markers.length > 0 && (
+              <WaveformMarkers
+                markers={markers}
+                duration={duration}
+                onSeek={onSeek}
+                onRename={onRenameMarker}
+                onDelete={onDeleteMarker}
+              />
+            )}
           </LoopRegion>
           {preparingPlayback && !playbackError && (
             <div

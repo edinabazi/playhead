@@ -230,6 +230,16 @@ export function SettingsDialog({
     { action: "Play selected track", keys: ["Enter"] },
     { action: "Love selected track", keys: ["L"] },
     {
+      action: "Add marker",
+      keys: ["M"],
+      detail: "Drops a marker at the playhead. Double-click a marker to rename it.",
+    },
+    {
+      action: "Loop a section",
+      keys: ["Shift", "Drag"],
+      detail: "Drag across the waveform while holding Shift.",
+    },
+    {
       action: "Volume up",
       keys: [`${modifierLabel} ↑`],
       detail: `${savedPlaybackSettings.volumeStepPercent}%. Hold Shift for ${shiftVolumeStep}%.`,

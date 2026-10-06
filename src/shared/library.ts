@@ -216,8 +216,17 @@ export type LibraryState = {
   playlists: LibraryPlaylist[];
   tags: LibraryTag[];
   favoriteTrackIds: string[];
+  /** User markers per track id, sorted by time. Kept apart from scanned track data. */
+  trackMarkers?: Record<string, TrackMarker[]>;
   selectedSource: SelectedSource | null;
   settings: AppSettings;
+};
+
+export type TrackMarker = {
+  id: string;
+  /** Position in the track, in seconds. */
+  time: number;
+  label: string;
 };
 
 export type AppSettings = {
@@ -636,6 +645,7 @@ export const emptyLibraryState = (): LibraryState => ({
   playlists: [],
   tags: [],
   favoriteTrackIds: [],
+  trackMarkers: {},
   selectedSource: null,
   settings: defaultAppSettings(),
 });

@@ -15,6 +15,7 @@ export function usePlayerKeyboardShortcuts({
   onSelectAdjacentTrack,
   onPlaySelectedTrack,
   onToggleSelectedTrackFavorite,
+  onAddMarker,
 }: {
   playbackSettings: PlaybackSettings;
   onToggleQueue: () => void;
@@ -27,6 +28,7 @@ export function usePlayerKeyboardShortcuts({
   onSelectAdjacentTrack: (direction: 1 | -1, step?: number) => void;
   onPlaySelectedTrack: () => void;
   onToggleSelectedTrackFavorite: () => void;
+  onAddMarker?: () => void;
 }) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -114,12 +116,25 @@ export function usePlayerKeyboardShortcuts({
       if (event.key.toLowerCase() === "l" && !event.metaKey && !event.ctrlKey && !event.altKey) {
         event.preventDefault();
         onToggleSelectedTrackFavorite();
+        return;
+      }
+
+      if (
+        onAddMarker &&
+        event.key.toLowerCase() === "m" &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        onAddMarker();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
+    onAddMarker,
     onChangeVolumeBy,
     onOpenSearch,
     onOpenSettings,
