@@ -108,6 +108,10 @@ export function Sidebar({
   onExpandedFolderPathsChange,
   onDropTrackToPlaylist,
   onDropTrackToTag,
+  onDropTrackToSoundCloudPlaylist,
+  onCreateSoundCloudPlaylist,
+  onRenameSoundCloudPlaylist,
+  onDeleteSoundCloudPlaylist,
   onRemoveFolder,
   onExportPlaylist,
   onRenamePlaylist,
@@ -149,6 +153,14 @@ export function Sidebar({
   onExpandedFolderPathsChange: (paths: string[]) => void;
   onDropTrackToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
   onDropTrackToTag: (trackIds: string[], tag: LibraryTag) => void;
+  onCreateSoundCloudPlaylist: () => void;
+  onRenameSoundCloudPlaylist: (playlist: SoundCloudCollection) => void;
+  onDeleteSoundCloudPlaylist: (playlist: SoundCloudCollection) => void;
+  onDropTrackToSoundCloudPlaylist: (
+    trackIds: string[],
+    playlist: SoundCloudCollection,
+    move: boolean,
+  ) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
   onExportPlaylist: (playlist: LibraryPlaylist, format: PlaylistExportFormat) => void;
   onRenamePlaylist: (playlist: LibraryPlaylist) => void;
@@ -427,9 +439,12 @@ export function Sidebar({
         title="SoundCloud"
         collapsed={soundcloudCollapsed}
         onToggleCollapsed={() => setSoundcloudCollapsed((value) => !value)}
-        actionLabel="Refresh SoundCloud"
-        actionIcon={icons["radio-tower"]}
-        onAction={onRefreshSoundCloud}
+        actionLabel="New SoundCloud playlist"
+        actionIcon={icons.plus}
+        onAction={onCreateSoundCloudPlaylist}
+        secondaryActions={[
+          { label: "Refresh SoundCloud", icon: icons["rotate-ccw"], onClick: onRefreshSoundCloud },
+        ]}
         {...groupDragProps("soundcloud")}
       >
         {soundcloudSidebarCollections.length === 0 ? (
@@ -453,6 +468,18 @@ export function Sidebar({
                 ) : undefined
               }
               onClick={() => onSelectSoundCloudSource(collection.id)}
+              onContextMenu={
+                collection.id.startsWith("playlist:")
+                  ? (point) =>
+                      setContextMenu({ type: "soundcloud-playlist", item: collection, point })
+                  : undefined
+              }
+              onDropTrack={
+                collection.id.startsWith("playlist:")
+                  ? (trackIds, { altKey }) =>
+                      onDropTrackToSoundCloudPlaylist(trackIds, collection, altKey)
+                  : undefined
+              }
             />
           ))
         )}
@@ -499,6 +526,8 @@ export function Sidebar({
         onDeletePlaylist={onDeletePlaylist}
         onRenameTag={onRenameTag}
         onDeleteTag={onDeleteTag}
+        onRenameSoundCloudPlaylist={onRenameSoundCloudPlaylist}
+        onDeleteSoundCloudPlaylist={onDeleteSoundCloudPlaylist}
       />
     </SidebarShell>
   );

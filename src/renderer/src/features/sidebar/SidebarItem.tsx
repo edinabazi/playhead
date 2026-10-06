@@ -31,7 +31,8 @@ export function SidebarItem({
   expanded?: boolean;
   onToggleExpanded?: () => void;
   onClick: () => void;
-  onDropTrack?: (trackIds: string[]) => void;
+  /** `altKey` is true when Option/Alt was held, which moves instead of copying. */
+  onDropTrack?: (trackIds: string[], modifiers: { altKey: boolean }) => void;
   onContextMenu?: (point: MenuAnchorPoint) => void;
 }) {
   const labelId = useId();
@@ -83,7 +84,7 @@ export function SidebarItem({
           }
         }
 
-        if (trackIds.length > 0) onDropTrack(trackIds);
+        if (trackIds.length > 0) onDropTrack(trackIds, { altKey: event.altKey });
         setIsDropTarget(false);
       }}
       onDragEnter={(event) => {

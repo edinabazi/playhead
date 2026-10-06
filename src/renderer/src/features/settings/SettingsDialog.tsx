@@ -78,6 +78,7 @@ export function SettingsDialog({
   onSoundCloudSettingsChange,
   onStartSoundCloudAuth,
   onCompleteSoundCloudAuth,
+  onCancelSoundCloudAuth,
   onDisconnectSoundCloud,
   onAdvancedAction,
   batchAnalysis,
@@ -113,6 +114,7 @@ export function SettingsDialog({
   onSoundCloudSettingsChange: (settings: SoundCloudSettings) => void;
   onStartSoundCloudAuth: () => void;
   onCompleteSoundCloudAuth: (input: string) => void;
+  onCancelSoundCloudAuth: () => void;
   onDisconnectSoundCloud: () => void;
   onAdvancedAction: (action: AdvancedSettingsAction) => Promise<string>;
   batchAnalysis: {
@@ -179,7 +181,8 @@ export function SettingsDialog({
     savedPlaybackSettings.skipUnavailableTracks !== draftPlaybackSettings.skipUnavailableTracks;
   const appearanceSettingsChanged =
     savedAppearanceSettings.appTransparency !== draftAppearanceSettings.appTransparency ||
-    savedAppearanceSettings.reduceMotion !== draftAppearanceSettings.reduceMotion;
+    savedAppearanceSettings.reduceMotion !== draftAppearanceSettings.reduceMotion ||
+    savedAppearanceSettings.windowCornerRadius !== draftAppearanceSettings.windowCornerRadius;
   const telemetrySettingsChanged =
     savedTelemetrySettings.enabled !== draftTelemetrySettings.enabled;
   const hasUnsavedChanges =
@@ -575,6 +578,7 @@ export function SettingsDialog({
                 onSoundCloudSettingsChange={onSoundCloudSettingsChange}
                 onConnectSoundCloud={onStartSoundCloudAuth}
                 onCompleteSoundCloudAuth={onCompleteSoundCloudAuth}
+                onCancelSoundCloudAuth={onCancelSoundCloudAuth}
                 onDisconnectSoundCloud={onDisconnectSoundCloud}
               />
             ) : (

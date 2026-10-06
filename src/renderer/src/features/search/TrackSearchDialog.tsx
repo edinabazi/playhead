@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dialog-motion";
 import type { LibraryAlbum, LibraryArtist } from "@/features/library/library-model";
 import { LibraryCollectionContextMenu } from "@/features/library/LibraryBrowser";
+import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
 import type {
@@ -24,6 +25,13 @@ type SearchResult =
   | { type: "artist"; artist: LibraryArtist }
   | { type: "album"; album: LibraryAlbum }
   | { type: "track"; track: LibraryTrack };
+
+type SearchMode = "all" | "scope" | "soundcloud";
+
+export type SearchSelectContext =
+  | { mode: "all" }
+  | { mode: "scope" }
+  | { mode: "soundcloud"; results: LibraryTrack[] };
 
 type ScoredSearchResult = {
   result: SearchResult;
@@ -75,6 +83,8 @@ export function TrackSearchDialog({
   playlists,
   tags,
   libraryMode,
+  scope = null,
+  soundcloudSearchEnabled = false,
   onSelectTrack,
   onSelectArtist,
   onSelectAlbum,
@@ -94,7 +104,11 @@ export function TrackSearchDialog({
   playlists: LibraryPlaylist[];
   tags: LibraryTag[];
   libraryMode: LibraryMode;
-  onSelectTrack: (track: LibraryTrack) => void;
+  /** The open folder/playlist; Tab switches between searching it and the whole library. */
+  scope?: { title: string; tracks: LibraryTrack[] } | null;
+  /** Adds a SoundCloud mode to the Tab cycle. */
+  soundcloudSearchEnabled?: boolean;
+  onSelectTrack: (track: LibraryTrack, context: SearchSelectContext) => void;
   onSelectArtist: (artist: LibraryArtist) => void;
   onSelectAlbum: (album: LibraryAlbum) => void;
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
@@ -114,6 +128,57 @@ export function TrackSearchDialog({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const resultRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [query, setQuery] = useState("");
+  const modes = useMemo<SearchMode[]>(
+    () => [
+      "all",
+      ...(scope ? ["scope" as const] : []),
+      ...(soundcloudSearchEnabled ? ["soundcloud" as const] : []),
+    ],
+    [scope, soundcloudSearchEnabled],
+  );
+  const [requestedMode, setRequestedMode] = useState<SearchMode>("all");
+  const mode = modes.includes(requestedMode) ? requestedMode : "all";
+  const isScoped = mode === "scope";
+  const isSoundCloud = mode === "soundcloud";
+  const cycleMode = (direction: 1 | -1) =>
+    setRequestedMode(
+      modes[(modes.indexOf(mode) + direction + modes.length) % modes.length] || "all",
+    );
+  const modeLabel = isScoped && scope ? scope.title : isSoundCloud ? "SoundCloud" : "All tracks";
+  const searchTracks = isScoped && scope ? scope.tracks : tracks;
+  const [soundcloudResults, setSoundCloudResults] = useState<{
+    query: string;
+    tracks: LibraryTrack[];
+    error?: string;
+  } | null>(null);
+  const soundcloudQuery = isSoundCloud ? query.trim() : "";
+  const soundcloudLoading =
+    Boolean(soundcloudQuery) && soundcloudResults?.query !== soundcloudQuery;
+
+  useEffect(() => {
+    if (!soundcloudQuery) return;
+    let cancelled = false;
+    // Wait for a pause in typing; this search goes over the network.
+    const timer = window.setTimeout(() => {
+      window.playhead
+        .searchSoundCloudTracks(soundcloudQuery)
+        .then((found) => {
+          if (!cancelled) setSoundCloudResults({ query: soundcloudQuery, tracks: found });
+        })
+        .catch((error: unknown) => {
+          if (!cancelled)
+            setSoundCloudResults({
+              query: soundcloudQuery,
+              tracks: [],
+              error: error instanceof Error ? error.message : "SoundCloud search failed.",
+            });
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [soundcloudQuery]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [contextMenu, setContextMenu] = useState<
     | { type: "track"; track: LibraryTrack; point: MenuAnchorPoint }
@@ -126,7 +191,7 @@ export function TrackSearchDialog({
   );
   const searchableTracks = useMemo(
     () =>
-      tracks
+      searchTracks
         .slice()
         .sort((a, b) => a.title.localeCompare(b.title))
         .map((track) => ({
@@ -138,7 +203,7 @@ export function TrackSearchDialog({
           fileName: normalizeSearchText(track.fileName),
           folderName: normalizeSearchText(folderNames.get(track.folderId) || ""),
         })),
-    [folderNames, tracks],
+    [folderNames, searchTracks],
   );
   const searchableArtists = useMemo(
     () =>
@@ -160,6 +225,11 @@ export function TrackSearchDialog({
     [albums],
   );
   const results = useMemo<SearchResult[]>(() => {
+    if (isSoundCloud) {
+      return soundcloudResults?.query === soundcloudQuery
+        ? soundcloudResults.tracks.map((track) => ({ type: "track" as const, track }))
+        : [];
+    }
     const normalizedQuery = normalizeSearchText(query);
     if (!normalizedQuery) {
       return searchableTracks.slice(0, 24).map(({ track }) => ({ type: "track" as const, track }));
@@ -180,7 +250,7 @@ export function TrackSearchDialog({
       ),
     }));
 
-    if (libraryMode !== "library") {
+    if (libraryMode !== "library" || isScoped) {
       return bestResults(trackResults, 24);
     }
 
@@ -203,7 +273,17 @@ export function TrackSearchDialog({
     }));
 
     return bestResults([...trackResults, ...artistResults, ...albumResults], 24);
-  }, [libraryMode, query, searchableAlbums, searchableArtists, searchableTracks]);
+  }, [
+    isScoped,
+    isSoundCloud,
+    libraryMode,
+    query,
+    searchableAlbums,
+    searchableArtists,
+    searchableTracks,
+    soundcloudQuery,
+    soundcloudResults,
+  ]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -211,7 +291,7 @@ export function TrackSearchDialog({
 
   useEffect(() => {
     setActiveIndex(0);
-  }, [query]);
+  }, [query, mode]);
 
   useEffect(() => {
     resultRefs.current[activeIndex]?.scrollIntoView({ block: "nearest" });
@@ -228,7 +308,15 @@ export function TrackSearchDialog({
       onSelectAlbum(result.album);
       return;
     }
-    onSelectTrack(result.track);
+    onSelectTrack(
+      result.track,
+      isSoundCloud
+        ? {
+            mode: "soundcloud",
+            results: results.flatMap((item) => (item.type === "track" ? [item.track] : [])),
+          }
+        : { mode: isScoped ? "scope" : "all" },
+    );
   };
 
   const openContextMenu = (result: SearchResult, point: MenuAnchorPoint) => {
@@ -261,12 +349,23 @@ export function TrackSearchDialog({
             ref={inputRef}
             className="h-full min-w-0 flex-1 bg-transparent text-[15px] font-medium text-foreground outline-none placeholder:text-muted-foreground"
             value={query}
-            placeholder="Search tracks"
+            placeholder={
+              isScoped && scope
+                ? `Search in ${scope.title}`
+                : isSoundCloud
+                  ? "Search SoundCloud"
+                  : "Search tracks"
+            }
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 event.preventDefault();
                 onClose();
+                return;
+              }
+              if (event.key === "Tab" && modes.length > 1) {
+                event.preventDefault();
+                cycleMode(event.shiftKey ? -1 : 1);
                 return;
               }
               if (event.key === "ArrowDown" && results.length > 0) {
@@ -285,15 +384,41 @@ export function TrackSearchDialog({
               }
             }}
           />
-          <span className="rounded-full border border-white/10 px-2 py-1 font-mono text-[10px] text-muted-foreground">
-            Cmd K
-          </span>
+          {modes.length > 1 ? (
+            <button
+              type="button"
+              aria-label={`Searching ${modeLabel}. Press Tab to change.`}
+              title="Press Tab to switch what you're searching"
+              className={`flex max-w-[220px] shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium transition-colors ${
+                mode !== "all"
+                  ? "border-primary/40 bg-primary/15 text-foreground"
+                  : "border-white/10 text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => {
+                cycleMode(1);
+                inputRef.current?.focus();
+              }}
+            >
+              <span className="truncate">{modeLabel}</span>
+              <span className="font-mono text-[10px] text-muted-foreground">Tab</span>
+            </button>
+          ) : (
+            <span className="rounded-full border border-white/10 px-2 py-1 font-mono text-[10px] text-muted-foreground">
+              Cmd K
+            </span>
+          )}
         </div>
 
         <div className="thin-scrollbar max-h-[420px] overflow-y-auto p-1">
           {results.length === 0 ? (
             <div className="grid h-32 place-items-center text-[13px] text-muted-foreground">
-              No tracks found.
+              {isSoundCloud
+                ? !soundcloudQuery
+                  ? "Type to search SoundCloud."
+                  : soundcloudLoading
+                    ? "Searching SoundCloud…"
+                    : soundcloudResults?.error || "No tracks found on SoundCloud."
+                : "No tracks found."}
             </div>
           ) : (
             results.map((result, index) => {
@@ -367,16 +492,25 @@ export function TrackSearchDialog({
                           : result.track.artist}
                     </div>
                   </div>
-                  {result.type === "track" && libraryMode === "folder" && (
-                    <div className="max-w-[170px] truncate text-right text-[12px] font-medium text-[var(--text-tertiary)]">
-                      {folderNames.get(result.track.folderId) || "Folder"}
+                  {result.type === "track" && result.track.soundcloud && (
+                    <div className="shrink-0 text-right text-[12px] font-medium tabular-nums text-[var(--text-tertiary)]">
+                      {formatTime(result.track.duration)}
                     </div>
                   )}
-                  {result.type === "track" && libraryMode === "library" && (
-                    <div className="max-w-[120px] truncate text-right text-[12px] font-medium text-[var(--text-tertiary)]">
-                      Track
-                    </div>
-                  )}
+                  {result.type === "track" &&
+                    !result.track.soundcloud &&
+                    libraryMode === "folder" && (
+                      <div className="max-w-[170px] truncate text-right text-[12px] font-medium text-[var(--text-tertiary)]">
+                        {folderNames.get(result.track.folderId) || "Folder"}
+                      </div>
+                    )}
+                  {result.type === "track" &&
+                    !result.track.soundcloud &&
+                    libraryMode === "library" && (
+                      <div className="max-w-[120px] truncate text-right text-[12px] font-medium text-[var(--text-tertiary)]">
+                        Track
+                      </div>
+                    )}
                   {result.type !== "track" && (
                     <div className="max-w-[120px] truncate text-right text-[12px] font-medium text-[var(--text-tertiary)]">
                       {result.type === "artist" ? "Artist" : "Album"}

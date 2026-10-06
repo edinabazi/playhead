@@ -10,7 +10,7 @@ export function FavoriteHeartButton({
 }: {
   active: boolean;
   disabled?: boolean;
-  tooltipSide?: "top" | "left";
+  tooltipSide?: "top" | "left" | "bottom";
   onClick: React.MouseEventHandler<HTMLButtonElement>;
 }) {
   const icons = useIcons();
@@ -36,7 +36,7 @@ export function FavoriteHeartButton({
         disabled={disabled}
         onClick={onClick}
       >
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {active && !reduceMotion && (
             <motion.span
               key="favorite-burst"
@@ -48,8 +48,10 @@ export function FavoriteHeartButton({
             />
           )}
         </AnimatePresence>
+        {/* Rows mount whenever they scroll into view, so only animate real changes. */}
         <motion.span
           className="relative grid place-items-center"
+          initial={false}
           animate={
             reduceMotion
               ? { scale: 1 }
@@ -61,7 +63,7 @@ export function FavoriteHeartButton({
         >
           <HeartIcon size={18} strokeWidth={1.7} fill={active ? "currentColor" : "none"} />
         </motion.span>
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {active && !reduceMotion && (
             <motion.span
               key="favorite-sparks"

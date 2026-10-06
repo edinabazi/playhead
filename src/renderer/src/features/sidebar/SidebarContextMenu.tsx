@@ -9,12 +9,14 @@ import type {
   LibraryPlaylist,
   LibraryTag,
   PlaylistExportFormat,
+  SoundCloudCollection,
 } from "../../../../shared/library";
 
 export type SidebarContextMenuState =
   | { type: "folder"; item: LibraryFolder; point: MenuAnchorPoint }
   | { type: "playlist"; item: LibraryPlaylist; point: MenuAnchorPoint }
   | { type: "tag"; item: LibraryTag; point: MenuAnchorPoint }
+  | { type: "soundcloud-playlist"; item: SoundCloudCollection; point: MenuAnchorPoint }
   | null;
 
 export function SidebarContextMenu({
@@ -26,6 +28,8 @@ export function SidebarContextMenu({
   onDeletePlaylist,
   onRenameTag,
   onDeleteTag,
+  onRenameSoundCloudPlaylist,
+  onDeleteSoundCloudPlaylist,
 }: {
   state: SidebarContextMenuState;
   onOpenChange: (state: SidebarContextMenuState) => void;
@@ -35,6 +39,8 @@ export function SidebarContextMenu({
   onDeletePlaylist: (playlist: LibraryPlaylist) => void;
   onRenameTag: (tag: LibraryTag) => void;
   onDeleteTag: (tag: LibraryTag) => void;
+  onRenameSoundCloudPlaylist: (playlist: SoundCloudCollection) => void;
+  onDeleteSoundCloudPlaylist: (playlist: SoundCloudCollection) => void;
 }) {
   const icons = useIcons();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -184,6 +190,27 @@ export function SidebarContextMenu({
               index={2}
               onSelect={() => {
                 onDeletePlaylist(state.item);
+                onOpenChange(null);
+              }}
+            />
+          </>
+        ) : state.type === "soundcloud-playlist" ? (
+          <>
+            <MenuItem
+              icon={icons.pencil}
+              label="Rename Playlist"
+              index={0}
+              onSelect={() => {
+                onRenameSoundCloudPlaylist(state.item);
+                onOpenChange(null);
+              }}
+            />
+            <MenuItem
+              icon={icons["trash-2"]}
+              label="Delete from SoundCloud"
+              index={1}
+              onSelect={() => {
+                onDeleteSoundCloudPlaylist(state.item);
                 onOpenChange(null);
               }}
             />

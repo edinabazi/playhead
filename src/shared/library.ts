@@ -264,6 +264,8 @@ export type PlaybackSettings = {
 export type AppearanceSettings = {
   appTransparency: number;
   reduceMotion: boolean;
+  /** Corner radius of the main window in CSS pixels. */
+  windowCornerRadius: number;
 };
 
 export type TelemetrySettings = {
@@ -278,6 +280,14 @@ export type LastfmSettings = {
 export type SoundCloudSettings = {
   enabled: boolean;
   visibleCollections: SoundCloudCollectionId[];
+  /** Mirror hearts on SoundCloud tracks to SoundCloud likes. */
+  likeSyncEnabled: boolean;
+  /** When the queue ends on a SoundCloud track, keep playing similar tracks. */
+  stationEnabled: boolean;
+  /** Show timed comments along the waveform of SoundCloud tracks. */
+  commentsEnabled: boolean;
+  /** Pop up each comment as the playhead passes it. */
+  commentPopupsEnabled: boolean;
 };
 
 export type SidebarGroupId = "library" | "playlists" | "tags" | "soundcloud";
@@ -329,6 +339,22 @@ export type SoundCloudState = {
   pendingAuth: boolean;
   lastError?: string;
 };
+
+export type SoundCloudComment = {
+  id: string;
+  body: string;
+  /** Position in the track, in seconds. */
+  time: number;
+  createdAt?: string;
+  username: string;
+  avatarUrl?: string;
+  userUrl?: string;
+};
+
+export type SoundCloudPlaylistEdit =
+  | { type: "add"; trackIds: number[] }
+  | { type: "remove"; trackIds: number[] }
+  | { type: "move"; trackIds: number[]; targetTrackId: number; edge: "before" | "after" };
 
 export type SoundCloudCollection = {
   id: SoundCloudCollectionId | `playlist:${string}`;
@@ -439,10 +465,32 @@ export type PlayheadApi = {
   startSoundCloudAuth: () => Promise<SoundCloudState>;
   completeSoundCloudAuth: (input: string) => Promise<SoundCloudState>;
   disconnectSoundCloud: () => Promise<SoundCloudState>;
+  cancelSoundCloudAuth: () => Promise<SoundCloudState>;
   getSoundCloudCollections: (
     visibleCollections: SoundCloudCollectionId[],
   ) => Promise<SoundCloudCollection[]>;
   getSoundCloudCollectionTracks: (collectionId: string) => Promise<LibraryTrack[]>;
+  searchSoundCloudTracks: (query: string) => Promise<LibraryTrack[]>;
+  getSoundCloudComments: (trackId: number, trackUrn?: string) => Promise<SoundCloudComment[]>;
+  postSoundCloudComment: (
+    trackId: number,
+    trackUrn: string | undefined,
+    body: string,
+    time: number,
+  ) => Promise<SoundCloudComment>;
+  getSoundCloudRelatedTracks: (trackId: number, trackUrn?: string) => Promise<LibraryTrack[]>;
+  createSoundCloudPlaylist: (title: string, trackIds: number[]) => Promise<SoundCloudCollection>;
+  renameSoundCloudPlaylist: (collectionId: string, title: string) => Promise<void>;
+  deleteSoundCloudPlaylist: (collectionId: string) => Promise<void>;
+  editSoundCloudPlaylist: (
+    collectionId: string,
+    edit: SoundCloudPlaylistEdit,
+  ) => Promise<{ changed: number; tracks: LibraryTrack[] }>;
+  setSoundCloudTrackLiked: (
+    trackId: number,
+    trackUrn: string | undefined,
+    liked: boolean,
+  ) => Promise<void>;
   getSoundCloudStreamUrl: (
     trackId: number,
     streamUrl?: string,
@@ -514,9 +562,17 @@ export const defaultPlaybackSettings = (): PlaybackSettings => ({
   equalizer: defaultEqualizerSettings(),
 });
 
+export const defaultWindowCornerRadius = 49;
+export const windowCornerRadiusOptions = [
+  { label: "Large", value: defaultWindowCornerRadius },
+  { label: "Medium", value: 26 },
+  { label: "Small", value: 12 },
+];
+
 export const defaultAppearanceSettings = (): AppearanceSettings => ({
   appTransparency: 95,
   reduceMotion: false,
+  windowCornerRadius: defaultWindowCornerRadius,
 });
 
 export const defaultTelemetrySettings = (): TelemetrySettings => ({
@@ -531,6 +587,10 @@ export const defaultLastfmSettings = (): LastfmSettings => ({
 export const defaultSoundCloudSettings = (): SoundCloudSettings => ({
   enabled: true,
   visibleCollections: ["playlists"],
+  likeSyncEnabled: false,
+  stationEnabled: false,
+  commentsEnabled: true,
+  commentPopupsEnabled: true,
 });
 
 export const defaultSessionSettings = (): SessionSettings => ({

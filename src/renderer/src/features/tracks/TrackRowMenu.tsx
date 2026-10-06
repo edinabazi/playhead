@@ -18,6 +18,7 @@ export function TrackRowMenu({
   playlists,
   tags,
   selectedPlaylist,
+  canRemoveFromPlaylist = false,
   selectedTag,
   menuIcon: MenuIcon,
   open,
@@ -26,6 +27,7 @@ export function TrackRowMenu({
   onAddToPlaylist,
   onAddTracksToPlaylist,
   onCreatePlaylist,
+  onCreateSoundCloudPlaylist,
   onAddTracksToTag,
   onCreateTag,
   onRemoveFromPlaylist,
@@ -42,6 +44,7 @@ export function TrackRowMenu({
   playlists: LibraryPlaylist[];
   tags: LibraryTag[];
   selectedPlaylist: LibraryPlaylist | null;
+  canRemoveFromPlaylist?: boolean;
   selectedTag: LibraryTag | null;
   menuIcon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   open: boolean;
@@ -50,6 +53,7 @@ export function TrackRowMenu({
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
   onAddTracksToPlaylist?: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (tracks: LibraryTrack[]) => void;
+  onCreateSoundCloudPlaylist?: (tracks: LibraryTrack[]) => void;
   onAddTracksToTag: (tracks: LibraryTrack[], tag: LibraryTag) => void;
   onCreateTag: (tracks: LibraryTrack[]) => void;
   onRemoveFromPlaylist: (trackIds: string[]) => void;
@@ -81,7 +85,10 @@ export function TrackRowMenu({
   const fileManagerName = getNativeFileManagerName();
   const tracksForAction = selectedTracks && selectedTracks.length > 1 ? selectedTracks : [track];
   const isMultiTrackMenu = tracksForAction.length > 1;
-  const soundCloudOpenIndex = 2 + (selectedPlaylist ? 1 : 0) + (selectedTag ? 1 : 0);
+  // Streamed tracks have no file to reveal or retag.
+  const hasFileActions = fileActionsEnabled && !track.soundcloud;
+  const canRemove = Boolean(selectedPlaylist) || canRemoveFromPlaylist;
+  const soundCloudOpenIndex = 2 + (canRemove ? 1 : 0) + (selectedTag ? 1 : 0);
 
   useEffect(() => {
     if (!open) return;
@@ -268,7 +275,7 @@ export function TrackRowMenu({
                   </div>
                 )}
               </div>
-              {selectedPlaylist && (
+              {canRemove && (
                 <MenuItem
                   icon={icons.x}
                   label="Remove from Playlist"
@@ -283,19 +290,30 @@ export function TrackRowMenu({
                 <MenuItem
                   icon={icons.x}
                   label="Remove from Tag"
-                  index={selectedPlaylist ? 3 : 2}
+                  index={canRemove ? 3 : 2}
                   onSelect={() => {
                     onRemoveFromTag(tracksForAction.map((item) => item.id));
                     onOpenChange(false, null);
                   }}
                 />
               )}
-              {!fileActionsEnabled && track.soundcloud?.permalinkUrl && (
+              {onCreateSoundCloudPlaylist && tracksForAction.every((item) => item.soundcloud) && (
+                <MenuItem
+                  icon={icons.plus}
+                  label="New SoundCloud Playlist…"
+                  index={soundCloudOpenIndex - 1}
+                  onSelect={() => {
+                    onCreateSoundCloudPlaylist(tracksForAction);
+                    onOpenChange(false, null);
+                  }}
+                />
+              )}
+              {!hasFileActions && !isMultiTrackMenu && track.soundcloud?.permalinkUrl && (
                 <>
                   <DropdownSeparator />
                   <MenuItem
-                    icon={InfoIcon}
-                    label="Open in SoundCloud"
+                    icon={icons.globe}
+                    label="Open on SoundCloud"
                     index={soundCloudOpenIndex}
                     onSelect={() => {
                       window.open(track.soundcloud?.permalinkUrl, "_blank", "noopener,noreferrer");
@@ -304,7 +322,7 @@ export function TrackRowMenu({
                   />
                 </>
               )}
-              {!isMultiTrackMenu && fileActionsEnabled && (
+              {!isMultiTrackMenu && hasFileActions && (
                 <>
                   <DropdownSeparator />
                   {onViewArtist && (

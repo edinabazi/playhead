@@ -5,13 +5,16 @@ import type {
   LibraryTrack,
   SoundCloudCollection,
   SoundCloudCollectionId,
+  SoundCloudComment,
+  SoundCloudPlaylistEdit,
   SoundCloudState,
   SoundCloudTranscoding,
 } from "../../shared/library";
 import { electron } from "../electron";
 import { hasIntegrationsBroker, postIntegrationsBroker } from "../integrations-broker";
+import { applySoundCloudPlaylistEdit } from "../../shared/soundcloud-playlist";
 
-const { app, ipcMain, net, protocol, safeStorage, shell } = electron;
+const { app, BrowserWindow, ipcMain, net, protocol, safeStorage, shell } = electron;
 
 const apiRoot = "https://api.soundcloud.com";
 const authRoot = "https://secure.soundcloud.com/authorize";
@@ -35,6 +38,7 @@ type SoundCloudSession = {
 type SoundCloudStoredState = {
   pendingState?: string;
   pendingCodeVerifier?: string;
+  pendingStartedAt?: number;
   session?: SoundCloudSession;
   lastError?: string;
 };
@@ -541,13 +545,65 @@ async function setLastError(message?: string): Promise<void> {
   await writeStoredState({ ...state, lastError: message });
 }
 
+// A sign-in that never came back should not leave the integration stuck across launches.
+const pendingAuthTimeoutMs = 15 * 60 * 1000;
+
+function isAuthPending(state: SoundCloudStoredState): boolean {
+  return Boolean(
+    state.pendingState &&
+    state.pendingStartedAt &&
+    Date.now() - state.pendingStartedAt < pendingAuthTimeoutMs,
+  );
+}
+
+let handleAuthCallbackUrl: (url: string) => void = () => {};
+
+// Development builds run inside the stock Electron.app, so macOS hands playhead:// links to
+// whichever app owns the scheme (often another Electron app). Sign in from a window we
+// control instead and read the code straight off the redirect.
+function openDevelopmentAuthWindow(authUrl: string) {
+  const window = new BrowserWindow({
+    width: 520,
+    height: 760,
+    title: "Connect SoundCloud",
+    autoHideMenuBar: true,
+    webPreferences: { partition: "soundcloud-auth" },
+  });
+  const intercept = (event: { preventDefault: () => void }, url: string) => {
+    if (!url.startsWith(redirectUri)) return;
+    event.preventDefault();
+    handleAuthCallbackUrl(url);
+    window.close();
+  };
+  window.webContents.on("will-redirect", intercept);
+  window.webContents.on("will-navigate", intercept);
+  void window.loadURL(authUrl);
+}
+
+async function openAuthUrl(authUrl: string) {
+  if (app.isPackaged) await shell.openExternal(authUrl);
+  else openDevelopmentAuthWindow(authUrl);
+}
+
+export async function cancelSoundCloudAuth(): Promise<SoundCloudState> {
+  const state = await readStoredState();
+  await writeStoredState({
+    ...state,
+    pendingState: undefined,
+    pendingCodeVerifier: undefined,
+    pendingStartedAt: undefined,
+    lastError: undefined,
+  });
+  return getSoundCloudState();
+}
+
 export async function getSoundCloudState(): Promise<SoundCloudState> {
   const state = await readStoredState();
   return {
     configured: isConfigured(),
     connected: Boolean(state.session),
     username: state.session?.username,
-    pendingAuth: Boolean(state.pendingState),
+    pendingAuth: isAuthPending(state),
     lastError: state.lastError,
   };
 }
@@ -843,14 +899,20 @@ export async function startSoundCloudAuth(): Promise<SoundCloudState> {
   const state = await readStoredState();
   const pendingState = randomBytes(18).toString("base64url");
   const pendingCodeVerifier = randomBytes(48).toString("base64url");
-  await writeStoredState({ ...state, pendingState, pendingCodeVerifier, lastError: undefined });
+  await writeStoredState({
+    ...state,
+    pendingState,
+    pendingCodeVerifier,
+    pendingStartedAt: Date.now(),
+    lastError: undefined,
+  });
   if (hasIntegrationsBroker()) {
     try {
       const response = await postIntegrationsBroker<{ authUrl: string }>("/soundcloud/auth-url", {
         state: pendingState,
         codeChallenge: createCodeChallenge(pendingCodeVerifier),
       });
-      await shell.openExternal(response.authUrl);
+      await openAuthUrl(response.authUrl);
     } catch (error) {
       await writeStoredState({
         ...state,
@@ -860,7 +922,7 @@ export async function startSoundCloudAuth(): Promise<SoundCloudState> {
       });
     }
   } else {
-    await shell.openExternal(createAuthUrl(pendingState, pendingCodeVerifier));
+    await openAuthUrl(createAuthUrl(pendingState, pendingCodeVerifier));
   }
   return getSoundCloudState();
 }
@@ -870,7 +932,7 @@ export async function completeSoundCloudAuth(
   returnedState?: string,
 ): Promise<SoundCloudState> {
   const state = await readStoredState();
-  if (!state.pendingState) return getSoundCloudState();
+  if (!isAuthPending(state)) return getSoundCloudState();
   if (returnedState && returnedState !== state.pendingState) {
     await setLastError("SoundCloud auth state did not match.");
     return getSoundCloudState();
@@ -881,7 +943,17 @@ export async function completeSoundCloudAuth(
     code,
     code_verifier: state.pendingCodeVerifier || "",
   });
-  if (!session) return getSoundCloudState();
+  if (!session) {
+    // Authorization codes are single use, so a failed exchange needs a fresh sign-in.
+    const failed = await readStoredState();
+    await writeStoredState({
+      ...failed,
+      pendingState: undefined,
+      pendingCodeVerifier: undefined,
+      pendingStartedAt: undefined,
+    });
+    return getSoundCloudState();
+  }
   const accessToken = decryptSecret(session.accessToken, session.encrypted);
   const meResponse = await soundCloudApiFetch(`${apiRoot}/me`, {
     headers: { Authorization: `OAuth ${accessToken}` },
@@ -941,6 +1013,103 @@ export async function getSoundCloudCollections(
   }
 
   return collections;
+}
+
+export async function searchSoundCloudTracks(query: string): Promise<LibraryTrack[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const params = new URLSearchParams({
+    q: trimmed,
+    limit: "20",
+    linked_partitioning: "1",
+    access: "playable,preview",
+  });
+  const page = await getSoundCloud<Paginated<SoundCloudTrack> | SoundCloudTrack[]>(
+    `/tracks?${params.toString()}`,
+  );
+  const tracks = Array.isArray(page) ? page : page?.collection || [];
+  return tracks.map(mapTrack);
+}
+
+type SoundCloudApiComment = {
+  id?: number | string;
+  urn?: string;
+  body?: string;
+  timestamp?: number | null;
+  created_at?: string;
+  user?: { username?: string; avatar_url?: string; permalink_url?: string };
+};
+
+// Popular tracks have tens of thousands of comments; the newest few pages are plenty.
+const maxCommentPages = 5;
+
+function mapComment(comment: SoundCloudApiComment): SoundCloudComment | null {
+  if (comment.timestamp == null || !comment.body) return null;
+  // Request the small avatar size; the waveform shows them at 16px.
+  const avatar = comment.user?.avatar_url?.replace(/-large(\.\w+)$/, "-small$1");
+  return {
+    id: String(comment.urn || comment.id),
+    body: comment.body,
+    time: Math.max(0, comment.timestamp / 1000),
+    createdAt: comment.created_at,
+    username: comment.user?.username || "SoundCloud user",
+    avatarUrl: avatar ? createSoundCloudImageUrl(avatar) : undefined,
+    userUrl: comment.user?.permalink_url,
+  };
+}
+
+export async function getSoundCloudComments(
+  trackId: number,
+  trackUrn?: string,
+): Promise<SoundCloudComment[]> {
+  let nextUrl: string | null =
+    `${apiRoot}/tracks/${encodeResourceId(trackUrn || trackId)}/comments?linked_partitioning=1&limit=200`;
+  const comments: SoundCloudComment[] = [];
+  for (let page = 0; nextUrl && page < maxCommentPages; page += 1) {
+    const result: Paginated<SoundCloudApiComment> | SoundCloudApiComment[] | null =
+      await getSoundCloud(nextUrl);
+    if (!result) break;
+    const items = Array.isArray(result) ? result : result.collection || [];
+    for (const item of items) {
+      const comment = mapComment(item);
+      if (comment) comments.push(comment);
+    }
+    nextUrl = Array.isArray(result) ? null : result.next_href || null;
+  }
+  return comments.sort((a, b) => a.time - b.time);
+}
+
+export async function postSoundCloudComment(
+  trackId: number,
+  trackUrn: string | undefined,
+  body: string,
+  time: number,
+): Promise<SoundCloudComment> {
+  const created = await writeSoundCloud<SoundCloudApiComment>(
+    "POST",
+    `/tracks/${encodeResourceId(trackUrn || trackId)}/comments`,
+    { comment: { body: body.trim(), timestamp: Math.round(Math.max(0, time) * 1000) } },
+    "SoundCloud did not allow commenting on this track.",
+  );
+  const comment = created ? mapComment(created) : null;
+  if (!comment) throw new Error("SoundCloud did not return the new comment.");
+  return comment;
+}
+
+export async function getSoundCloudRelatedTracks(
+  trackId: number,
+  trackUrn?: string,
+): Promise<LibraryTrack[]> {
+  const params = new URLSearchParams({
+    limit: "20",
+    linked_partitioning: "1",
+    access: "playable",
+  });
+  const page = await getSoundCloud<Paginated<SoundCloudTrack> | SoundCloudTrack[]>(
+    `/tracks/${encodeResourceId(trackUrn || trackId)}/related?${params.toString()}`,
+  );
+  const tracks = Array.isArray(page) ? page : page?.collection || [];
+  return tracks.map(mapTrack);
 }
 
 export async function getSoundCloudCollectionTracks(collectionId: string): Promise<LibraryTrack[]> {
@@ -1106,7 +1275,10 @@ async function fetchSoundCloudHlsBytes(
   if (playlist.variants.length > 0) {
     const variants = playlist.variants
       .slice()
-      .sort((a, b) => (a.bandwidth || Number.MAX_SAFE_INTEGER) - (b.bandwidth || Number.MAX_SAFE_INTEGER));
+      .sort(
+        (a, b) =>
+          (a.bandwidth || Number.MAX_SAFE_INTEGER) - (b.bandwidth || Number.MAX_SAFE_INTEGER),
+      );
     for (const variant of variants) {
       debugSoundCloud("BPM analysis trying HLS variant", {
         url: variant.url,
@@ -1462,7 +1634,130 @@ async function handleSoundCloudAudioRequest(request: Request): Promise<Response>
   }
 }
 
-export function registerSoundCloudIpc(): void {
+async function writeSoundCloud<T = unknown>(
+  method: "POST" | "PUT" | "DELETE",
+  path: string,
+  body: unknown,
+  forbiddenMessage: string,
+): Promise<T | null> {
+  const accessToken = await getAccessToken();
+  if (!accessToken) throw new Error("Connect SoundCloud first.");
+  const response = await soundCloudApiFetch(`${apiRoot}${path}`, {
+    method,
+    headers: {
+      Accept: "application/json; charset=utf-8",
+      Authorization: `OAuth ${accessToken}`,
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const raw = await response.text();
+  if (response.ok) return parseJson<T>(raw);
+  const data = parseJson<{ message?: string }>(raw);
+  throw new Error(
+    response.status === 403 || response.status === 401
+      ? forbiddenMessage
+      : data?.message || `SoundCloud request failed (${response.status}).`,
+  );
+}
+
+/**
+ * Edits one of the user's SoundCloud playlists. SoundCloud replaces the whole track list on
+ * update, so the edit is applied to the playlist's current tracks and the full list is sent.
+ */
+export async function editSoundCloudPlaylist(
+  collectionId: string,
+  edit: SoundCloudPlaylistEdit,
+): Promise<{ changed: number; tracks: LibraryTrack[] }> {
+  if (!collectionId.startsWith("playlist:")) throw new Error("Only playlists can be edited.");
+  const playlistId = collectionId.slice("playlist:".length);
+  const current = await getPlaylistTracks(playlistId);
+  const currentIds = current.flatMap((track) => (track.soundcloud ? [track.soundcloud.id] : []));
+  const nextIds = applySoundCloudPlaylistEdit(currentIds, edit);
+  const changed =
+    edit.type === "move"
+      ? Number(nextIds.some((id, index) => id !== currentIds[index]))
+      : Math.abs(nextIds.length - currentIds.length);
+  if (!changed) return { changed: 0, tracks: current };
+
+  await writeSoundCloud(
+    "PUT",
+    `/playlists/${encodeResourceId(playlistId)}`,
+    { playlist: { tracks: nextIds.map((id) => ({ id })) } },
+    "SoundCloud only allows editing playlists you own.",
+  );
+  return { changed, tracks: await getPlaylistTracks(playlistId) };
+}
+
+function toPlaylistCollection(playlist: SoundCloudPlaylist): SoundCloudCollection {
+  return {
+    id: `playlist:${getPlaylistResourceId(playlist)}`,
+    title: playlist.title,
+    subtitle: playlist.user?.username,
+    trackCount: playlist.track_count ?? playlist.tracks?.length ?? 0,
+    kind: "tracks",
+  };
+}
+
+function playlistIdFromCollection(collectionId: string) {
+  if (!collectionId.startsWith("playlist:")) throw new Error("Only playlists can be edited.");
+  return collectionId.slice("playlist:".length);
+}
+
+// New playlists start private so nothing is published without the user choosing to.
+export async function createSoundCloudPlaylist(
+  title: string,
+  trackIds: number[],
+): Promise<SoundCloudCollection> {
+  const playlist = await writeSoundCloud<SoundCloudPlaylist>(
+    "POST",
+    "/playlists",
+    {
+      playlist: {
+        title: title.trim(),
+        sharing: "private",
+        tracks: [...new Set(trackIds)].map((id) => ({ id })),
+      },
+    },
+    "SoundCloud did not allow creating a playlist.",
+  );
+  if (!playlist) throw new Error("SoundCloud did not return the new playlist.");
+  return toPlaylistCollection(playlist);
+}
+
+export async function renameSoundCloudPlaylist(collectionId: string, title: string): Promise<void> {
+  await writeSoundCloud(
+    "PUT",
+    `/playlists/${encodeResourceId(playlistIdFromCollection(collectionId))}`,
+    { playlist: { title: title.trim() } },
+    "SoundCloud only allows renaming playlists you own.",
+  );
+}
+
+export async function deleteSoundCloudPlaylist(collectionId: string): Promise<void> {
+  await writeSoundCloud(
+    "DELETE",
+    `/playlists/${encodeResourceId(playlistIdFromCollection(collectionId))}`,
+    undefined,
+    "SoundCloud only allows deleting playlists you own.",
+  );
+}
+
+export async function setSoundCloudTrackLiked(
+  trackId: number,
+  trackUrn: string | undefined,
+  liked: boolean,
+): Promise<void> {
+  await writeSoundCloud(
+    liked ? "POST" : "DELETE",
+    `/likes/tracks/${encodeResourceId(trackUrn || trackId)}`,
+    undefined,
+    "SoundCloud did not allow updating this like.",
+  );
+}
+
+export function registerSoundCloudIpc(onAuthCallbackUrl: (url: string) => void): void {
+  handleAuthCallbackUrl = onAuthCallbackUrl;
   if (protocol.isProtocolHandled("playhead-soundcloud-image")) {
     protocol.unhandle("playhead-soundcloud-image");
   }
@@ -1478,11 +1773,45 @@ export function registerSoundCloudIpc(): void {
     completeSoundCloudAuth(code, state),
   );
   ipcMain.handle("soundcloud:disconnect", () => disconnectSoundCloud());
+  ipcMain.handle("soundcloud:cancel-auth", () => cancelSoundCloudAuth());
   ipcMain.handle("soundcloud:get-collections", (_event, visible: SoundCloudCollectionId[]) =>
     getSoundCloudCollections(visible),
   );
   ipcMain.handle("soundcloud:get-collection-tracks", (_event, collectionId: string) =>
     getSoundCloudCollectionTracks(collectionId),
+  );
+  ipcMain.handle("soundcloud:search-tracks", (_event, query: string) =>
+    searchSoundCloudTracks(query),
+  );
+  ipcMain.handle("soundcloud:get-comments", (_event, trackId: number, trackUrn?: string) =>
+    getSoundCloudComments(trackId, trackUrn),
+  );
+  ipcMain.handle(
+    "soundcloud:post-comment",
+    (_event, trackId: number, trackUrn: string | undefined, body: string, time: number) =>
+      postSoundCloudComment(trackId, trackUrn, body, time),
+  );
+  ipcMain.handle("soundcloud:get-related-tracks", (_event, trackId: number, trackUrn?: string) =>
+    getSoundCloudRelatedTracks(trackId, trackUrn),
+  );
+  ipcMain.handle("soundcloud:create-playlist", (_event, title: string, trackIds: number[]) =>
+    createSoundCloudPlaylist(title, trackIds),
+  );
+  ipcMain.handle("soundcloud:rename-playlist", (_event, collectionId: string, title: string) =>
+    renameSoundCloudPlaylist(collectionId, title),
+  );
+  ipcMain.handle("soundcloud:delete-playlist", (_event, collectionId: string) =>
+    deleteSoundCloudPlaylist(collectionId),
+  );
+  ipcMain.handle(
+    "soundcloud:edit-playlist",
+    (_event, collectionId: string, edit: SoundCloudPlaylistEdit) =>
+      editSoundCloudPlaylist(collectionId, edit),
+  );
+  ipcMain.handle(
+    "soundcloud:set-track-liked",
+    (_event, trackId: number, trackUrn: string | undefined, liked: boolean) =>
+      setSoundCloudTrackLiked(trackId, trackUrn, liked),
   );
   ipcMain.handle(
     "soundcloud:get-stream-url",
@@ -1511,8 +1840,7 @@ export function registerSoundCloudIpc(): void {
       durationSeconds: number,
       transcodings?: SoundCloudTranscoding[],
       trackAuthorization?: string,
-    ) =>
-      getSoundCloudAnalysisAudioData(trackId, durationSeconds, transcodings, trackAuthorization),
+    ) => getSoundCloudAnalysisAudioData(trackId, durationSeconds, transcodings, trackAuthorization),
   );
   ipcMain.handle("soundcloud:get-image-url", (_event, url: string) =>
     createSoundCloudImageUrl(url),

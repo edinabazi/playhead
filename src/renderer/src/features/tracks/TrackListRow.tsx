@@ -21,6 +21,7 @@ type TrackListRowProps = {
   favorite: boolean;
   selectedTracks: LibraryTrack[];
   selectedPlaylist: LibraryPlaylist | null;
+  canRemoveFromPlaylist?: boolean;
   selectedTag: LibraryTag | null;
   playlists: LibraryPlaylist[];
   tags: LibraryTag[];
@@ -46,6 +47,7 @@ type TrackListRowProps = {
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
   onAddTracksToPlaylist: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (tracks: LibraryTrack[]) => void;
+  onCreateSoundCloudPlaylist?: (tracks: LibraryTrack[]) => void;
   onAddTracksToTag: (tracks: LibraryTrack[], tag: LibraryTag) => void;
   onCreateTag: (tracks: LibraryTrack[]) => void;
   onRemoveFromPlaylist: (trackIds: string[]) => void;
@@ -68,6 +70,7 @@ export function TrackListRow({
   favorite,
   selectedTracks,
   selectedPlaylist,
+  canRemoveFromPlaylist,
   selectedTag,
   playlists,
   tags,
@@ -89,6 +92,7 @@ export function TrackListRow({
   onAddToPlaylist,
   onAddTracksToPlaylist,
   onCreatePlaylist,
+  onCreateSoundCloudPlaylist,
   onAddTracksToTag,
   onCreateTag,
   onRemoveFromPlaylist,
@@ -177,6 +181,7 @@ export function TrackListRow({
           playlists={playlists}
           tags={tags}
           selectedPlaylist={selectedPlaylist}
+          canRemoveFromPlaylist={canRemoveFromPlaylist}
           selectedTag={selectedTag}
           menuIcon={menuIcon}
           open={menuOpen}
@@ -185,6 +190,7 @@ export function TrackListRow({
           onAddToPlaylist={onAddToPlaylist}
           onAddTracksToPlaylist={onAddTracksToPlaylist}
           onCreatePlaylist={onCreatePlaylist}
+          onCreateSoundCloudPlaylist={onCreateSoundCloudPlaylist}
           onAddTracksToTag={onAddTracksToTag}
           onCreateTag={onCreateTag}
           onRemoveFromPlaylist={onRemoveFromPlaylist}

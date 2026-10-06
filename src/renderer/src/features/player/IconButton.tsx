@@ -62,7 +62,7 @@ export function IconButton({
   );
 
   return tooltip ? (
-    <Tooltip content={tooltip} side="left">
+    <Tooltip content={tooltip} side="bottom">
       {button}
     </Tooltip>
   ) : (

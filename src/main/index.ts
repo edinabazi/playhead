@@ -167,7 +167,7 @@ app.whenReady().then(() => {
   registerLibraryIpc();
   registerLyricsIpc();
   registerLastfmIpc();
-  registerSoundCloudIpc();
+  registerSoundCloudIpc(handleSoundCloudCallback);
   registerTelemetryIpc();
   registerMediaShortcuts();
   registerUpdaterIpc();

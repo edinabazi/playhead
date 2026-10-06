@@ -8,14 +8,14 @@ import {
   dialogPanelMotion,
 } from "@/components/ui/dialog-motion";
 import { useIcons } from "@/lib/icon-context";
-import type { LibraryPlaylist } from "../../../../shared/library";
-
 export function DeletePlaylistDialog({
-  playlist,
+  name,
+  description = "This removes the playlist from Playhead. Your music files will stay where they are.",
   onConfirm,
   onClose,
 }: {
-  playlist: LibraryPlaylist;
+  name: string;
+  description?: string;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -44,10 +44,10 @@ export function DeletePlaylistDialog({
         <div className="flex items-start justify-between gap-3 px-2 pt-1">
           <div>
             <h2 className="text-[15px] font-semibold leading-6 text-foreground">
-              Delete {playlist.name}?
+              Delete {name}?
             </h2>
             <p className="mt-1 text-[13px] font-medium leading-5 text-muted-foreground">
-              This removes the playlist from Playhead. Your music files will stay where they are.
+              {description}
             </p>
           </div>
           <button

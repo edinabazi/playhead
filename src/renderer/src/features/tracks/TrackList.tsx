@@ -46,6 +46,7 @@ export function TrackList({
   selectedPlaylist,
   selectedTag,
   canReorderTracks = true,
+  canRemoveFromPlaylist = false,
   isLoading = false,
   playlists,
   tags,
@@ -55,6 +56,7 @@ export function TrackList({
   onAddToPlaylist,
   onAddTracksToPlaylist,
   onCreatePlaylist,
+  onCreateSoundCloudPlaylist,
   onAddTracksToTag,
   onCreateTag,
   onToggleFavorite,
@@ -82,6 +84,8 @@ export function TrackList({
   selectedPlaylist: LibraryPlaylist | null;
   selectedTag: LibraryTag | null;
   canReorderTracks?: boolean;
+  /** Offer "Remove from Playlist" for sources other than local playlists. */
+  canRemoveFromPlaylist?: boolean;
   isLoading?: boolean;
   playlists: LibraryPlaylist[];
   tags: LibraryTag[];
@@ -91,6 +95,7 @@ export function TrackList({
   onAddToPlaylist: (track: LibraryTrack, playlist: LibraryPlaylist) => void;
   onAddTracksToPlaylist: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (tracks: LibraryTrack[]) => void;
+  onCreateSoundCloudPlaylist?: (tracks: LibraryTrack[]) => void;
   onAddTracksToTag: (tracks: LibraryTrack[], tag: LibraryTag) => void;
   onCreateTag: (tracks: LibraryTrack[]) => void;
   onToggleFavorite: (track: LibraryTrack) => void;
@@ -207,7 +212,7 @@ export function TrackList({
             ref={containerRef}
             role="rowgroup"
             tabIndex={-1}
-            className="thin-scrollbar no-drag min-h-0 flex-1 overflow-y-auto pr-2"
+            className="thin-scrollbar no-drag mt-1 min-h-0 flex-1 overflow-y-auto pr-2"
             onScroll={handleScroll}
           >
             {tracks.length === 0 ? (
@@ -255,6 +260,7 @@ export function TrackList({
                         favorite={isFavorite}
                         selectedTracks={isSelected ? selectedTracks : [track]}
                         selectedPlaylist={selectedPlaylist}
+                        canRemoveFromPlaylist={canRemoveFromPlaylist}
                         selectedTag={selectedTag}
                         playlists={playlists}
                         tags={tags}
@@ -299,6 +305,7 @@ export function TrackList({
                         onAddToPlaylist={onAddToPlaylist}
                         onAddTracksToPlaylist={onAddTracksToPlaylist}
                         onCreatePlaylist={onCreatePlaylist}
+                        onCreateSoundCloudPlaylist={onCreateSoundCloudPlaylist}
                         onAddTracksToTag={onAddTracksToTag}
                         onCreateTag={onCreateTag}
                         onRemoveFromPlaylist={onRemoveFromPlaylist}

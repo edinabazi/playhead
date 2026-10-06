@@ -61,7 +61,7 @@ export function usePlaybackQueue({
       updateQueue({ ...queue, activeItemId: item.id });
       setSelectedTrackIds([track.id]);
       setScrollToTrackId(track.id);
-      void selectTrack(track, true, 0, false, "preserve", item.id);
+      void selectTrack(track, true, undefined, false, "preserve", item.id);
     },
     [tracksById, queue, selectTrack, setScrollToTrackId, setSelectedTrackIds, updateQueue],
   );

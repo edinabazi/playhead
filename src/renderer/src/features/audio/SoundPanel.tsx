@@ -64,8 +64,8 @@ export function SoundPanel({
           onKeyDown={(event) => {
             if (event.key !== "Escape") event.stopPropagation();
           }}
-          className="no-drag absolute left-0 top-full z-50 mt-2 w-[min(470px,calc(100vw-340px))] overflow-y-auto overscroll-contain rounded-[22px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl"
-          style={{ maxHeight: `calc(100dvh - ${300 + extraHeaderHeight}px)` }}
+          className="no-drag absolute right-0 top-full z-50 mt-2 w-[min(470px,calc(100vw-340px))] overflow-y-auto overscroll-contain rounded-[22px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+          style={{ maxHeight: `calc(100dvh - ${200 + extraHeaderHeight}px)` }}
           initial={{ opacity: 0, y: -6, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.98 }}

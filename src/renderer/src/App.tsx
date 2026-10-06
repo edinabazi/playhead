@@ -30,6 +30,8 @@ import {
   type PlaylistExportFormat,
   type PlaylistImportTrack,
   type SoundCloudCollection,
+  type SoundCloudPlaylistEdit,
+  type PlaybackQueue,
   type SoundCloudSettings,
   type SoundCloudState,
   type TelemetrySettings,
@@ -48,6 +50,7 @@ import {
   buildQueueFromTracks,
   getActiveQueueIndex,
   getVisibleQueueItems,
+  addTracksToQueue,
   setQueueActiveTrack,
   smartShuffleQueue,
 } from "@/features/player/queue-model";
@@ -62,7 +65,7 @@ import { setMediaActionHandler, updateMediaPosition } from "@/features/player/me
 import { PlaybackClock } from "@/features/player/playback-clock";
 import { limitWaveformProgressRendering } from "@/features/waveform/waveform";
 import type { RepeatMode } from "@/features/player/types";
-import { TrackSearchDialog } from "@/features/search/TrackSearchDialog";
+import { TrackSearchDialog, type SearchSelectContext } from "@/features/search/TrackSearchDialog";
 import { SettingsDialog, type AdvancedSettingsAction } from "@/features/settings/SettingsDialog";
 import { DeletePlaylistDialog } from "@/features/sidebar/DeletePlaylistDialog";
 import { DeleteTagDialog } from "@/features/sidebar/DeleteTagDialog";
@@ -72,6 +75,8 @@ import { TrackList } from "@/features/tracks/TrackList";
 import { sortTrackList } from "@/features/tracks/track-columns";
 import { normalizeTrackListSettings } from "../../shared/track-list";
 import { RemoveTracksFromPlaylistDialog } from "@/features/tracks/RemoveTracksFromPlaylistDialog";
+import { resumePosition, withTrackPosition } from "@/features/player/track-positions";
+import { applySoundCloudPlaylistEdit } from "../../shared/soundcloud-playlist";
 import { UpdateMessageDialog, type UpdateMessage } from "@/features/updates/UpdateMessageDialog";
 import { updateMessagesByVersion } from "@/features/updates/update-messages";
 import {
@@ -173,6 +178,12 @@ async function runWithConcurrency<T>(
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+// Pseudo collection holding SoundCloud search results that were played.
+const soundcloudSearchCollectionId = "search";
+// Pseudo collection holding tracks the station added to the queue.
+const soundcloudStationCollectionId = "station";
+const stationBatchSize = 10;
 
 function getQueueSourceTitle(library: LibraryState): string {
   const source = library.selectedSource;
@@ -509,6 +520,16 @@ export function App() {
   });
   const [soundcloudActionPending, setSoundCloudActionPending] = useState(false);
   const [soundcloudCollections, setSoundCloudCollections] = useState<SoundCloudCollection[]>([]);
+  const [soundcloudPlaylistDialog, setSoundCloudPlaylistDialog] = useState<
+    | { mode: "create"; tracks: LibraryTrack[] }
+    | { mode: "rename"; collection: SoundCloudCollection }
+    | null
+  >(null);
+  const [soundcloudPlaylistPendingDeletion, setSoundCloudPlaylistPendingDeletion] =
+    useState<SoundCloudCollection | null>(null);
+  const [soundcloudLikedTrackIds, setSoundCloudLikedTrackIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [soundcloudTracksByCollection, setSoundCloudTracksByCollection] = useState<
     Record<string, LibraryTrack[]>
   >({});
@@ -566,10 +587,15 @@ export function App() {
   );
   const libraryTrackCount = useMemo(() => Object.keys(library.tracks).length, [library.tracks]);
   const activeTrack = activeTrackId ? allPlayableTracksById[activeTrackId] : null;
-  const favoriteTrackSet = useMemo(
-    () => new Set(library.favoriteTrackIds || []),
-    [library.favoriteTrackIds],
+  // SoundCloud likes count as loved, so hearts match what the user sees on SoundCloud.
+  const favoriteTrackIds = useMemo(
+    () =>
+      soundcloudLikedTrackIds.size === 0
+        ? library.favoriteTrackIds || []
+        : Array.from(new Set([...(library.favoriteTrackIds || []), ...soundcloudLikedTrackIds])),
+    [library.favoriteTrackIds, soundcloudLikedTrackIds],
   );
+  const favoriteTrackSet = useMemo(() => new Set(favoriteTrackIds), [favoriteTrackIds]);
   const activeTags = useMemo(
     () =>
       activeTrack
@@ -627,9 +653,26 @@ export function App() {
     libraryArtists,
     soundcloudCollections,
   ]);
+  // Search can be narrowed to the open folder or playlist, but not to views that already
+  // cover the whole library.
+  const searchScope = useMemo(() => {
+    const type = library.selectedSource?.type;
+    if (
+      !type ||
+      (type.startsWith("library-") && !["library-artist", "library-album"].includes(type))
+    )
+      return null;
+    return tracks.length > 0 ? { title: selectedTitle, tracks } : null;
+  }, [library.selectedSource?.type, selectedTitle, tracks]);
   const appTransparency =
     (previewAppTransparency ?? library.settings.appearance.appTransparency) / 100;
   const reduceMotion = library.settings.appearance.reduceMotion;
+  const windowCornerRadius = library.settings.appearance.windowCornerRadius;
+
+  useEffect(() => {
+    // Set on the root so portaled overlays share the window's corner radius.
+    document.documentElement.style.setProperty("--window-radius", `${windowCornerRadius}px`);
+  }, [windowCornerRadius]);
 
   const persistLibrary = useCallback(async (nextState: LibraryState) => {
     libraryRef.current = nextState;
@@ -1124,14 +1167,32 @@ export function App() {
     async (
       track: LibraryTrack,
       autoplay = true,
-      startTime = 0,
+      requestedStartTime?: number,
       allowSkipUnavailable = true,
       queueMode: "preserve" | "source" = "preserve",
       activeQueueItemId?: string,
       forceLocalCopy = false,
+      queueOverride?: PlaybackQueue,
     ) => {
       const wavesurfer = wavesurferRef.current;
       if (!wavesurfer) return;
+      const rememberPositions = library.settings.playback.rememberTrackPositions;
+      let trackPositions = library.settings.session.trackPositions;
+      // Save where the outgoing track stopped as part of this session update; a separate
+      // save would be overwritten by the session persisted below.
+      const outgoingTrackId = loadedTrackIdRef.current;
+      if (rememberPositions && outgoingTrackId && outgoingTrackId !== track.id) {
+        trackPositions = withTrackPosition(
+          trackPositions,
+          outgoingTrackId,
+          wavesurfer.getCurrentTime(),
+          wavesurfer.getDuration(),
+        );
+      }
+      // Without an explicit start time, resume from the remembered position.
+      const startTime =
+        requestedStartTime ??
+        (rememberPositions ? resumePosition(trackPositions[track.id], track.duration) : 0);
       playbackAbortRef.current?.abort();
       const playbackAbort = new AbortController();
       playbackAbortRef.current = playbackAbort;
@@ -1154,8 +1215,9 @@ export function App() {
       playbackClock.setTime(0);
       setDuration(track.duration || 0);
       setIsPlaying(false);
-      const nextQueue =
-        queueMode === "source"
+      const nextQueue = queueOverride
+        ? queueOverride
+        : queueMode === "source"
           ? {
               ...buildQueueFromTracks(
                 tracks,
@@ -1180,6 +1242,7 @@ export function App() {
         activeTrackId: track.id,
         selectedTrackIds: [track.id],
         queue: nextQueue,
+        trackPositions,
       });
 
       const remoteTrack = isSoundCloudTrack(track);
@@ -1361,11 +1424,244 @@ export function App() {
     };
   }, [selectTrack]);
 
+  const storeSoundCloudPlaylistTracks = useCallback(
+    (collectionId: string, tracks: LibraryTrack[]) => {
+      setSoundCloudTracksByCollection((current) => ({ ...current, [collectionId]: tracks }));
+      setSoundCloudCollections((current) =>
+        current.map((collection) =>
+          collection.id === collectionId
+            ? { ...collection, trackCount: tracks.length }
+            : collection,
+        ),
+      );
+      soundcloudTracksRef.current = {
+        ...soundcloudTracksRef.current,
+        ...Object.fromEntries(tracks.map((track) => [track.id, track])),
+      };
+    },
+    [],
+  );
+
+  const toSoundCloudIds = useCallback(
+    (trackIds: string[]) =>
+      trackIds.flatMap((trackId) => {
+        const id = allPlayableTracksById[trackId]?.soundcloud?.id;
+        return id === undefined ? [] : [id];
+      }),
+    [allPlayableTracksById],
+  );
+
+  const editSoundCloudPlaylist = useCallback(
+    async (collectionId: string, edit: SoundCloudPlaylistEdit) => {
+      const { changed, tracks } = await window.playhead.editSoundCloudPlaylist(collectionId, edit);
+      storeSoundCloudPlaylistTracks(collectionId, tracks);
+      return changed;
+    },
+    [storeSoundCloudPlaylistTracks],
+  );
+
+  const soundCloudCollectionTitle = useCallback(
+    (collectionId: string) =>
+      soundcloudCollections.find((collection) => collection.id === collectionId)?.title ||
+      "playlist",
+    [soundcloudCollections],
+  );
+
+  const addTracksToSoundCloudPlaylist = useCallback(
+    async (trackIds: string[], playlist: SoundCloudCollection, move = false) => {
+      const soundcloudIds = toSoundCloudIds(trackIds);
+      if (soundcloudIds.length === 0) {
+        showSimpleActionToast(
+          "Only SoundCloud tracks can be added to SoundCloud playlists.",
+          "info",
+        );
+        return;
+      }
+      // Moving only makes sense out of another SoundCloud playlist.
+      const source = library.selectedSource;
+      const moveFrom =
+        move &&
+        source?.type === "soundcloud" &&
+        source.id?.startsWith("playlist:") &&
+        source.id !== playlist.id
+          ? source.id
+          : null;
+      try {
+        const added = await editSoundCloudPlaylist(playlist.id, {
+          type: "add",
+          trackIds: soundcloudIds,
+        });
+        if (moveFrom) {
+          await editSoundCloudPlaylist(moveFrom, { type: "remove", trackIds: soundcloudIds });
+          showSimpleActionToast(
+            `Moved ${soundcloudIds.length} ${soundcloudIds.length === 1 ? "track" : "tracks"} to ${playlist.title}`,
+          );
+          return;
+        }
+        showSimpleActionToast(
+          added === 0
+            ? `Already in ${playlist.title}`
+            : `Added ${added} ${added === 1 ? "track" : "tracks"} to ${playlist.title}`,
+          added === 0 ? "info" : "success",
+        );
+      } catch (error) {
+        showSimpleActionToast(
+          getErrorMessage(error, "Could not update the SoundCloud playlist."),
+          "error",
+        );
+      }
+    },
+    [editSoundCloudPlaylist, library.selectedSource, toSoundCloudIds],
+  );
+
+  const createSoundCloudPlaylist = useCallback(
+    async (title: string, tracksToAdd: LibraryTrack[]) => {
+      try {
+        const collection = await window.playhead.createSoundCloudPlaylist(
+          title,
+          toSoundCloudIds(tracksToAdd.map((track) => track.id)),
+        );
+        setSoundCloudCollections((current) => {
+          // Keep playlists together, newest first, ahead of the other collections.
+          const playlists = current.filter((item) => item.id.startsWith("playlist:"));
+          const others = current.filter((item) => !item.id.startsWith("playlist:"));
+          return [collection, ...playlists, ...others];
+        });
+        showSimpleActionToast(`Created ${collection.title} on SoundCloud (private)`);
+      } catch (error) {
+        showSimpleActionToast(
+          getErrorMessage(error, "Could not create the SoundCloud playlist."),
+          "error",
+        );
+      }
+    },
+    [toSoundCloudIds],
+  );
+
+  const renameSoundCloudPlaylist = useCallback(
+    async (collection: SoundCloudCollection, title: string) => {
+      const rename = (nextTitle: string) =>
+        setSoundCloudCollections((current) =>
+          current.map((item) => (item.id === collection.id ? { ...item, title: nextTitle } : item)),
+        );
+      rename(title);
+      try {
+        await window.playhead.renameSoundCloudPlaylist(collection.id, title);
+      } catch (error) {
+        rename(collection.title);
+        showSimpleActionToast(
+          getErrorMessage(error, "Could not rename the SoundCloud playlist."),
+          "error",
+        );
+      }
+    },
+    [],
+  );
+
+  const removeTracksFromSoundCloudPlaylist = useCallback(
+    async (collectionId: string, trackIds: string[]) => {
+      const soundcloudIds = toSoundCloudIds(trackIds);
+      if (soundcloudIds.length === 0) return;
+      try {
+        const removed = await editSoundCloudPlaylist(collectionId, {
+          type: "remove",
+          trackIds: soundcloudIds,
+        });
+        showSimpleActionToast(
+          `Removed ${removed} ${removed === 1 ? "track" : "tracks"} from ${soundCloudCollectionTitle(collectionId)}`,
+        );
+      } catch (error) {
+        showSimpleActionToast(
+          getErrorMessage(error, "Could not update the SoundCloud playlist."),
+          "error",
+        );
+      }
+    },
+    [editSoundCloudPlaylist, soundCloudCollectionTitle, toSoundCloudIds],
+  );
+
+  const reorderSoundCloudPlaylist = useCallback(
+    async (
+      collectionId: string,
+      trackIds: string[],
+      targetTrackId: string,
+      edge: "before" | "after" = "before",
+    ) => {
+      const target = allPlayableTracksById[targetTrackId]?.soundcloud?.id;
+      const current = soundcloudTracksByCollection[collectionId];
+      if (target === undefined || !current) return;
+      const edit = {
+        type: "move" as const,
+        trackIds: toSoundCloudIds(trackIds),
+        targetTrackId: target,
+        edge,
+      };
+      // Reorder locally straight away; SoundCloud's copy follows.
+      const byId = new Map(current.map((track) => [track.soundcloud?.id, track]));
+      const reordered = applySoundCloudPlaylistEdit(
+        current.flatMap((track) => (track.soundcloud ? [track.soundcloud.id] : [])),
+        edit,
+      ).flatMap((id) => byId.get(id) ?? []);
+      storeSoundCloudPlaylistTracks(collectionId, reordered);
+      try {
+        await editSoundCloudPlaylist(collectionId, edit);
+      } catch (error) {
+        storeSoundCloudPlaylistTracks(collectionId, current);
+        showSimpleActionToast(
+          getErrorMessage(error, "Could not reorder the SoundCloud playlist."),
+          "error",
+        );
+      }
+    },
+    [
+      allPlayableTracksById,
+      editSoundCloudPlaylist,
+      soundcloudTracksByCollection,
+      storeSoundCloudPlaylistTracks,
+      toSoundCloudIds,
+    ],
+  );
+
   const playSearchResult = useCallback(
-    async (track: LibraryTrack) => {
+    async (track: LibraryTrack, context: SearchSelectContext) => {
       setSelectedTrackIds([track.id]);
       setScrollToTrackId(track.id);
       setIsSearchOpen(false);
+      if (context.mode === "soundcloud") {
+        // Results live outside any collection; keep them playable and queue the result list.
+        setSoundCloudTracksByCollection((current) => {
+          const kept = (current[soundcloudSearchCollectionId] || []).filter(
+            (item) => !context.results.some((result) => result.id === item.id),
+          );
+          return { ...current, [soundcloudSearchCollectionId]: [...kept, ...context.results] };
+        });
+        soundcloudTracksRef.current = {
+          ...soundcloudTracksRef.current,
+          ...Object.fromEntries(context.results.map((item) => [item.id, item])),
+        };
+        const tracksById = Object.fromEntries(context.results.map((item) => [item.id, item]));
+        const queue = {
+          ...buildQueueFromTracks(
+            context.results,
+            track.id,
+            {
+              type: "soundcloud" as const,
+              id: soundcloudSearchCollectionId,
+              title: "SoundCloud search",
+            },
+            tracksById,
+            shuffleEnabled,
+          ),
+          panelOpen: library.settings.session.queue.panelOpen,
+        };
+        await selectTrack(track, true, undefined, true, "preserve", undefined, false, queue);
+        return;
+      }
+      if (context.mode === "scope") {
+        // The track is already in the open folder/playlist, so play it in place.
+        await selectTrack(track, true, undefined, true, "source");
+        return;
+      }
       await persistLibrary({
         ...library,
         selectedSource:
@@ -1375,7 +1671,7 @@ export function App() {
       });
       await selectTrack(track, true);
     },
-    [library, persistLibrary, selectTrack, setScrollToTrackId],
+    [library, persistLibrary, selectTrack, setScrollToTrackId, shuffleEnabled],
   );
 
   const addFolder = useCallback(async () => {
@@ -1729,6 +2025,10 @@ export function App() {
     [applySoundCloudActivationDefaults, runSoundCloudAction],
   );
 
+  const cancelSoundCloudAuth = useCallback(() => {
+    void runSoundCloudAction(() => window.playhead.cancelSoundCloudAuth());
+  }, [runSoundCloudAction]);
+
   const disconnectSoundCloud = useCallback(() => {
     void runSoundCloudAction(async () => {
       const nextState = await window.playhead.disconnectSoundCloud();
@@ -1965,14 +2265,57 @@ export function App() {
     [activeTrackId, library, persistLibrary, playbackClock],
   );
 
+  const syncSoundCloudLike = useCallback(async (track: LibraryTrack, liked: boolean) => {
+    const soundcloud = track.soundcloud;
+    if (!soundcloud) return;
+    const apply = (isLiked: boolean) => {
+      setSoundCloudLikedTrackIds((current) => {
+        const next = new Set(current);
+        if (isLiked) next.add(track.id);
+        else next.delete(track.id);
+        return next;
+      });
+      // Keep an already loaded Loved Tracks collection in step with the like.
+      setSoundCloudTracksByCollection((current) => {
+        const likedTracks = current["liked-tracks"];
+        if (!likedTracks) return current;
+        const without = likedTracks.filter((item) => item.id !== track.id);
+        return { ...current, "liked-tracks": isLiked ? [track, ...without] : without };
+      });
+      setSoundCloudCollections((current) =>
+        current.map((collection) =>
+          collection.id === "liked-tracks" && collection.trackCount !== undefined
+            ? { ...collection, trackCount: Math.max(0, collection.trackCount + (isLiked ? 1 : -1)) }
+            : collection,
+        ),
+      );
+    };
+    apply(liked);
+    try {
+      await window.playhead.setSoundCloudTrackLiked(soundcloud.id, soundcloud.urn, liked);
+    } catch (error) {
+      apply(!liked);
+      showSimpleActionToast(
+        getErrorMessage(error, "Could not update the like on SoundCloud."),
+        "error",
+      );
+    }
+  }, []);
+
   const toggleFavoriteTrack = useCallback(
     async (trackId: string) => {
       const track = allPlayableTracksById[trackId];
       if (!track) return;
       const favoriteTrackIds = new Set(library.favoriteTrackIds || []);
-      const wasFavorite = favoriteTrackIds.has(trackId);
+      const wasFavorite = favoriteTrackIds.has(trackId) || soundcloudLikedTrackIds.has(trackId);
       if (wasFavorite) favoriteTrackIds.delete(trackId);
       else favoriteTrackIds.add(trackId);
+      if (
+        track.soundcloud &&
+        soundcloudState.connected &&
+        library.settings.soundcloud.likeSyncEnabled
+      )
+        void syncSoundCloudLike(track, !wasFavorite);
 
       await persistLibrary({
         ...library,
@@ -2003,7 +2346,14 @@ export function App() {
         track,
       });
     },
-    [allPlayableTracksById, library, persistLibrary],
+    [
+      allPlayableTracksById,
+      library,
+      persistLibrary,
+      soundcloudLikedTrackIds,
+      soundcloudState.connected,
+      syncSoundCloudLike,
+    ],
   );
 
   const saveTrackMetadata = useCallback(
@@ -2460,7 +2810,7 @@ export function App() {
 
   const playSelectedTrack = useCallback(() => {
     const selectedTrack = selectedTrackIds[0] ? allPlayableTracksById[selectedTrackIds[0]] : null;
-    if (selectedTrack) void selectTrack(selectedTrack, true, 0, true, "source");
+    if (selectedTrack) void selectTrack(selectedTrack, true, undefined, true, "source");
   }, [allPlayableTracksById, selectTrack, selectedTrackIds]);
 
   const selectLibrarySource = useCallback((source: LibraryState["selectedSource"]) => {
@@ -2490,6 +2840,33 @@ export function App() {
       await loadSoundCloudCollectionTracks(collectionId);
     },
     [loadSoundCloudCollectionTracks, selectLibrarySource],
+  );
+
+  const deleteSoundCloudPlaylist = useCallback(
+    async (collection: SoundCloudCollection) => {
+      try {
+        await window.playhead.deleteSoundCloudPlaylist(collection.id);
+      } catch (error) {
+        showSimpleActionToast(
+          getErrorMessage(error, "Could not delete the SoundCloud playlist."),
+          "error",
+        );
+        return;
+      }
+      setSoundCloudCollections((current) => current.filter((item) => item.id !== collection.id));
+      setSoundCloudTracksByCollection((current) => {
+        const next = { ...current };
+        delete next[collection.id];
+        return next;
+      });
+      const source = libraryRef.current.selectedSource;
+      if (source?.type === "soundcloud" && source.id === collection.id) {
+        const folder = libraryRef.current.folders[0];
+        selectLibrarySource(folder ? { type: "folder", id: folder.id } : null);
+      }
+      showSimpleActionToast(`Deleted ${collection.title} from SoundCloud`);
+    },
+    [selectLibrarySource],
   );
 
   const selectLibraryBrowserItem = useCallback(
@@ -2586,15 +2963,11 @@ export function App() {
     (trackId: string, time: number) => {
       if (!library.settings.playback.rememberTrackPositions) return;
 
-      const nextPositions = { ...library.settings.session.trackPositions };
-      if (time < 3) delete nextPositions[trackId];
-      else nextPositions[trackId] = time;
-
       persistSessionSettings({
         ...library.settings.session,
         activeTrackId: trackId,
         selectedTrackIds,
-        trackPositions: nextPositions,
+        trackPositions: withTrackPosition(library.settings.session.trackPositions, trackId, time),
       });
     },
     [
@@ -2688,6 +3061,64 @@ export function App() {
     ],
   );
 
+  const continueSoundCloudStation = useCallback(
+    async (seed: LibraryTrack) => {
+      if (!seed.soundcloud) return;
+      let related: LibraryTrack[];
+      try {
+        related = await window.playhead.getSoundCloudRelatedTracks(
+          seed.soundcloud.id,
+          seed.soundcloud.urn,
+        );
+      } catch {
+        related = [];
+      }
+      // The user may have started something else while related tracks were loading.
+      if (activeTrackIdRef.current !== seed.id || isPlayingRef.current) return;
+      const queue = libraryRef.current.settings.session.queue;
+      const queued = new Set([...queue.items, ...queue.shuffledItems].map((item) => item.trackId));
+      const fresh = related
+        .filter((track) => !queued.has(track.id) && track.id !== seed.id)
+        .slice(0, stationBatchSize);
+      if (fresh.length === 0) {
+        showSimpleActionToast("No similar SoundCloud tracks to continue with.", "info");
+        return;
+      }
+      setSoundCloudTracksByCollection((current) => ({
+        ...current,
+        [soundcloudStationCollectionId]: [
+          ...(current[soundcloudStationCollectionId] || []),
+          ...fresh,
+        ],
+      }));
+      soundcloudTracksRef.current = {
+        ...soundcloudTracksRef.current,
+        ...Object.fromEntries(fresh.map((track) => [track.id, track])),
+      };
+      const extended = addTracksToQueue(
+        queue,
+        fresh.map((track) => track.id),
+        null,
+        "after",
+        shuffleEnabled,
+      );
+      const existingItemIds = new Set(
+        [...queue.items, ...queue.shuffledItems].map((item) => item.id),
+      );
+      const firstNew = getVisibleQueueItems(extended, shuffleEnabled).find(
+        (item) => !existingItemIds.has(item.id),
+      );
+      if (!firstNew) return;
+      const nextTrack = fresh.find((track) => track.id === firstNew.trackId) || fresh[0];
+      setScrollToTrackId(nextTrack.id);
+      await selectTrack(nextTrack, true, 0, true, "preserve", firstNew.id, false, {
+        ...extended,
+        activeItemId: firstNew.id,
+      });
+    },
+    [selectTrack, setScrollToTrackId, shuffleEnabled],
+  );
+
   const playNextTrackOnEnd = useCallback(() => {
     if (!activeTrackId) return false;
 
@@ -2708,7 +3139,11 @@ export function App() {
             (repeatMode === "all" ? visibleQueueItems[0] : null)
           : visibleQueueItems[0] || null;
       const nextTrack = nextItem ? allPlayableTracksById[nextItem.trackId] : null;
-      if (!nextTrack || !nextItem) return false;
+      if (!nextTrack || !nextItem) {
+        if (activeTrack?.soundcloud && library.settings.soundcloud.stationEnabled)
+          void continueSoundCloudStation(activeTrack);
+        return false;
+      }
 
       persistSessionSettings({
         ...library.settings.session,
@@ -2722,14 +3157,21 @@ export function App() {
     const currentIndex = tracks.findIndex((track) => track.id === activeTrackId);
     let nextTrack = currentIndex >= 0 ? tracks[currentIndex + 1] : null;
     if (!nextTrack && repeatMode === "all") nextTrack = tracks[0] || null;
-    if (!nextTrack) return false;
+    if (!nextTrack) {
+      if (activeTrack?.soundcloud && library.settings.soundcloud.stationEnabled)
+        void continueSoundCloudStation(activeTrack);
+      return false;
+    }
 
     setScrollToTrackId(nextTrack.id);
-    void selectTrack(nextTrack, true);
+    void selectTrack(nextTrack, true, 0);
     return true;
   }, [
+    activeTrack,
     activeTrackId,
+    continueSoundCloudStation,
     library.settings.session,
+    library.settings.soundcloud.stationEnabled,
     allPlayableTracksById,
     persistSessionSettings,
     repeatMode,
@@ -2926,6 +3368,23 @@ export function App() {
       if (nextState.connected) void applySoundCloudActivationDefaults();
     });
   }, [applySoundCloudActivationDefaults]);
+
+  useEffect(() => {
+    if (!soundcloudState.connected || !library.settings.soundcloud.likeSyncEnabled) {
+      setSoundCloudLikedTrackIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    void window.playhead
+      .getSoundCloudCollectionTracks("liked-tracks")
+      .then((tracks) => {
+        if (!cancelled) setSoundCloudLikedTrackIds(new Set(tracks.map((track) => track.id)));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [library.settings.soundcloud.likeSyncEnabled, soundcloudState.connected]);
 
   useEffect(() => {
     void loadSoundCloudCollections();
@@ -3190,6 +3649,18 @@ export function App() {
     selectedSource?.type === "playlist"
       ? library.playlists.find((playlist) => playlist.id === selectedSource.id) || null
       : null;
+  const selectedSoundCloudPlaylistId =
+    selectedSource?.type === "soundcloud" && selectedSource.id?.startsWith("playlist:")
+      ? selectedSource.id
+      : null;
+  const requestRemoveTracksFromListedPlaylist = (trackIds: string[]) => {
+    if (!selectedSoundCloudPlaylistId) {
+      requestRemoveTracksFromSelectedPlaylist(trackIds);
+      return;
+    }
+    if (trackIds.length > 1) setPlaylistTrackIdsPendingRemoval(trackIds);
+    else void removeTracksFromSoundCloudPlaylist(selectedSoundCloudPlaylistId, trackIds);
+  };
   const selectedTag =
     selectedSource?.type === "tag"
       ? (library.tags || []).find((tag) => tag.id === selectedSource.id) || null
@@ -3291,6 +3762,16 @@ export function App() {
                   void addTracksToPlaylist(trackIds, playlist)
                 }
                 onDropTrackToTag={(trackIds, tag) => void addTracksToTag(trackIds, tag)}
+                onCreateSoundCloudPlaylist={() =>
+                  setSoundCloudPlaylistDialog({ mode: "create", tracks: [] })
+                }
+                onRenameSoundCloudPlaylist={(collection) =>
+                  setSoundCloudPlaylistDialog({ mode: "rename", collection })
+                }
+                onDeleteSoundCloudPlaylist={setSoundCloudPlaylistPendingDeletion}
+                onDropTrackToSoundCloudPlaylist={(trackIds, playlist, move) =>
+                  void addTracksToSoundCloudPlaylist(trackIds, playlist, move)
+                }
                 onRemoveFolder={(folder) => setFolderPendingRemoval(folder)}
                 onExportPlaylist={(playlist, format) => void exportPlaylist(playlist, format)}
                 onRenamePlaylist={(playlist) => setRenamingPlaylistId(playlist.id)}
@@ -3332,6 +3813,15 @@ export function App() {
             ) : (
               <>
                 <Player
+                  soundcloudComments={
+                    soundcloudState.connected && library.settings.soundcloud.commentsEnabled
+                      ? {
+                          popups: library.settings.soundcloud.commentPopupsEnabled,
+                          canPost: true,
+                        }
+                      : null
+                  }
+                  onSeek={seekToLyric}
                   playbackError={playbackError}
                   preparingPlayback={preparingPlayback}
                   onRetryPlayback={() => {
@@ -3562,17 +4052,19 @@ export function App() {
                       canReorderTracks={
                         selectedSource?.type !== "library-tracks" &&
                         selectedSource?.type !== "tag" &&
-                        selectedSource?.type !== "soundcloud"
+                        (selectedSource?.type !== "soundcloud" ||
+                          Boolean(selectedSoundCloudPlaylistId))
                       }
+                      canRemoveFromPlaylist={Boolean(selectedSoundCloudPlaylistId)}
                       isLoading={
                         selectedSource?.type === "soundcloud" &&
                         soundcloudLoadingCollectionId === selectedSource.id
                       }
                       playlists={library.playlists}
                       tags={library.tags || []}
-                      favoriteTrackIds={library.favoriteTrackIds || []}
+                      favoriteTrackIds={favoriteTrackIds}
                       onSelectTrack={selectTrackInList}
-                      onPlayTrack={(track) => selectTrack(track, true, 0, true, "source")}
+                      onPlayTrack={(track) => selectTrack(track, true, undefined, true, "source")}
                       onAddToPlaylist={(track, playlist) => addTrackToPlaylist(track.id, playlist)}
                       onAddTracksToPlaylist={(tracks, playlist) =>
                         addTracksToPlaylist(
@@ -3595,7 +4087,13 @@ export function App() {
                         setIsCreateTagOpen(true);
                       }}
                       onToggleFavorite={(track) => toggleFavoriteTrack(track.id)}
-                      onRemoveFromPlaylist={requestRemoveTracksFromSelectedPlaylist}
+                      onRemoveFromPlaylist={requestRemoveTracksFromListedPlaylist}
+                      onCreateSoundCloudPlaylist={
+                        soundcloudState.connected
+                          ? (tracksToAdd) =>
+                              setSoundCloudPlaylistDialog({ mode: "create", tracks: tracksToAdd })
+                          : undefined
+                      }
                       onRemoveFromTag={removeTracksFromSelectedTag}
                       onShowInFolder={(track) => window.playhead.showItemInFolder(track.path)}
                       onShowMetadata={(track) => setMetadataDialog({ track })}
@@ -3605,8 +4103,15 @@ export function App() {
                       onViewAlbum={
                         library.settings.library.mode === "library" ? viewTrackAlbum : undefined
                       }
-                      onReorderTrack={(trackId, targetTrackId, edge) =>
-                        reorderTrack(trackId, targetTrackId, edge)
+                      onReorderTrack={(trackIds, targetTrackId, edge) =>
+                        selectedSoundCloudPlaylistId
+                          ? reorderSoundCloudPlaylist(
+                              selectedSoundCloudPlaylistId,
+                              trackIds,
+                              targetTrackId,
+                              edge,
+                            )
+                          : reorderTrack(trackIds, targetTrackId, edge)
                       }
                       onScrollPositionChange={(scrollTop) => {
                         sourceScrollPositionsRef.current[selectedSourceScrollKey] = scrollTop;
@@ -3640,6 +4145,10 @@ export function App() {
               playlists={library.playlists}
               tags={library.tags || []}
               libraryMode={library.settings.library.mode}
+              scope={searchScope}
+              soundcloudSearchEnabled={
+                soundcloudState.connected && library.settings.soundcloud.enabled
+              }
               onSelectTrack={playSearchResult}
               onSelectArtist={(artist) => {
                 setIsSearchOpen(false);
@@ -3707,6 +4216,7 @@ export function App() {
               onSoundCloudSettingsChange={(settings) => void updateSoundCloudSettings(settings)}
               onStartSoundCloudAuth={startSoundCloudAuth}
               onCompleteSoundCloudAuth={completeSoundCloudAuth}
+              onCancelSoundCloudAuth={cancelSoundCloudAuth}
               onDisconnectSoundCloud={disconnectSoundCloud}
               onAdvancedAction={runAdvancedSettingsAction}
               batchAnalysis={batchAnalysis}
@@ -3738,10 +4248,53 @@ export function App() {
               onClose={() => setFolderPendingRemoval(null)}
             />
           )}
+          {soundcloudPlaylistPendingDeletion && (
+            <DeletePlaylistDialog
+              key={`delete-soundcloud-playlist-${soundcloudPlaylistPendingDeletion.id}`}
+              name={soundcloudPlaylistPendingDeletion.title}
+              description="This permanently deletes the playlist from your SoundCloud account. It can't be undone."
+              onConfirm={() => {
+                const collection = soundcloudPlaylistPendingDeletion;
+                setSoundCloudPlaylistPendingDeletion(null);
+                void deleteSoundCloudPlaylist(collection);
+              }}
+              onClose={() => setSoundCloudPlaylistPendingDeletion(null)}
+            />
+          )}
+          {soundcloudPlaylistDialog && (
+            <CreatePlaylistDialog
+              key="soundcloud-playlist"
+              title={
+                soundcloudPlaylistDialog.mode === "create"
+                  ? "New SoundCloud Playlist"
+                  : "Rename SoundCloud Playlist"
+              }
+              description={
+                soundcloudPlaylistDialog.mode === "rename"
+                  ? "The new name is saved to SoundCloud."
+                  : soundcloudPlaylistDialog.tracks.length > 0
+                    ? `Creates a private playlist on SoundCloud with ${soundcloudPlaylistDialog.tracks.length} ${soundcloudPlaylistDialog.tracks.length === 1 ? "track" : "tracks"}.`
+                    : "Creates a private playlist on SoundCloud."
+              }
+              initialName={
+                soundcloudPlaylistDialog.mode === "rename"
+                  ? soundcloudPlaylistDialog.collection.title
+                  : ""
+              }
+              submitLabel={soundcloudPlaylistDialog.mode === "create" ? "Create" : "Rename"}
+              onCreate={(name) => {
+                const dialog = soundcloudPlaylistDialog;
+                setSoundCloudPlaylistDialog(null);
+                if (dialog.mode === "create") void createSoundCloudPlaylist(name, dialog.tracks);
+                else void renameSoundCloudPlaylist(dialog.collection, name);
+              }}
+              onClose={() => setSoundCloudPlaylistDialog(null)}
+            />
+          )}
           {playlistPendingDeletion && (
             <DeletePlaylistDialog
               key={`delete-playlist-${playlistPendingDeletion.id}`}
-              playlist={playlistPendingDeletion}
+              name={playlistPendingDeletion.name}
               onConfirm={() => {
                 const playlistId = playlistPendingDeletion.id;
                 setPlaylistPendingDeletion(null);
@@ -3762,19 +4315,26 @@ export function App() {
               onClose={() => setTagPendingDeletion(null)}
             />
           )}
-          {playlistTrackIdsPendingRemoval.length > 1 && selectedPlaylist && (
-            <RemoveTracksFromPlaylistDialog
-              key="remove-tracks-from-playlist"
-              trackCount={playlistTrackIdsPendingRemoval.length}
-              playlistName={selectedPlaylist.name}
-              onConfirm={() => {
-                const trackIds = playlistTrackIdsPendingRemoval;
-                setPlaylistTrackIdsPendingRemoval([]);
-                void removeTracksFromSelectedPlaylist(trackIds);
-              }}
-              onClose={() => setPlaylistTrackIdsPendingRemoval([])}
-            />
-          )}
+          {playlistTrackIdsPendingRemoval.length > 1 &&
+            (selectedPlaylist || selectedSoundCloudPlaylistId) && (
+              <RemoveTracksFromPlaylistDialog
+                key="remove-tracks-from-playlist"
+                trackCount={playlistTrackIdsPendingRemoval.length}
+                playlistName={
+                  selectedSoundCloudPlaylistId
+                    ? soundCloudCollectionTitle(selectedSoundCloudPlaylistId)
+                    : selectedPlaylist?.name || "playlist"
+                }
+                onConfirm={() => {
+                  const trackIds = playlistTrackIdsPendingRemoval;
+                  setPlaylistTrackIdsPendingRemoval([]);
+                  if (selectedSoundCloudPlaylistId)
+                    void removeTracksFromSoundCloudPlaylist(selectedSoundCloudPlaylistId, trackIds);
+                  else void removeTracksFromSelectedPlaylist(trackIds);
+                }}
+                onClose={() => setPlaylistTrackIdsPendingRemoval([])}
+              />
+            )}
           {isCreatePlaylistOpen && (
             <CreatePlaylistDialog
               key="create-playlist"

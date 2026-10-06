@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useId, useRef, useState } from "react";
 import { SliderComfortable } from "@/components/ui/slider";
 import { SoundPanel } from "@/features/audio/SoundPanel";
+import { DragRegionBlocker } from "@/components/ui/drag-region-blocker";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
@@ -16,6 +17,9 @@ import { PlayPauseMorphIcon, SkipBackFilledIcon, SkipForwardFilledIcon } from ".
 import type { RepeatMode } from "./types";
 import { usePlaybackSeconds, type PlaybackClock } from "./playback-clock";
 import { WaveformEmptyState } from "./WaveformEmptyState";
+import { CommentComposer } from "./CommentComposer";
+import { WaveformComments } from "./WaveformComments";
+import { useSoundCloudComments } from "./use-soundcloud-comments";
 
 function formatAudioFormat(track: LibraryTrack): string {
   if (track.source === "soundcloud" || track.soundcloud) {
@@ -60,6 +64,8 @@ export function Player({
   volume,
   maxVolume,
   volumeBoostEnabled,
+  soundcloudComments,
+  onSeek,
   limiterActive,
   equalizer,
   levelsOpen,
@@ -99,6 +105,9 @@ export function Player({
   volume: number;
   maxVolume: number;
   volumeBoostEnabled: boolean;
+  /** Null when comments are off or SoundCloud isn't connected. */
+  soundcloudComments: { popups: boolean; canPost: boolean } | null;
+  onSeek: (time: number) => void;
   limiterActive: boolean;
   equalizer: EqualizerSettings;
   levelsOpen: boolean;
@@ -131,6 +140,7 @@ export function Player({
   const soundPanelId = useId();
   const soundControlsRef = useRef<HTMLDivElement>(null);
   const [soundPanelOpen, setSoundPanelOpen] = useState(false);
+  const { comments, addComment } = useSoundCloudComments(activeTrack, Boolean(soundcloudComments));
 
   useEffect(() => {
     if (!soundPanelOpen) return;
@@ -267,6 +277,42 @@ export function Player({
         </div>
 
         <div className="no-drag flex shrink-0 items-center gap-2 text-[13px] font-medium tabular-nums text-muted-foreground">
+          <div
+            ref={soundControlsRef}
+            className="relative shrink-0"
+            onKeyDown={(event) => {
+              if (event.key === " " || event.key === "Enter") event.stopPropagation();
+            }}
+          >
+            <IconButton
+              title="Sound"
+              tooltip={soundPanelOpen ? "Hide equalizer" : "Show equalizer"}
+              ariaExpanded={soundPanelOpen}
+              ariaControls={soundPanelId}
+              active={soundPanelOpen || equalizer.enabled}
+              onClick={() => setSoundPanelOpen((value) => !value)}
+            >
+              <SoundIcon size={19} strokeWidth={1.8} />
+            </IconButton>
+            {soundPanelOpen && <DragRegionBlocker />}
+            <SoundPanel
+              open={soundPanelOpen}
+              id={soundPanelId}
+              extraHeaderHeight={levelsOpen ? 68 : 0}
+              equalizer={equalizer}
+              volumeBoostEnabled={volumeBoostEnabled}
+              onEqualizerPreview={onEqualizerPreview}
+              onEqualizerChange={onEqualizerChange}
+              onVolumeBoostChange={onVolumeBoostChange}
+            />
+          </div>
+          {activeTrack?.soundcloud && soundcloudComments?.canPost && (
+            <CommentComposer
+              track={activeTrack}
+              playbackClock={playbackClock}
+              onPosted={addComment}
+            />
+          )}
           <IconButton
             title="Levels"
             tooltip={levelsOpen ? "Hide levels" : "Show levels"}
@@ -290,7 +336,7 @@ export function Player({
           <FavoriteHeartButton
             active={isFavorite}
             disabled={!activeTrack}
-            tooltipSide="left"
+            tooltipSide="bottom"
             onClick={onToggleFavorite}
           />
         </div>
@@ -322,11 +368,24 @@ export function Player({
             </motion.div>
           </motion.div>
 
+          {hasWaveform && !playbackError && comments.length > 0 && soundcloudComments && (
+            <WaveformComments
+              comments={comments}
+              duration={duration}
+              playbackClock={playbackClock}
+              popupsEnabled={soundcloudComments.popups}
+              reduceMotion={reduceMotion}
+              onSeek={onSeek}
+            />
+          )}
+
           <AnimatePresence mode="wait">
             {!hasWaveform && !playbackError && (
               <WaveformEmptyState
                 key={activeTrack ? "loading-waveform" : "empty-waveform"}
-                isLoading={isLoading || !activeTrack}
+                // Idle placeholders stay static: an endless pulse here kept the
+                // compositor busy (high idle CPU/GPU) until something was played.
+                isLoading={isLoading && Boolean(activeTrack)}
                 reduceMotion={reduceMotion}
               />
             )}
@@ -349,33 +408,6 @@ export function Player({
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center py-1">
         <div className="flex min-w-0 items-center gap-2 pr-4">
-          <div
-            ref={soundControlsRef}
-            className="relative shrink-0"
-            onKeyDown={(event) => {
-              if (event.key === " " || event.key === "Enter") event.stopPropagation();
-            }}
-          >
-            <IconButton
-              title="Sound"
-              ariaExpanded={soundPanelOpen}
-              ariaControls={soundPanelId}
-              active={soundPanelOpen || equalizer.enabled}
-              onClick={() => setSoundPanelOpen((value) => !value)}
-            >
-              <SoundIcon size={19} strokeWidth={1.8} />
-            </IconButton>
-            <SoundPanel
-              open={soundPanelOpen}
-              id={soundPanelId}
-              extraHeaderHeight={levelsOpen ? 68 : 0}
-              equalizer={equalizer}
-              volumeBoostEnabled={volumeBoostEnabled}
-              onEqualizerPreview={onEqualizerPreview}
-              onEqualizerChange={onEqualizerChange}
-              onVolumeBoostChange={onVolumeBoostChange}
-            />
-          </div>
           {trackInfo.length > 0 && (
             <div className="min-w-0 truncate text-[12px] font-medium leading-normal text-muted-foreground @max-lg:hidden">
               {trackInfo.join(" · ")}

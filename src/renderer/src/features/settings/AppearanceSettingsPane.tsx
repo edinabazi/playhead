@@ -1,6 +1,6 @@
 import { Switch } from "@/components/ui/switch";
-import type { AppearanceSettings } from "../../../../shared/library";
-import { SettingsFooter, TransparencySlider } from "./SettingsControls";
+import { windowCornerRadiusOptions, type AppearanceSettings } from "../../../../shared/library";
+import { SettingsFooter, SettingsOptionGroup, TransparencySlider } from "./SettingsControls";
 
 export function AppearanceSettingsPane({
   settings,
@@ -70,6 +70,20 @@ export function AppearanceSettingsPane({
               onCheckedChange={(checked) => onChange({ ...settings, reduceMotion: checked })}
             />
           </div>
+        </div>
+
+        <div
+          className={`transition-opacity ${
+            isTransparencyPreviewing ? "pointer-events-none opacity-0" : ""
+          }`}
+        >
+          <SettingsOptionGroup
+            title="Window corners"
+            description="Choose how rounded the window corners are."
+            options={windowCornerRadiusOptions}
+            value={settings.windowCornerRadius}
+            onChange={(windowCornerRadius) => onChange({ ...settings, windowCornerRadius })}
+          />
         </div>
       </div>
 
