@@ -66,7 +66,8 @@ export function SleepTimerButton({
     >
       <IconButton
         title="Sleep timer"
-        tooltip={label}
+        // The tooltip sits below the button, where the open menu is.
+        tooltip={open ? undefined : label}
         active={Boolean(timer)}
         ariaExpanded={open}
         onClick={() => setOpen((value) => !value)}
@@ -82,10 +83,10 @@ export function SleepTimerButton({
       <AnimatePresence>
         {open && (
           <motion.div
-            className="no-drag absolute bottom-full right-0 z-50 mb-2"
-            initial={{ opacity: 0, y: 6, scale: 0.98 }}
+            className="no-drag absolute right-0 top-full z-50 mt-2"
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.98 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.6 }}
           >
             <Dropdown className="w-52 bg-[rgba(10,10,10,0.96)]">
