@@ -48,7 +48,7 @@ export function useSoundCloudPlaylistActions({
         ...Object.fromEntries(tracks.map((track) => [track.id, track])),
       };
     },
-    [],
+    [setSoundCloudCollections, setSoundCloudTracksByCollection, soundcloudTracksRef],
   );
 
   const toSoundCloudIds = useCallback(
@@ -144,7 +144,7 @@ export function useSoundCloudPlaylistActions({
         );
       }
     },
-    [toSoundCloudIds],
+    [setSoundCloudCollections, toSoundCloudIds],
   );
 
   const renameSoundCloudPlaylist = useCallback(
@@ -164,7 +164,7 @@ export function useSoundCloudPlaylistActions({
         );
       }
     },
-    [],
+    [setSoundCloudCollections],
   );
 
   const removeTracksFromSoundCloudPlaylist = useCallback(
@@ -255,7 +255,7 @@ export function useSoundCloudPlaylistActions({
       }
       showSimpleActionToast(`Deleted ${collection.title} from SoundCloud`);
     },
-    [selectLibrarySource],
+    [libraryRef, selectLibrarySource, setSoundCloudCollections, setSoundCloudTracksByCollection],
   );
 
   return {
