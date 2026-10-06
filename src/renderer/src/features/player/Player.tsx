@@ -18,6 +18,7 @@ import type { RepeatMode } from "./types";
 import { usePlaybackSeconds, type PlaybackClock } from "./playback-clock";
 import { WaveformEmptyState } from "./WaveformEmptyState";
 import { CommentComposer } from "./CommentComposer";
+import { LoopRegion, type PlaybackLoop } from "./LoopRegion";
 import { SleepTimerButton, type SleepTimer } from "./SleepTimerButton";
 import { WaveformComments } from "./WaveformComments";
 import { useSoundCloudComments } from "./use-soundcloud-comments";
@@ -72,6 +73,8 @@ export function Player({
   playbackRate,
   preservePitch,
   onPlaybackRateChange,
+  loop,
+  onLoopChange,
   limiterActive,
   equalizer,
   levelsOpen,
@@ -119,6 +122,8 @@ export function Player({
   playbackRate: number;
   preservePitch: boolean;
   onPlaybackRateChange: (playbackRate: number, preservePitch: boolean) => void;
+  loop: PlaybackLoop | null;
+  onLoopChange: (loop: PlaybackLoop | null) => void;
   limiterActive: boolean;
   equalizer: EqualizerSettings;
   levelsOpen: boolean;
@@ -358,52 +363,55 @@ export function Player({
 
       <div className="relative mt-4 flex flex-col">
         <div className="relative h-[74px] overflow-hidden rounded-[20px]">
-          <motion.div className="absolute inset-0 overflow-hidden rounded-[2px]">
-            <motion.div
-              className="h-full origin-left"
-              animate={{
-                clipPath: hasWaveform ? "inset(0% 0% 0% 0%)" : "inset(0% 100% 0% 0%)",
-                opacity: hasWaveform && !playbackError ? 1 : 0,
-              }}
-              transition={{
-                clipPath: {
-                  duration: reduceMotion || !shouldAnimateWaveform ? 0 : 0.55,
-                  ease: [0.22, 1, 0.36, 1],
-                },
-                opacity: {
-                  duration: reduceMotion || !shouldAnimateWaveform ? 0 : hasWaveform ? 0.08 : 0.18,
-                },
-              }}
-            >
-              <div
-                ref={waveformRef}
-                className="no-drag h-full w-full rounded-[2px] [contain:layout_paint]"
-              />
+          <LoopRegion loop={loop} duration={duration} onChange={onLoopChange}>
+            <motion.div className="absolute inset-0 overflow-hidden rounded-[2px]">
+              <motion.div
+                className="h-full origin-left"
+                animate={{
+                  clipPath: hasWaveform ? "inset(0% 0% 0% 0%)" : "inset(0% 100% 0% 0%)",
+                  opacity: hasWaveform && !playbackError ? 1 : 0,
+                }}
+                transition={{
+                  clipPath: {
+                    duration: reduceMotion || !shouldAnimateWaveform ? 0 : 0.55,
+                    ease: [0.22, 1, 0.36, 1],
+                  },
+                  opacity: {
+                    duration:
+                      reduceMotion || !shouldAnimateWaveform ? 0 : hasWaveform ? 0.08 : 0.18,
+                  },
+                }}
+              >
+                <div
+                  ref={waveformRef}
+                  className="no-drag h-full w-full rounded-[2px] [contain:layout_paint]"
+                />
+              </motion.div>
             </motion.div>
-          </motion.div>
 
-          {hasWaveform && !playbackError && comments.length > 0 && soundcloudComments && (
-            <WaveformComments
-              comments={comments}
-              duration={duration}
-              playbackClock={playbackClock}
-              popupsEnabled={soundcloudComments.popups}
-              reduceMotion={reduceMotion}
-              onSeek={onSeek}
-            />
-          )}
-
-          <AnimatePresence mode="wait">
-            {!hasWaveform && !playbackError && (
-              <WaveformEmptyState
-                key={activeTrack ? "loading-waveform" : "empty-waveform"}
-                // Idle placeholders stay static: an endless pulse here kept the
-                // compositor busy (high idle CPU/GPU) until something was played.
-                isLoading={isLoading && Boolean(activeTrack)}
+            {hasWaveform && !playbackError && comments.length > 0 && soundcloudComments && (
+              <WaveformComments
+                comments={comments}
+                duration={duration}
+                playbackClock={playbackClock}
+                popupsEnabled={soundcloudComments.popups}
                 reduceMotion={reduceMotion}
+                onSeek={onSeek}
               />
             )}
-          </AnimatePresence>
+
+            <AnimatePresence mode="wait">
+              {!hasWaveform && !playbackError && (
+                <WaveformEmptyState
+                  key={activeTrack ? "loading-waveform" : "empty-waveform"}
+                  // Idle placeholders stay static: an endless pulse here kept the
+                  // compositor busy (high idle CPU/GPU) until something was played.
+                  isLoading={isLoading && Boolean(activeTrack)}
+                  reduceMotion={reduceMotion}
+                />
+              )}
+            </AnimatePresence>
+          </LoopRegion>
           {preparingPlayback && !playbackError && (
             <div
               role="status"

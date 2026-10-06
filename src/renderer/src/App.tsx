@@ -45,6 +45,7 @@ import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/Me
 import { Player } from "@/features/player/Player";
 import { QueueSidebar } from "@/features/player/QueueSidebar";
 import type { SleepTimer } from "@/features/player/SleepTimerButton";
+import type { PlaybackLoop } from "@/features/player/LoopRegion";
 import { usePlaybackQueue } from "@/features/player/use-playback-queue";
 import {
   buildQueueFromTracks,
@@ -518,6 +519,11 @@ export function App() {
   const [soundcloudActionPending, setSoundCloudActionPending] = useState(false);
   const [soundcloudCollections, setSoundCloudCollections] = useState<SoundCloudCollection[]>([]);
   const [sleepTimer, setSleepTimer] = useState<SleepTimer>(null);
+  const [playbackLoop, setPlaybackLoop] = useState<PlaybackLoop | null>(null);
+  const playbackLoopRef = useRef<PlaybackLoop | null>(null);
+  useEffect(() => {
+    playbackLoopRef.current = playbackLoop;
+  }, [playbackLoop]);
   const sleepTimerRef = useRef<SleepTimer>(null);
   useEffect(() => {
     sleepTimerRef.current = sleepTimer;
@@ -2890,6 +2896,14 @@ export function App() {
 
   const playNextTrackOnEnd = useCallback(() => {
     if (!activeTrackId) return false;
+    // A loop that runs to the end of the track restarts instead of moving on.
+    const loop = playbackLoopRef.current;
+    if (loop && wavesurferRef.current) {
+      wavesurferRef.current.setTime(loop.start);
+      playbackClock.setTime(loop.start);
+      void wavesurferRef.current.play();
+      return true;
+    }
     if (sleepTimerRef.current?.kind === "end-of-track") {
       setSleepTimer(null);
       showSimpleActionToast("Sleep timer stopped playback.", "info");
@@ -2943,6 +2957,7 @@ export function App() {
   }, [
     activeTrack,
     activeTrackId,
+    playbackClock,
     continueSoundCloudStation,
     library.settings.session,
     library.settings.soundcloud.stationEnabled,
@@ -3339,6 +3354,21 @@ export function App() {
     return wavesurfer.on("ready", apply);
   }, [isWaveformEngineReady, playbackRate, preservePitch]);
 
+  // A loop belongs to the track it was drawn on.
+  useEffect(() => {
+    setPlaybackLoop(null);
+  }, [activeTrackId]);
+
+  useEffect(() => {
+    if (!playbackLoop) return;
+    return playbackClock.subscribePrecise(() => {
+      const wavesurfer = wavesurferRef.current;
+      if (!wavesurfer || playbackClock.getTime() < playbackLoop.end) return;
+      wavesurfer.setTime(playbackLoop.start);
+      playbackClock.setTime(playbackLoop.start);
+    });
+  }, [playbackClock, playbackLoop]);
+
   const queueTracks = useCallback(
     (tracksToQueue: LibraryTrack[], position: "next" | "later") =>
       playbackQueue.addTracks(
@@ -3619,6 +3649,8 @@ export function App() {
                   onSeek={seekToLyric}
                   sleepTimer={sleepTimer}
                   onSleepTimerChange={setSleepTimer}
+                  loop={playbackLoop}
+                  onLoopChange={setPlaybackLoop}
                   playbackRate={library.settings.playback.playbackRate}
                   preservePitch={library.settings.playback.preservePitch}
                   onPlaybackRateChange={(playbackRate, preservePitch) =>
