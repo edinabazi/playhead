@@ -18,6 +18,7 @@ import type { RepeatMode } from "./types";
 import { usePlaybackSeconds, type PlaybackClock } from "./playback-clock";
 import { WaveformEmptyState } from "./WaveformEmptyState";
 import { CommentComposer } from "./CommentComposer";
+import { SleepTimerButton, type SleepTimer } from "./SleepTimerButton";
 import { WaveformComments } from "./WaveformComments";
 import { useSoundCloudComments } from "./use-soundcloud-comments";
 
@@ -66,6 +67,8 @@ export function Player({
   volumeBoostEnabled,
   soundcloudComments,
   onSeek,
+  sleepTimer,
+  onSleepTimerChange,
   limiterActive,
   equalizer,
   levelsOpen,
@@ -108,6 +111,8 @@ export function Player({
   /** Null when comments are off or SoundCloud isn't connected. */
   soundcloudComments: { popups: boolean; canPost: boolean } | null;
   onSeek: (time: number) => void;
+  sleepTimer: SleepTimer;
+  onSleepTimerChange: (timer: SleepTimer) => void;
   limiterActive: boolean;
   equalizer: EqualizerSettings;
   levelsOpen: boolean;
@@ -502,6 +507,7 @@ export function Player({
           </IconButton>
         </div>
         <div className="no-drag ml-auto flex items-center gap-2">
+          <SleepTimerButton timer={sleepTimer} onChange={onSleepTimerChange} />
           {(volumeBoostEnabled || limiterActive) && (
             <span
               className={`rounded-[4px] border px-1 py-0.5 font-mono text-[10px] font-semibold leading-none transition-colors duration-100 @max-lg:hidden ${

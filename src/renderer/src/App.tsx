@@ -44,6 +44,7 @@ import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
 import { QueueSidebar } from "@/features/player/QueueSidebar";
+import type { SleepTimer } from "@/features/player/SleepTimerButton";
 import { usePlaybackQueue } from "@/features/player/use-playback-queue";
 import {
   buildQueueFromTracks,
@@ -516,6 +517,11 @@ export function App() {
   });
   const [soundcloudActionPending, setSoundCloudActionPending] = useState(false);
   const [soundcloudCollections, setSoundCloudCollections] = useState<SoundCloudCollection[]>([]);
+  const [sleepTimer, setSleepTimer] = useState<SleepTimer>(null);
+  const sleepTimerRef = useRef<SleepTimer>(null);
+  useEffect(() => {
+    sleepTimerRef.current = sleepTimer;
+  }, [sleepTimer]);
   const [soundcloudPlaylistDialog, setSoundCloudPlaylistDialog] = useState<
     | { mode: "create"; tracks: LibraryTrack[] }
     | { mode: "rename"; collection: SoundCloudCollection }
@@ -2884,6 +2890,11 @@ export function App() {
 
   const playNextTrackOnEnd = useCallback(() => {
     if (!activeTrackId) return false;
+    if (sleepTimerRef.current?.kind === "end-of-track") {
+      setSleepTimer(null);
+      showSimpleActionToast("Sleep timer stopped playback.", "info");
+      return false;
+    }
 
     if (repeatMode === "one") {
       const wavesurfer = wavesurferRef.current;
@@ -3299,6 +3310,19 @@ export function App() {
     setSelectedTrackIds,
     setScrollToTrackId,
   });
+  useEffect(() => {
+    if (sleepTimer?.kind !== "minutes") return;
+    const timeout = window.setTimeout(
+      () => {
+        wavesurferRef.current?.pause();
+        setSleepTimer(null);
+        showSimpleActionToast("Sleep timer stopped playback.", "info");
+      },
+      Math.max(0, sleepTimer.endsAt - Date.now()),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [sleepTimer]);
+
   const queueTracks = useCallback(
     (tracksToQueue: LibraryTrack[], position: "next" | "later") =>
       playbackQueue.addTracks(
@@ -3577,6 +3601,8 @@ export function App() {
                       : null
                   }
                   onSeek={seekToLyric}
+                  sleepTimer={sleepTimer}
+                  onSleepTimerChange={setSleepTimer}
                   playbackError={playbackError}
                   preparingPlayback={preparingPlayback}
                   onRetryPlayback={() => {
