@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   LibraryTrack,
@@ -510,18 +510,6 @@ function isConfigured(): boolean {
   return hasIntegrationsBroker() || Boolean(clientId && clientSecret);
 }
 
-async function readJson<T>(path: string, fallback: T): Promise<T> {
-  try {
-    return JSON.parse(await readFile(path, "utf8")) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-async function writeJson(path: string, value: unknown): Promise<void> {
-  await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-}
-
 function encryptSecret(value: string): string {
   if (!safeStorage?.isEncryptionAvailable()) return value;
   return safeStorage.encryptString(value).toString("base64");
@@ -532,16 +520,40 @@ function decryptSecret(value: string, encrypted: boolean): string {
   return safeStorage.decryptString(Buffer.from(value, "base64"));
 }
 
+// The session lives in memory and is written through to disk. Many SoundCloud requests run at
+// once; re-reading the file on each one could catch a half-written file, parse it as empty and
+// then save that empty state over the user's session.
+let storedState: SoundCloudStoredState | null = null;
+let storedStateLoad: Promise<SoundCloudStoredState> | null = null;
+let stateWrites: Promise<void> = Promise.resolve();
+
 async function readStoredState(): Promise<SoundCloudStoredState> {
-  return readJson<SoundCloudStoredState>(statePath(), {});
+  if (storedState) return storedState;
+  storedStateLoad ??= readFile(statePath(), "utf8")
+    .then((raw) => JSON.parse(raw) as SoundCloudStoredState)
+    .catch(() => ({}));
+  const loaded = await storedStateLoad;
+  storedState ??= loaded;
+  return storedState;
 }
 
 async function writeStoredState(state: SoundCloudStoredState): Promise<void> {
-  await writeJson(statePath(), state);
+  storedState = state;
+  const contents = `${JSON.stringify(state, null, 2)}\n`;
+  // Serialise writes and replace the file atomically so readers never see a partial file.
+  stateWrites = stateWrites
+    .catch(() => undefined)
+    .then(async () => {
+      const temporary = `${statePath()}.${process.pid}.tmp`;
+      await writeFile(temporary, contents, { encoding: "utf8", mode: 0o600 });
+      await rename(temporary, statePath());
+    });
+  await stateWrites;
 }
 
 async function setLastError(message?: string): Promise<void> {
   const state = await readStoredState();
+  if (state.lastError === message) return;
   await writeStoredState({ ...state, lastError: message });
 }
 
@@ -672,16 +684,28 @@ async function exchangeToken(params: Record<string, string>): Promise<SoundCloud
   };
 }
 
+// Concurrent requests that find the token expired share one refresh.
+let tokenRefresh: Promise<string | null> | null = null;
+
 async function getAccessToken(): Promise<string | null> {
   const state = await readStoredState();
   const session = state.session;
   if (!session) return null;
-
-  try {
-    if (Date.now() < session.expiresAt - 60_000) {
+  if (Date.now() < session.expiresAt - 60_000) {
+    try {
       return decryptSecret(session.accessToken, session.encrypted);
+    } catch {
+      return null;
     }
+  }
+  tokenRefresh ??= refreshAccessToken(session).finally(() => {
+    tokenRefresh = null;
+  });
+  return tokenRefresh;
+}
 
+async function refreshAccessToken(session: SoundCloudSession): Promise<string | null> {
+  try {
     const refreshToken = session.refreshToken
       ? decryptSecret(session.refreshToken, session.encrypted)
       : null;
@@ -693,7 +717,7 @@ async function getAccessToken(): Promise<string | null> {
     });
     if (!refreshed) return null;
     await writeStoredState({
-      ...state,
+      ...(await readStoredState()),
       session: {
         ...session,
         ...refreshed,
@@ -705,7 +729,7 @@ async function getAccessToken(): Promise<string | null> {
     return decryptSecret(refreshed.accessToken, refreshed.encrypted);
   } catch {
     await writeStoredState({
-      ...state,
+      ...(await readStoredState()),
       session: undefined,
       lastError: "SoundCloud session expired.",
     });
@@ -971,6 +995,8 @@ export async function completeSoundCloudAuth(
 }
 
 export async function disconnectSoundCloud(): Promise<SoundCloudState> {
+  storedState = {};
+  await stateWrites.catch(() => undefined);
   await rm(statePath(), { force: true });
   return getSoundCloudState();
 }

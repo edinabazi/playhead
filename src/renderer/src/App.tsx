@@ -213,6 +213,7 @@ function getSourceScrollKey(source: LibraryState["selectedSource"]): string {
 
 function isSoundCloudPlaybackStopError(message: string): boolean {
   return (
+    message.includes("SoundCloud is not connected") ||
     message.includes("SoundCloud temporarily challenged stream requests") ||
     message.includes("SoundCloud only returned a 30 second preview") ||
     message.includes("This SoundCloud track is not available for full playback") ||
@@ -2833,8 +2834,14 @@ export function App() {
       if (activeTrackIdRef.current !== seed.id || isPlayingRef.current) return;
       const queue = libraryRef.current.settings.session.queue;
       const queued = new Set([...queue.items, ...queue.shuffledItems].map((item) => item.trackId));
+      // SoundCloud's related list can repeat tracks; only queue each one once.
+      const seen = new Set([...queued, seed.id]);
       const fresh = related
-        .filter((track) => !queued.has(track.id) && track.id !== seed.id)
+        .filter((track) => {
+          if (seen.has(track.id) || track.soundcloud?.streamable === false) return false;
+          seen.add(track.id);
+          return true;
+        })
         .slice(0, stationBatchSize);
       if (fresh.length === 0) {
         showSimpleActionToast("No similar SoundCloud tracks to continue with.", "info");
