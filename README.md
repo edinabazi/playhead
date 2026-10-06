@@ -196,6 +196,9 @@ Start the app in development:
 npm run dev
 ```
 
+The renderer hot-reloads. Changes to the main process or preload script rebuild and restart
+the app, which stops playback.
+
 Run checks:
 
 ```bash
