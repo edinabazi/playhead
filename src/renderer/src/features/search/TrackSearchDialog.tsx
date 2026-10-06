@@ -85,6 +85,7 @@ export function TrackSearchDialog({
   libraryMode,
   scope = null,
   soundcloudSearchEnabled = false,
+  onQueueTracks,
   onSelectTrack,
   onSelectArtist,
   onSelectAlbum,
@@ -108,6 +109,7 @@ export function TrackSearchDialog({
   scope?: { title: string; tracks: LibraryTrack[] } | null;
   /** Adds a SoundCloud mode to the Tab cycle. */
   soundcloudSearchEnabled?: boolean;
+  onQueueTracks?: (tracks: LibraryTrack[], position: "next" | "later") => void;
   onSelectTrack: (track: LibraryTrack, context: SearchSelectContext) => void;
   onSelectArtist: (artist: LibraryArtist) => void;
   onSelectAlbum: (album: LibraryAlbum) => void;
@@ -537,6 +539,7 @@ export function TrackSearchDialog({
           onOpenChange={(open) => {
             if (!open) setContextMenu(null);
           }}
+          onQueueTracks={onQueueTracks}
           onAddToPlaylist={onAddToPlaylist}
           onAddTracksToPlaylist={(tracksToAdd, playlist) =>
             onAddTracksToPlaylist(

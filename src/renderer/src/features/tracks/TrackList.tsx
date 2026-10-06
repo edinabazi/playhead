@@ -57,6 +57,7 @@ export function TrackList({
   onAddTracksToPlaylist,
   onCreatePlaylist,
   onCreateSoundCloudPlaylist,
+  onQueueTracks,
   onAddTracksToTag,
   onCreateTag,
   onToggleFavorite,
@@ -96,6 +97,7 @@ export function TrackList({
   onAddTracksToPlaylist: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (tracks: LibraryTrack[]) => void;
   onCreateSoundCloudPlaylist?: (tracks: LibraryTrack[]) => void;
+  onQueueTracks?: (tracks: LibraryTrack[], position: "next" | "later") => void;
   onAddTracksToTag: (tracks: LibraryTrack[], tag: LibraryTag) => void;
   onCreateTag: (tracks: LibraryTrack[]) => void;
   onToggleFavorite: (track: LibraryTrack) => void;
@@ -306,6 +308,7 @@ export function TrackList({
                         onAddTracksToPlaylist={onAddTracksToPlaylist}
                         onCreatePlaylist={onCreatePlaylist}
                         onCreateSoundCloudPlaylist={onCreateSoundCloudPlaylist}
+                        onQueueTracks={onQueueTracks}
                         onAddTracksToTag={onAddTracksToTag}
                         onCreateTag={onCreateTag}
                         onRemoveFromPlaylist={onRemoveFromPlaylist}

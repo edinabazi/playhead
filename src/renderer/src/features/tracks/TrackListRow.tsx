@@ -48,6 +48,7 @@ type TrackListRowProps = {
   onAddTracksToPlaylist: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (tracks: LibraryTrack[]) => void;
   onCreateSoundCloudPlaylist?: (tracks: LibraryTrack[]) => void;
+  onQueueTracks?: (tracks: LibraryTrack[], position: "next" | "later") => void;
   onAddTracksToTag: (tracks: LibraryTrack[], tag: LibraryTag) => void;
   onCreateTag: (tracks: LibraryTrack[]) => void;
   onRemoveFromPlaylist: (trackIds: string[]) => void;
@@ -93,6 +94,7 @@ export function TrackListRow({
   onAddTracksToPlaylist,
   onCreatePlaylist,
   onCreateSoundCloudPlaylist,
+  onQueueTracks,
   onAddTracksToTag,
   onCreateTag,
   onRemoveFromPlaylist,
@@ -191,6 +193,7 @@ export function TrackListRow({
           onAddTracksToPlaylist={onAddTracksToPlaylist}
           onCreatePlaylist={onCreatePlaylist}
           onCreateSoundCloudPlaylist={onCreateSoundCloudPlaylist}
+          onQueueTracks={onQueueTracks}
           onAddTracksToTag={onAddTracksToTag}
           onCreateTag={onCreateTag}
           onRemoveFromPlaylist={onRemoveFromPlaylist}

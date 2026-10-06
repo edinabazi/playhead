@@ -28,6 +28,7 @@ export function TrackRowMenu({
   onAddTracksToPlaylist,
   onCreatePlaylist,
   onCreateSoundCloudPlaylist,
+  onQueueTracks,
   onAddTracksToTag,
   onCreateTag,
   onRemoveFromPlaylist,
@@ -54,6 +55,8 @@ export function TrackRowMenu({
   onAddTracksToPlaylist?: (tracks: LibraryTrack[], playlist: LibraryPlaylist) => void;
   onCreatePlaylist: (tracks: LibraryTrack[]) => void;
   onCreateSoundCloudPlaylist?: (tracks: LibraryTrack[]) => void;
+  /** Adds tracks right after the playing one ("next") or at the end of the queue ("later"). */
+  onQueueTracks?: (tracks: LibraryTrack[], position: "next" | "later") => void;
   onAddTracksToTag: (tracks: LibraryTrack[], tag: LibraryTag) => void;
   onCreateTag: (tracks: LibraryTrack[]) => void;
   onRemoveFromPlaylist: (trackIds: string[]) => void;
@@ -91,7 +94,8 @@ export function TrackRowMenu({
   const showNewSoundCloudPlaylist =
     Boolean(onCreateSoundCloudPlaylist) && tracksForAction.every((item) => item.soundcloud);
   // Menu items are tracked by index for hover and keyboard focus, so each needs its own.
-  const removeTagIndex = 2 + (canRemove ? 1 : 0);
+  const queueOffset = onQueueTracks ? 2 : 0;
+  const removeTagIndex = queueOffset + 2 + (canRemove ? 1 : 0);
   const trailingIndex = removeTagIndex + (selectedTag ? 1 : 0);
   const newSoundCloudPlaylistIndex = trailingIndex;
   const soundCloudOpenIndex = trailingIndex + (showNewSoundCloudPlaylist ? 1 : 0);
@@ -149,6 +153,29 @@ export function TrackRowMenu({
             onClick={(event) => event.stopPropagation()}
           >
             <Dropdown className="w-56 bg-[rgba(10,10,10,0.96)]">
+              {onQueueTracks && (
+                <>
+                  <MenuItem
+                    icon={icons["list-start"]}
+                    label="Play Next"
+                    index={0}
+                    onSelect={() => {
+                      onQueueTracks(tracksForAction, "next");
+                      onOpenChange(false, null);
+                    }}
+                  />
+                  <MenuItem
+                    icon={icons["list-end"]}
+                    label="Play Later"
+                    index={1}
+                    onSelect={() => {
+                      onQueueTracks(tracksForAction, "later");
+                      onOpenChange(false, null);
+                    }}
+                  />
+                  <DropdownSeparator />
+                </>
+              )}
               <div
                 className="relative"
                 ref={playlistTriggerRef}
@@ -163,7 +190,7 @@ export function TrackRowMenu({
                 <MenuItem
                   icon={ListPlusIcon}
                   label="Add to Playlist"
-                  index={0}
+                  index={queueOffset}
                   className="pr-8"
                   onSelect={() => setPlaylistOpen((value) => !value)}
                 />
@@ -230,7 +257,7 @@ export function TrackRowMenu({
                 <MenuItem
                   icon={TagIcon}
                   label="Add Tag"
-                  index={1}
+                  index={queueOffset + 1}
                   className="pr-8"
                   onSelect={() => setTagOpen((value) => !value)}
                 />
@@ -285,7 +312,7 @@ export function TrackRowMenu({
                 <MenuItem
                   icon={icons.x}
                   label="Remove from Playlist"
-                  index={2}
+                  index={queueOffset + 2}
                   onSelect={() => {
                     onRemoveFromPlaylist(tracksForAction.map((item) => item.id));
                     onOpenChange(false, null);

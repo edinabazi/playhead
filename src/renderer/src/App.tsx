@@ -3299,6 +3299,15 @@ export function App() {
     setSelectedTrackIds,
     setScrollToTrackId,
   });
+  const queueTracks = useCallback(
+    (tracksToQueue: LibraryTrack[], position: "next" | "later") =>
+      playbackQueue.addTracks(
+        tracksToQueue.map((track) => track.id),
+        position === "next" ? playbackQueue.activeItemId : null,
+        "after",
+      ),
+    [playbackQueue],
+  );
 
   usePlayerKeyboardShortcuts({
     playbackSettings: library.settings.playback,
@@ -3834,6 +3843,7 @@ export function App() {
                       }}
                       onToggleFavorite={(track) => toggleFavoriteTrack(track.id)}
                       onRemoveFromPlaylist={requestRemoveTracksFromListedPlaylist}
+                      onQueueTracks={queueTracks}
                       onCreateSoundCloudPlaylist={
                         soundcloudState.connected
                           ? (tracksToAdd) =>
@@ -3892,6 +3902,7 @@ export function App() {
               tags={library.tags || []}
               libraryMode={library.settings.library.mode}
               scope={searchScope}
+              onQueueTracks={queueTracks}
               soundcloudSearchEnabled={
                 soundcloudState.connected && library.settings.soundcloud.enabled
               }
