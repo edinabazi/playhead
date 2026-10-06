@@ -43,6 +43,7 @@ import {
   isSupportedPlaylistExportFormat,
   parsePlaylistImportFile,
 } from "./playlist-export";
+import { aiffToWav, isAiffPath } from "../media/aiff";
 
 const { app, dialog, ipcMain, protocol, shell } = electron;
 function encodeMediaPath(filePath: string): string {
@@ -180,7 +181,9 @@ export function registerLibraryIpc(): void {
   });
 
   ipcMain.handle("library:read-audio-file", async (_event, filePath: string) => {
-    const bytes = await readFile(filePath);
+    const file = await readFile(filePath);
+    // Web Audio cannot decode AIFF; hand the renderer the equivalent WAV instead.
+    const bytes = isAiffPath(filePath) ? await aiffToWav(file) : file;
     return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   });
 

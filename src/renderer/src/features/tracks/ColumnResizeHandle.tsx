@@ -38,12 +38,13 @@ export function ColumnResizeHandle({
   };
   useEffect(() => {
     if (!resizing) return;
-    const previousCursor = document.body.style.cursor;
+    // The global `* { cursor: default !important }` rule wins over inline body styles,
+    // so keep the resize cursor everywhere while dragging via a root class.
     const previousSelect = document.body.style.userSelect;
-    document.body.style.cursor = "col-resize";
+    document.documentElement.classList.add("col-resizing");
     document.body.style.userSelect = "none";
     return () => {
-      document.body.style.cursor = previousCursor;
+      document.documentElement.classList.remove("col-resizing");
       document.body.style.userSelect = previousSelect;
     };
   }, [resizing]);

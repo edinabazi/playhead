@@ -5,7 +5,6 @@ export const trackColumnIds = [
   "albumArtist",
   "genre",
   "disc",
-  "trackNumber",
   "year",
   "composer",
   "bpm",

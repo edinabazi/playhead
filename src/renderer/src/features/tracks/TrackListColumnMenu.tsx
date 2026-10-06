@@ -20,7 +20,6 @@ export const columnIcons: Record<TrackColumnId, IconName> = {
   albumArtist: "users",
   genre: "tag",
   disc: "disc-3",
-  trackNumber: "hash",
   year: "calendar-days",
   composer: "pencil",
   bpm: "gauge",

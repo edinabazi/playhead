@@ -2,6 +2,7 @@ import { open, type FileHandle } from "node:fs/promises";
 import { extname } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { playbackFailure } from "../../shared/playback";
+import { isAiffPath, parseAiff, readWav, wavSize, type AiffLayout } from "./aiff";
 
 const mimeTypes: Record<string, string> = {
   ".aac": "audio/aac",
@@ -81,29 +82,45 @@ export async function fileResponse(filePath: string, request: Request): Promise<
       await close();
       return new Response(null, { status: 499 });
     }
-    const range =
-      request.method === "HEAD" ? null : byteRange(request.headers.get("range"), info.size);
+    const handle = file;
+    const readFile = async (position: number, length: number) => {
+      const buffer = Buffer.allocUnsafe(length);
+      let filled = 0;
+      while (filled < length) {
+        const { bytesRead } = await handle.read(buffer, filled, length - filled, position + filled);
+        if (!bytesRead) break;
+        filled += bytesRead;
+      }
+      return buffer.subarray(0, filled);
+    };
+    // Chromium cannot decode AIFF, so serve it as an equivalent WAV.
+    let aiff: AiffLayout | null = null;
+    if (isAiffPath(filePath))
+      aiff = await retryFileOperation(() => parseAiff(readFile, info.size), request.signal);
+    const size = aiff ? wavSize(aiff) : info.size;
+    const range = request.method === "HEAD" ? null : byteRange(request.headers.get("range"), size);
     if (range === "invalid") {
       await close();
       return new Response(null, {
         status: 416,
-        headers: { ...baseHeaders, "Content-Range": `bytes */${info.size}` },
+        headers: { ...baseHeaders, "Content-Range": `bytes */${size}` },
       });
     }
     const start = range?.start ?? 0;
-    const end = range?.end ?? info.size - 1;
+    const end = range?.end ?? size - 1;
     const headers = {
       ...baseHeaders,
-      "Content-Type": mimeTypes[extname(filePath).toLowerCase()] || "application/octet-stream",
+      "Content-Type": aiff
+        ? "audio/wav"
+        : mimeTypes[extname(filePath).toLowerCase()] || "application/octet-stream",
       "Content-Length": String(end - start + 1),
-      ...(range ? { "Content-Range": `bytes ${start}-${end}/${info.size}` } : {}),
+      ...(range ? { "Content-Range": `bytes ${start}-${end}/${size}` } : {}),
     };
-    if (request.method === "HEAD" || info.size === 0) {
+    if (request.method === "HEAD" || size === 0) {
       await close();
       return new Response(null, { headers });
     }
     let position = start;
-    const handle = file;
     request.signal.addEventListener("abort", onAbort, { once: true });
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -116,10 +133,12 @@ export async function fileResponse(filePath: string, request: Request): Promise<
           return;
         }
         try {
-          const buffer = Buffer.allocUnsafe(Math.min(64 * 1024, end - position + 1));
-          const { bytesRead } = await retryFileOperation(async () => {
-            const result = await handle.read(buffer, 0, buffer.length, position);
-            if (!result.bytesRead)
+          const length = Math.min(64 * 1024, end - position + 1);
+          const chunk = await retryFileOperation(async () => {
+            const result = aiff
+              ? await readWav(aiff, readFile, position, length)
+              : await readFile(position, length);
+            if (!result.length)
               throw Object.assign(
                 new Error("Audio stream ended before the requested range was read"),
                 { code: "EIO" },
@@ -127,8 +146,8 @@ export async function fileResponse(filePath: string, request: Request): Promise<
             return result;
           }, request.signal);
           if (closed) return;
-          position += bytesRead;
-          controller.enqueue(new Uint8Array(buffer.buffer, buffer.byteOffset, bytesRead));
+          position += chunk.length;
+          controller.enqueue(new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.length));
           if (position > end) {
             controller.close();
             await close();

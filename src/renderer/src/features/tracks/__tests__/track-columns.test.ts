@@ -46,11 +46,11 @@ describe("track list sorting", () => {
 
   it("sorts numeric metadata as numbers and supports old numeric disc metadata", () => {
     const tracks = [
-      track("ten", { trackNumber: 10, diskNumber: 10 }),
-      track("two", { trackNumber: 2, diskNumber: 2 }),
+      track("ten", { year: 2010, diskNumber: 10 }),
+      track("two", { year: 2002, diskNumber: 2 }),
       track("missing"),
     ];
-    expect(ids(sortTrackList(tracks, { column: "trackNumber", direction: "asc" }))).toEqual([
+    expect(ids(sortTrackList(tracks, { column: "year", direction: "asc" }))).toEqual([
       "two",
       "ten",
       "missing",

@@ -35,7 +35,7 @@ export function SidebarShell({
   const settingsTooltip = `Open settings (${modifierLabel} ,)`;
 
   return (
-    <aside className="app-drag relative flex size-full flex-col overflow-hidden rounded-[41px] bg-[rgba(0,0,0,0.2)] px-[18px] pb-[18px] pt-[54px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <aside className="app-drag relative flex size-full flex-col overflow-hidden app-panel-radius bg-[rgba(0,0,0,0.2)] px-[18px] pb-[18px] pt-[54px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <WindowControls />
       {hasReadyUpdate && (
         <Tooltip

@@ -67,6 +67,12 @@
   cursor: ew-resize !important;
 }
 
+.cursor-col-resize,
+.cursor-col-resize *,
+.col-resizing * {
+  cursor: col-resize !important;
+}
+
 .cursor-text,
 .cursor-text * {
   cursor: text !important;
@@ -115,9 +121,14 @@ canvas.app-drag {
 }
 
 .app-window {
-  border-radius: 49px;
+  border-radius: var(--window-radius, 49px);
   isolation: isolate;
   background: transparent;
+}
+
+/* Panels inset from the window edge follow the window's corner radius. */
+.app-panel-radius {
+  border-radius: max(calc(var(--window-radius, 49px) - 8px), 8px);
 }
 
 .app-shell {
@@ -193,7 +204,7 @@ canvas.app-drag {
 }
 
 .app-modal-overlay {
-  border-radius: 49px;
+  border-radius: var(--window-radius, 49px);
   overflow: hidden;
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);

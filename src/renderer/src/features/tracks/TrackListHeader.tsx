@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, MotionConfigContext, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { DragRegionBlocker } from "@/components/ui/drag-region-blocker";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
 import type {
@@ -192,6 +193,7 @@ export function TrackListHeader({
           </Button>
         </Tooltip>
       </span>
+      {menu && <DragRegionBlocker />}
       <AnimatePresence>
         {menu && (
           <TrackListColumnMenu

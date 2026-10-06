@@ -16,7 +16,6 @@ export const trackColumns: Record<
   albumArtist: { label: "Album artist", width: 160 },
   genre: { label: "Genre", width: 90 },
   disc: { label: "Disc", width: 80 },
-  trackNumber: { label: "Track no.", width: 90, numeric: true },
   year: { label: "Year", width: 80, numeric: true },
   composer: { label: "Composer", width: 160 },
   bpm: { label: "BPM", width: 80, numeric: true },

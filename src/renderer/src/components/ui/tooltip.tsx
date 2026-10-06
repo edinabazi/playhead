@@ -3,6 +3,7 @@ import {
   isValidElement,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactElement,
@@ -13,6 +14,16 @@ import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 type TooltipSide = "top" | "right" | "bottom" | "left";
+
+// Keep tooltips clear of the rounded window edge so they are never clipped.
+const VIEWPORT_MARGIN = 16;
+
+export function getTooltipNudge(rect: { left: number; right: number }, viewportWidth: number) {
+  if (rect.left < VIEWPORT_MARGIN) return VIEWPORT_MARGIN - rect.left;
+  if (rect.right > viewportWidth - VIEWPORT_MARGIN)
+    return viewportWidth - VIEWPORT_MARGIN - rect.right;
+  return 0;
+}
 type TooltipTriggerProps = {
   "aria-describedby"?: string;
   onBlur?: (event: React.FocusEvent) => void;
@@ -72,7 +83,9 @@ export function Tooltip({
   const tooltipId = useId();
   const delayRef = useRef<number | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
+  const tooltipRef = useRef<HTMLSpanElement | null>(null);
   const [open, setOpen] = useState(false);
+  const [nudge, setNudge] = useState(0);
   const [position, setPosition] = useState<ReturnType<typeof getTooltipPosition> | null>(null);
 
   const clearDelay = () => {
@@ -112,6 +125,17 @@ export function Tooltip({
     };
   }, [open, side, sideOffset]);
 
+  useLayoutEffect(() => {
+    if (!open || !position) return;
+    const tooltip = tooltipRef.current;
+    if (!tooltip) return;
+    // Measure the unshifted box: offsetLeft/offsetWidth ignore the entry transform.
+    const width = tooltip.offsetWidth;
+    const anchor = position.x === "-50%" ? -width / 2 : position.x === "-100%" ? -width : 0;
+    const left = position.left + anchor;
+    setNudge(getTooltipNudge({ left, right: left + width }, window.innerWidth));
+  }, [open, position, content]);
+
   if (!isValidElement(children)) return null;
 
   const child = children as ReactElement<TooltipTriggerProps> & { ref?: React.Ref<HTMLElement> };
@@ -150,6 +174,7 @@ export function Tooltip({
         <AnimatePresence>
           {open && position && (
             <motion.span
+              ref={tooltipRef}
               id={tooltipId}
               role="tooltip"
               className={cn(
@@ -157,7 +182,7 @@ export function Tooltip({
                 className,
               )}
               style={{
-                left: position.left,
+                left: position.left + nudge,
                 top: position.top,
                 translate: `${position.x} ${position.y}`,
               }}

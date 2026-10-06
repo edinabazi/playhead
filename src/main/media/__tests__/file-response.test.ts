@@ -65,9 +65,9 @@ it("retries a transient mount error, completes short reads and closes its handle
   const handle = {
     stat: async () => ({ size: 10, isFile: () => true }),
     close,
-    read: vi.fn(async (buffer: Buffer, _offset: number, length: number, position: number) => {
+    read: vi.fn(async (buffer: Buffer, offset: number, length: number, position: number) => {
       const chunk = Buffer.from("0123456789").subarray(position, position + Math.min(3, length));
-      chunk.copy(buffer);
+      chunk.copy(buffer, offset);
       return { bytesRead: chunk.length };
     }),
   };
