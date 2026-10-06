@@ -7,6 +7,7 @@ import {
   type ScannedFolder,
 } from "../../../../shared/library";
 import { isPathInFolder } from "./folder-tree";
+import { buildSmartPlaylistContext, matchesSmartPlaylist } from "../../../../shared/smart-playlist";
 
 const playlistName = "New Playlist";
 const tagName = "New Tag";
@@ -39,7 +40,8 @@ export type LibraryCollections = {
 export type LibrarySourceParts = Pick<
   LibraryState,
   "favoriteTrackIds" | "folders" | "playlists" | "selectedSource" | "tags" | "tracks"
->;
+> &
+  Pick<Partial<LibraryState>, "smartPlaylists">;
 
 export function getLibraryKey(value: string): string {
   return value.trim().toLowerCase() || "unknown";
@@ -285,6 +287,15 @@ export function getSourceTracksFromParts(state: LibrarySourceParts): LibraryTrac
   }
 
   if (source.type === "library-artists" || source.type === "library-albums") return [];
+
+  if (source.type === "smart-playlist") {
+    const playlist = state.smartPlaylists?.find((item) => item.id === source.id);
+    if (!playlist) return [];
+    const context = buildSmartPlaylistContext(state.favoriteTrackIds, state.tags);
+    return sortTracksByTitle(
+      Object.values(state.tracks).filter((track) => matchesSmartPlaylist(track, playlist, context)),
+    );
+  }
 
   if (source.type === "loved") {
     return (state.favoriteTrackIds || [])

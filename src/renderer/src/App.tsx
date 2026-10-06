@@ -64,6 +64,11 @@ import {
   type LastfmPlaybackSession,
 } from "@/features/player/lastfm-scrobble";
 import { CreatePlaylistDialog } from "@/features/playlists/CreatePlaylistDialog";
+import {
+  SmartPlaylistDialog,
+  type SmartPlaylistDraft,
+} from "@/features/playlists/SmartPlaylistDialog";
+import type { SmartPlaylist } from "../../shared/smart-playlist";
 import { setMediaActionHandler, updateMediaPosition } from "@/features/player/media-session";
 import { PlaybackClock } from "@/features/player/playback-clock";
 import { limitWaveformProgressRendering } from "@/features/waveform/waveform";
@@ -207,6 +212,9 @@ function getQueueSourceTitle(library: LibraryState): string {
     return (library.tags || []).find((tag) => tag.id === source.id)?.name || "Tag";
   }
   if (source.type === "loved") return "Loved";
+  if (source.type === "smart-playlist") {
+    return library.smartPlaylists?.find((item) => item.id === source.id)?.name || "Smart Playlist";
+  }
   return "Queue";
 }
 
@@ -523,6 +531,11 @@ export function App() {
   const [sleepTimer, setSleepTimer] = useState<SleepTimer>(null);
   const [playbackLoop, setPlaybackLoop] = useState<PlaybackLoop | null>(null);
   const [markerPendingRename, setMarkerPendingRename] = useState<TrackMarker | null>(null);
+  const [smartPlaylistEditor, setSmartPlaylistEditor] = useState<{
+    playlist: SmartPlaylist | null;
+  } | null>(null);
+  const [smartPlaylistPendingDeletion, setSmartPlaylistPendingDeletion] =
+    useState<SmartPlaylist | null>(null);
   const playbackLoopRef = useRef<PlaybackLoop | null>(null);
   useEffect(() => {
     playbackLoopRef.current = playbackLoop;
@@ -572,6 +585,7 @@ export function App() {
       folders: library.folders,
       playlists: library.playlists,
       selectedSource: library.selectedSource,
+      smartPlaylists: library.smartPlaylists,
       tags: library.tags,
       tracks: library.tracks,
     });
@@ -580,6 +594,7 @@ export function App() {
     library.folders,
     library.playlists,
     library.selectedSource,
+    library.smartPlaylists,
     library.tags,
     library.tracks,
     soundcloudTracksByCollection,
@@ -648,6 +663,11 @@ export function App() {
       return library.folders.find((folder) => folder.id === source.id)?.name || "Folder";
     }
     if (source.type === "loved") return "Loved";
+    if (source.type === "smart-playlist") {
+      return (
+        library.smartPlaylists?.find((item) => item.id === source.id)?.name || "Smart Playlist"
+      );
+    }
     if (source.type === "soundcloud") {
       return (
         soundcloudCollections.find((collection) => collection.id === source.id)?.title ||
@@ -662,6 +682,7 @@ export function App() {
     library.folders,
     library.playlists,
     library.selectedSource,
+    library.smartPlaylists,
     library.tags,
     libraryAlbums,
     libraryArtists,
@@ -3394,6 +3415,46 @@ export function App() {
     showSimpleActionToast(`Marker added at ${formatTime(time)}`);
   }, [activeTrack, duration, playbackClock, updateTrackMarkers]);
 
+  const saveSmartPlaylist = useCallback(
+    (existing: SmartPlaylist | null, draft: SmartPlaylistDraft) => {
+      const current = libraryRef.current;
+      const now = new Date().toISOString();
+      const playlist: SmartPlaylist = existing
+        ? { ...existing, ...draft, updatedAt: now }
+        : { id: crypto.randomUUID(), ...draft, createdAt: now, updatedAt: now };
+      const others = (current.smartPlaylists || []).filter((item) => item.id !== playlist.id);
+      void persistLibrary({
+        ...current,
+        smartPlaylists: existing
+          ? (current.smartPlaylists || []).map((item) =>
+              item.id === playlist.id ? playlist : item,
+            )
+          : [...others, playlist],
+        selectedSource: { type: "smart-playlist", id: playlist.id },
+      });
+    },
+    [persistLibrary],
+  );
+
+  const deleteSmartPlaylist = useCallback(
+    (playlist: SmartPlaylist) => {
+      const current = libraryRef.current;
+      const wasSelected =
+        current.selectedSource?.type === "smart-playlist" &&
+        current.selectedSource.id === playlist.id;
+      void persistLibrary({
+        ...current,
+        smartPlaylists: (current.smartPlaylists || []).filter((item) => item.id !== playlist.id),
+        selectedSource: wasSelected
+          ? current.folders[0]
+            ? { type: "folder", id: current.folders[0].id }
+            : null
+          : current.selectedSource,
+      });
+    },
+    [persistLibrary],
+  );
+
   const queueTracks = useCallback(
     (tracksToQueue: LibraryTrack[], position: "next" | "later") =>
       playbackQueue.addTracks(
@@ -3613,6 +3674,10 @@ export function App() {
                   void addTracksToPlaylist(trackIds, playlist)
                 }
                 onDropTrackToTag={(trackIds, tag) => void addTracksToTag(trackIds, tag)}
+                smartPlaylists={library.smartPlaylists || []}
+                onCreateSmartPlaylist={() => setSmartPlaylistEditor({ playlist: null })}
+                onEditSmartPlaylist={(playlist) => setSmartPlaylistEditor({ playlist })}
+                onDeleteSmartPlaylist={setSmartPlaylistPendingDeletion}
                 onCreateSoundCloudPlaylist={() =>
                   setSoundCloudPlaylistDialog({ mode: "create", tracks: [] })
                 }
@@ -3924,6 +3989,7 @@ export function App() {
                       canReorderTracks={
                         selectedSource?.type !== "library-tracks" &&
                         selectedSource?.type !== "tag" &&
+                        selectedSource?.type !== "smart-playlist" &&
                         (selectedSource?.type !== "soundcloud" ||
                           Boolean(selectedSoundCloudPlaylistId))
                       }
@@ -4120,6 +4186,33 @@ export function App() {
                 void removeFolderFromPlayhead(folderId);
               }}
               onClose={() => setFolderPendingRemoval(null)}
+            />
+          )}
+          {smartPlaylistEditor && (
+            <SmartPlaylistDialog
+              key="smart-playlist"
+              initial={smartPlaylistEditor.playlist ?? undefined}
+              tracks={Object.values(library.tracks)}
+              favoriteTrackIds={library.favoriteTrackIds}
+              tags={library.tags || []}
+              onSave={(draft) => {
+                saveSmartPlaylist(smartPlaylistEditor.playlist, draft);
+                setSmartPlaylistEditor(null);
+              }}
+              onClose={() => setSmartPlaylistEditor(null)}
+            />
+          )}
+          {smartPlaylistPendingDeletion && (
+            <DeletePlaylistDialog
+              key={`delete-smart-playlist-${smartPlaylistPendingDeletion.id}`}
+              name={smartPlaylistPendingDeletion.name}
+              description="This removes the smart playlist. Your tracks stay in your library."
+              onConfirm={() => {
+                const playlist = smartPlaylistPendingDeletion;
+                setSmartPlaylistPendingDeletion(null);
+                deleteSmartPlaylist(playlist);
+              }}
+              onClose={() => setSmartPlaylistPendingDeletion(null)}
             />
           )}
           {markerPendingRename && activeTrack && (

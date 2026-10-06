@@ -2,6 +2,7 @@ import type { LibraryScanProgress, LibraryScanRequest, LibraryScanResult } from 
 import type { PlaybackCopyResult } from "./playback";
 import type { TrackLyrics } from "./lyrics";
 import { defaultTrackListSettings, type TrackListSettings } from "./track-list";
+import type { SmartPlaylist } from "./smart-playlist";
 
 export const libraryTrackMetadataVersion = 2;
 
@@ -17,7 +18,8 @@ export type SourceType =
   | "library-artist"
   | "library-albums"
   | "library-album"
-  | "library-tracks";
+  | "library-tracks"
+  | "smart-playlist";
 
 export type TrackSource = "local" | "soundcloud";
 
@@ -218,6 +220,7 @@ export type LibraryState = {
   favoriteTrackIds: string[];
   /** User markers per track id, sorted by time. Kept apart from scanned track data. */
   trackMarkers?: Record<string, TrackMarker[]>;
+  smartPlaylists?: SmartPlaylist[];
   selectedSource: SelectedSource | null;
   settings: AppSettings;
 };

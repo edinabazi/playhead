@@ -310,6 +310,7 @@ export async function normalizeLibraryState(state: Partial<LibraryState>): Promi
     tags: state.tags || [],
     favoriteTrackIds: state.favoriteTrackIds || [],
     trackMarkers: state.trackMarkers || {},
+    smartPlaylists: state.smartPlaylists || [],
     settings,
   });
 }

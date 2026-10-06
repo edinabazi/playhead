@@ -18,6 +18,7 @@ import { SidebarDisclosure } from "./SidebarDisclosure";
 import { SidebarGroup } from "./SidebarGroup";
 import { SidebarEmpty, SidebarItem } from "./SidebarItem";
 import { SidebarShell } from "./SidebarShell";
+import type { SmartPlaylist } from "../../../../shared/smart-playlist";
 
 function SidebarDetailSpinner() {
   return (
@@ -110,6 +111,10 @@ export function Sidebar({
   onDropTrackToTag,
   onDropTrackToSoundCloudPlaylist,
   onCreateSoundCloudPlaylist,
+  smartPlaylists,
+  onCreateSmartPlaylist,
+  onEditSmartPlaylist,
+  onDeleteSmartPlaylist,
   onRenameSoundCloudPlaylist,
   onDeleteSoundCloudPlaylist,
   onRemoveFolder,
@@ -154,6 +159,10 @@ export function Sidebar({
   onDropTrackToPlaylist: (trackIds: string[], playlist: LibraryPlaylist) => void;
   onDropTrackToTag: (trackIds: string[], tag: LibraryTag) => void;
   onCreateSoundCloudPlaylist: () => void;
+  smartPlaylists: SmartPlaylist[];
+  onCreateSmartPlaylist: () => void;
+  onEditSmartPlaylist: (playlist: SmartPlaylist) => void;
+  onDeleteSmartPlaylist: (playlist: SmartPlaylist) => void;
   onRenameSoundCloudPlaylist: (playlist: SoundCloudCollection) => void;
   onDeleteSoundCloudPlaylist: (playlist: SoundCloudCollection) => void;
   onDropTrackToSoundCloudPlaylist: (
@@ -364,6 +373,11 @@ export function Sidebar({
         onAction={onCreatePlaylist}
         secondaryActions={[
           {
+            label: "New smart playlist",
+            icon: icons["list-filter"],
+            onClick: onCreateSmartPlaylist,
+          },
+          {
             label: "Import playlist",
             icon: icons.upload,
             onClick: onImportPlaylist,
@@ -371,7 +385,7 @@ export function Sidebar({
         ]}
         {...groupDragProps("playlists")}
       >
-        {lovedCount === 0 && playlists.length === 0 ? (
+        {lovedCount === 0 && playlists.length === 0 && smartPlaylists.length === 0 ? (
           <SidebarEmpty key="playlists-empty">No playlists yet</SidebarEmpty>
         ) : (
           <>
@@ -397,6 +411,20 @@ export function Sidebar({
                 onDropTrack={(trackIds) => onDropTrackToPlaylist(trackIds, playlist)}
                 onContextMenu={(point) =>
                   setContextMenu({ type: "playlist", item: playlist, point })
+                }
+              />
+            ))}
+            {smartPlaylists.map((playlist) => (
+              <SidebarItem
+                key={playlist.id}
+                active={
+                  selectedSource?.type === "smart-playlist" && selectedSource.id === playlist.id
+                }
+                icon={icons["list-filter"]}
+                label={playlist.name}
+                onClick={() => onSelectSource({ type: "smart-playlist", id: playlist.id })}
+                onContextMenu={(point) =>
+                  setContextMenu({ type: "smart-playlist", item: playlist, point })
                 }
               />
             ))}
@@ -527,6 +555,8 @@ export function Sidebar({
         onRenameTag={onRenameTag}
         onDeleteTag={onDeleteTag}
         onRenameSoundCloudPlaylist={onRenameSoundCloudPlaylist}
+        onEditSmartPlaylist={onEditSmartPlaylist}
+        onDeleteSmartPlaylist={onDeleteSmartPlaylist}
         onDeleteSoundCloudPlaylist={onDeleteSoundCloudPlaylist}
       />
     </SidebarShell>

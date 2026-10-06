@@ -43,9 +43,7 @@ export function DeletePlaylistDialog({
       >
         <div className="flex items-start justify-between gap-3 px-2 pt-1">
           <div>
-            <h2 className="text-[15px] font-semibold leading-6 text-foreground">
-              Delete {name}?
-            </h2>
+            <h2 className="text-[15px] font-semibold leading-6 text-foreground">Delete {name}?</h2>
             <p className="mt-1 text-[13px] font-medium leading-5 text-muted-foreground">
               {description}
             </p>

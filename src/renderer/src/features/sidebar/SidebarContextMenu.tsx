@@ -11,12 +11,14 @@ import type {
   PlaylistExportFormat,
   SoundCloudCollection,
 } from "../../../../shared/library";
+import type { SmartPlaylist } from "../../../../shared/smart-playlist";
 
 export type SidebarContextMenuState =
   | { type: "folder"; item: LibraryFolder; point: MenuAnchorPoint }
   | { type: "playlist"; item: LibraryPlaylist; point: MenuAnchorPoint }
   | { type: "tag"; item: LibraryTag; point: MenuAnchorPoint }
   | { type: "soundcloud-playlist"; item: SoundCloudCollection; point: MenuAnchorPoint }
+  | { type: "smart-playlist"; item: SmartPlaylist; point: MenuAnchorPoint }
   | null;
 
 export function SidebarContextMenu({
@@ -30,6 +32,8 @@ export function SidebarContextMenu({
   onDeleteTag,
   onRenameSoundCloudPlaylist,
   onDeleteSoundCloudPlaylist,
+  onEditSmartPlaylist,
+  onDeleteSmartPlaylist,
 }: {
   state: SidebarContextMenuState;
   onOpenChange: (state: SidebarContextMenuState) => void;
@@ -41,6 +45,8 @@ export function SidebarContextMenu({
   onDeleteTag: (tag: LibraryTag) => void;
   onRenameSoundCloudPlaylist: (playlist: SoundCloudCollection) => void;
   onDeleteSoundCloudPlaylist: (playlist: SoundCloudCollection) => void;
+  onEditSmartPlaylist: (playlist: SmartPlaylist) => void;
+  onDeleteSmartPlaylist: (playlist: SmartPlaylist) => void;
 }) {
   const icons = useIcons();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -190,6 +196,27 @@ export function SidebarContextMenu({
               index={2}
               onSelect={() => {
                 onDeletePlaylist(state.item);
+                onOpenChange(null);
+              }}
+            />
+          </>
+        ) : state.type === "smart-playlist" ? (
+          <>
+            <MenuItem
+              icon={icons["list-filter"]}
+              label="Edit Smart Playlist"
+              index={0}
+              onSelect={() => {
+                onEditSmartPlaylist(state.item);
+                onOpenChange(null);
+              }}
+            />
+            <MenuItem
+              icon={icons["trash-2"]}
+              label="Delete Smart Playlist"
+              index={1}
+              onSelect={() => {
+                onDeleteSmartPlaylist(state.item);
                 onOpenChange(null);
               }}
             />
