@@ -23,6 +23,7 @@ export const columnIcons: Record<TrackColumnId, IconName> = {
   year: "calendar-days",
   composer: "pencil",
   bpm: "gauge",
+  key: "audio-waveform",
   duration: "clock",
 };
 

@@ -77,6 +77,8 @@ export type LibraryTrack = {
   bpmSource?: "metadata" | "analysis";
   /** ReplayGain track gain from the file's tags, in dB. */
   replayGainDb?: number;
+  /** Detected key, e.g. "8A · Am". Filled in from LibraryState.trackKeys for display. */
+  musicalKey?: string;
   folderId: string;
   soundcloud?: {
     id: number;
@@ -221,6 +223,8 @@ export type LibraryState = {
   /** User markers per track id, sorted by time. Kept apart from scanned track data. */
   trackMarkers?: Record<string, TrackMarker[]>;
   smartPlaylists?: SmartPlaylist[];
+  /** Detected musical keys per track id. Kept apart from scanned track data. */
+  trackKeys?: Record<string, string>;
   selectedSource: SelectedSource | null;
   settings: AppSettings;
 };

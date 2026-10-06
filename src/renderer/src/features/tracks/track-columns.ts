@@ -19,11 +19,13 @@ export const trackColumns: Record<
   year: { label: "Year", width: 80, numeric: true },
   composer: { label: "Composer", width: 160 },
   bpm: { label: "BPM", width: 80, numeric: true },
+  key: { label: "Key", width: 90 },
   duration: { label: "Time", width: 60, numeric: true },
 };
 
 function trackValue(track: LibraryTrack, column: TrackColumnId): string | number | undefined {
   if (column === "disc") return track.disc || track.diskNumber;
+  if (column === "key") return track.musicalKey;
   return track[column];
 }
 

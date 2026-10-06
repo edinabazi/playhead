@@ -106,6 +106,7 @@ import {
 } from "@/features/audio/audio-analysis";
 import { PlaybackAudioEngine, type ChannelLevels } from "@/features/audio/audio-engine";
 import { getActiveEqualizerGains, normalizeEqualizerSettings } from "@/features/audio/equalizer";
+import { detectKeyFromBuffer, formatMusicalKey } from "@/features/audio/key-detection";
 import { LevelsPanel } from "@/features/levels/LevelsPanel";
 import { normalizeLevelMeterSettings } from "@/features/levels/meter-model";
 import { boostedMaxVolume, PlaybackVolumeController } from "@/features/audio/playback-volume";
@@ -599,9 +600,17 @@ export function App() {
     library.tracks,
     soundcloudTracksByCollection,
   ]);
+  // Detected keys live beside the scanned tracks; attach them for display and sorting.
+  const keyedSourceTracks = useMemo(() => {
+    const keys = library.trackKeys;
+    if (!keys || Object.keys(keys).length === 0) return sourceTracks;
+    return sourceTracks.map((track) =>
+      keys[track.id] ? { ...track, musicalKey: keys[track.id] } : track,
+    );
+  }, [library.trackKeys, sourceTracks]);
   const tracks = useMemo(
-    () => sortTrackList(sourceTracks, trackListSettings.sort),
-    [sourceTracks, trackListSettings.sort],
+    () => sortTrackList(keyedSourceTracks, trackListSettings.sort),
+    [keyedSourceTracks, trackListSettings.sort],
   );
   const allPlayableTracksById = useMemo(
     () => ({
@@ -3454,6 +3463,57 @@ export function App() {
     },
     [persistLibrary],
   );
+
+  const keyAnalysisTrackIdsRef = useRef(new Set<string>());
+  const pendingTrackKeysRef = useRef<Record<string, string>>({});
+  const trackKeyFlushRef = useRef<number | null>(null);
+
+  // Saving rewrites the whole library, so batch detected keys instead of saving per track.
+  const flushTrackKeys = useCallback(() => {
+    trackKeyFlushRef.current = null;
+    const pending = pendingTrackKeysRef.current;
+    if (Object.keys(pending).length === 0) return;
+    pendingTrackKeysRef.current = {};
+    const current = libraryRef.current;
+    void persistLibrary({ ...current, trackKeys: { ...current.trackKeys, ...pending } });
+  }, [persistLibrary]);
+  const keyColumnVisible = trackListSettings.columns.includes("key");
+
+  const analyzeTrackKey = useCallback(
+    (track: LibraryTrack) => {
+      // Streams have no file to decode cheaply; keys are for local files.
+      if (track.soundcloud || track.source === "soundcloud") return;
+      if (libraryRef.current.trackKeys?.[track.id] || pendingTrackKeysRef.current[track.id]) return;
+      if (keyAnalysisTrackIdsRef.current.has(track.id)) return;
+      keyAnalysisTrackIdsRef.current.add(track.id);
+      // Share the BPM queue so only one track is decoded at a time.
+      bpmAnalysisQueueRef.current = bpmAnalysisQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          try {
+            const buffer = await decodeAudioTrack(track, window.playhead.readAudioFile);
+            const key = detectKeyFromBuffer(buffer);
+            if (!key) return;
+            pendingTrackKeysRef.current[track.id] = formatMusicalKey(key);
+            trackKeyFlushRef.current ??= window.setTimeout(flushTrackKeys, 2000);
+          } catch (error) {
+            console.warn("Failed to detect key", { path: track.path, error });
+          } finally {
+            keyAnalysisTrackIdsRef.current.delete(track.id);
+          }
+        });
+    },
+    [flushTrackKeys],
+  );
+
+  // With the Key column on, work through the tracks in view in the background.
+  useEffect(() => {
+    if (!keyColumnVisible) return;
+    sourceTracks
+      .filter((track) => !library.trackKeys?.[track.id])
+      .slice(0, 200)
+      .forEach(analyzeTrackKey);
+  }, [analyzeTrackKey, keyColumnVisible, library.trackKeys, sourceTracks]);
 
   const queueTracks = useCallback(
     (tracksToQueue: LibraryTrack[], position: "next" | "later") =>

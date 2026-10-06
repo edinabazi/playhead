@@ -8,6 +8,7 @@ export const trackColumnIds = [
   "year",
   "composer",
   "bpm",
+  "key",
   "duration",
 ] as const;
 
