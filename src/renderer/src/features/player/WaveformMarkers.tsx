@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
 import type { TrackMarker } from "../../../../shared/library";
@@ -19,6 +19,23 @@ export function WaveformMarkers({
 }) {
   const icons = useIcons();
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // Hide after a short delay so the pointer can travel from the flag to the bubble's ×.
+  const hideTimer = useRef<number | null>(null);
+  const show = (id: string) => {
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    hideTimer.current = null;
+    setHoveredId(id);
+  };
+  const scheduleHide = () => {
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => setHoveredId(null), 250);
+  };
+  useEffect(
+    () => () => {
+      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    },
+    [],
+  );
   if (!duration) return null;
 
   return (
@@ -31,8 +48,8 @@ export function WaveformMarkers({
             key={marker.id}
             className="absolute inset-y-0"
             style={{ left: `${position * 100}%` }}
-            onMouseEnter={() => setHoveredId(marker.id)}
-            onMouseLeave={() => setHoveredId(null)}
+            onMouseEnter={() => show(marker.id)}
+            onMouseLeave={scheduleHide}
           >
             <span className="absolute inset-y-0 -left-px w-px bg-primary/70" />
             <button
@@ -53,7 +70,7 @@ export function WaveformMarkers({
             {hovered && (
               <div
                 className={`pointer-events-auto absolute top-0 flex items-center gap-1.5 whitespace-nowrap rounded-[8px] border border-white/10 bg-[rgba(10,10,10,0.9)] py-1 pl-2 pr-1 text-[11px] leading-none ${
-                  position > 0.75 ? "right-2" : "left-2"
+                  position > 0.75 ? "right-[3px]" : "left-[3px]"
                 }`}
               >
                 <span className="font-semibold text-foreground">{marker.label}</span>
