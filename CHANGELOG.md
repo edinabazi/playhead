@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.3.0
+
+### New
+
+- **Loop a section:** Shift+drag across the waveform to loop it; drag the edges to adjust.
+- **Markers:** press M to drop a marker at the playhead. Click to jump, double-click to rename.
+- **Smart playlists:** rule-based playlists (genre, artist, BPM, year, length, tags, loved and more) that update as your library changes.
+- **Key detection:** turn on the Key column to detect each track’s musical key, shown in Camelot notation (e.g. 8A · Am).
+- **Play Next and Play Later** in the track menu.
+- **Sleep timer:** stop playback after 15–90 minutes or at the end of the track.
+- **Playback speed** from 0.5× to 2×, with an option to keep the original pitch.
+- **Duplicate finder** in Settings → Library lists tracks you have more than once.
+- **Window corner radius** setting in Appearance. Thanks @wex288! ([#17](https://github.com/edinabazi/playhead/issues/17))
+- **Search the current folder or playlist:** press Tab in search to switch scope. Thanks @wex288! ([#22](https://github.com/edinabazi/playhead/issues/22))
+- **SoundCloud playlists:** drag tracks onto your SoundCloud playlists (hold Option to move), remove and reorder tracks, and create, rename or delete playlists. Thanks @portrgent! ([#29](https://github.com/edinabazi/playhead/issues/29))
+- **SoundCloud search:** press Tab in search to find tracks on SoundCloud.
+- **SoundCloud comments** appear along the waveform, pop up as they play, and you can post your own.
+- **Optional SoundCloud extras** in Settings → Integrations: sync hearts with SoundCloud likes, and keep playing similar tracks when the queue ends.
+
+### Improved
+
+- Volume normalization uses ReplayGain tags when files have them. Your library rescans once after updating to read them.
+- The equalizer moved to the top-right controls, and their tooltips now appear below.
+- Clicking anywhere outside the equalizer or column picker closes it. Thanks @wex288! ([#24](https://github.com/edinabazi/playhead/issues/24))
+- Column resize handles show a resize cursor. Thanks @wex288! ([#23](https://github.com/edinabazi/playhead/issues/23))
+- Removed the redundant “Track no.” column option. Thanks @wex288! ([#26](https://github.com/edinabazi/playhead/issues/26))
+- Tooltips near the window edge are no longer cut off. Thanks @wex288! ([#27](https://github.com/edinabazi/playhead/issues/27))
+- A little more space between the track list header and the first track.
+
+### Fixed
+
+- High CPU and GPU use while idle before anything was played. Thanks @wex288! ([#21](https://github.com/edinabazi/playhead/issues/21))
+- “Remember playback position” now resumes tracks where you left off. Thanks @wex288! ([#25](https://github.com/edinabazi/playhead/issues/25))
+- AIFF files now play instead of being skipped. Thanks @portrgent! ([#28](https://github.com/edinabazi/playhead/issues/28))
+- SoundCloud and Last.fm could sign you out when many requests ran at once.
+- A SoundCloud sign-in that never completed could get stuck; it can now be cancelled and expires on its own.
+
 ## 0.2.7
 
 - Fixed “Install update and restart” hiding the window instead of restarting Playhead.
