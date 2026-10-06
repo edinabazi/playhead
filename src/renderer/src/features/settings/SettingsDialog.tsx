@@ -9,6 +9,7 @@ import {
   defaultTelemetrySettings,
   type AppearanceSettings,
   type LastfmSettings,
+  type DiscordSettings,
   type LastfmState,
   type LibraryFolder,
   type LibrarySettings,
@@ -70,6 +71,9 @@ export function SettingsDialog({
   soundcloudSettings,
   soundcloudActionPending,
   onLastfmSettingsChange,
+  discordConfigured,
+  discordSettings,
+  onDiscordSettingsChange,
   onStartLastfmAuth,
   onCompleteLastfmAuth,
   onCancelLastfmAuth,
@@ -107,6 +111,9 @@ export function SettingsDialog({
   soundcloudSettings: SoundCloudSettings;
   soundcloudActionPending: boolean;
   onLastfmSettingsChange: (settings: LastfmSettings) => void;
+  discordConfigured: boolean;
+  discordSettings: DiscordSettings;
+  onDiscordSettingsChange: (settings: DiscordSettings) => void;
   onStartLastfmAuth: () => void;
   onCompleteLastfmAuth: () => void;
   onCancelLastfmAuth: () => void;
@@ -583,6 +590,9 @@ export function SettingsDialog({
                   x: icons.x,
                 }}
                 onLastfmSettingsChange={onLastfmSettingsChange}
+                discordConfigured={discordConfigured}
+                discordSettings={discordSettings}
+                onDiscordSettingsChange={onDiscordSettingsChange}
                 onConnectLastfm={onStartLastfmAuth}
                 onCompleteLastfmAuth={onCompleteLastfmAuth}
                 onCancelLastfmAuth={onCancelLastfmAuth}

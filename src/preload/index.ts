@@ -11,6 +11,7 @@ import type {
   MediaCommand,
   PlayheadApi,
   SoundCloudCollectionId,
+  DiscordPresence,
   SoundCloudPlaylistEdit,
   SoundCloudState,
   SoundCloudTranscoding,
@@ -116,6 +117,10 @@ const api: PlayheadApi = {
   getSoundCloudCollectionTracks: (collectionId: string) =>
     ipcRenderer.invoke("soundcloud:get-collection-tracks", collectionId),
   searchSoundCloudTracks: (query: string) => ipcRenderer.invoke("soundcloud:search-tracks", query),
+  isDiscordConfigured: () => ipcRenderer.invoke("discord:is-configured"),
+  setDiscordEnabled: (enabled: boolean) => ipcRenderer.invoke("discord:set-enabled", enabled),
+  updateDiscordPresence: (presence: DiscordPresence | null) =>
+    ipcRenderer.invoke("discord:update", presence),
   getSoundCloudComments: (trackId: number, trackUrn?: string) =>
     ipcRenderer.invoke("soundcloud:get-comments", trackId, trackUrn),
   postSoundCloudComment: (

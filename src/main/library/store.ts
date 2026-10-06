@@ -331,6 +331,7 @@ export function normalizeSettings(
       telemetry: { ...defaults.telemetry, ...(grouped.telemetry || {}) },
       lastfm: { ...defaults.lastfm, ...(grouped.lastfm || {}) },
       soundcloud: { ...defaults.soundcloud, ...(grouped.soundcloud || {}) },
+      discord: { ...defaults.discord, ...(grouped.discord || {}) },
       session: {
         ...defaults.session,
         ...(grouped.session || {}),

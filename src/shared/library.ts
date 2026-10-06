@@ -243,6 +243,7 @@ export type AppSettings = {
   telemetry: TelemetrySettings;
   lastfm: LastfmSettings;
   soundcloud: SoundCloudSettings;
+  discord: DiscordSettings;
   session: SessionSettings;
 };
 
@@ -292,6 +293,22 @@ export type AppearanceSettings = {
 
 export type TelemetrySettings = {
   enabled: boolean;
+};
+
+export type DiscordSettings = {
+  /** Show the playing track as Discord activity. */
+  enabled: boolean;
+};
+
+/** What Discord shows while a track plays. */
+export type DiscordPresence = {
+  title: string;
+  artist: string;
+  album?: string;
+  durationSeconds: number;
+  positionSeconds: number;
+  /** Public artwork URL; local files fall back to the app's uploaded image. */
+  artworkUrl?: string;
 };
 
 export type LastfmSettings = {
@@ -493,6 +510,9 @@ export type PlayheadApi = {
   ) => Promise<SoundCloudCollection[]>;
   getSoundCloudCollectionTracks: (collectionId: string) => Promise<LibraryTrack[]>;
   searchSoundCloudTracks: (query: string) => Promise<LibraryTrack[]>;
+  isDiscordConfigured: () => Promise<boolean>;
+  setDiscordEnabled: (enabled: boolean) => Promise<void>;
+  updateDiscordPresence: (presence: DiscordPresence | null) => Promise<void>;
   getSoundCloudComments: (trackId: number, trackUrn?: string) => Promise<SoundCloudComment[]>;
   postSoundCloudComment: (
     trackId: number,
@@ -643,6 +663,7 @@ export const defaultAppSettings = (): AppSettings => ({
   telemetry: defaultTelemetrySettings(),
   lastfm: defaultLastfmSettings(),
   soundcloud: defaultSoundCloudSettings(),
+  discord: { enabled: false },
   session: defaultSessionSettings(),
 });
 

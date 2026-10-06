@@ -7,6 +7,7 @@ import { registerLibraryIpc } from "./library/library-ipc";
 import { registerMediaShortcuts } from "./media/media-shortcuts";
 import { installApplicationMenu } from "./menu";
 import { completeSoundCloudAuth, registerSoundCloudIpc } from "./soundcloud/soundcloud";
+import { registerDiscordIpc } from "./discord/discord-presence";
 import { registerTelemetryIpc, trackAppLaunch } from "./telemetry";
 import { registerUpdaterIpc, startUpdater } from "./updater";
 import { revealPlaybackWindow } from "./window/background-playback";
@@ -168,6 +169,7 @@ app.whenReady().then(() => {
   registerLyricsIpc();
   registerLastfmIpc();
   registerSoundCloudIpc(handleSoundCloudCallback);
+  registerDiscordIpc();
   registerTelemetryIpc();
   registerMediaShortcuts();
   registerUpdaterIpc();

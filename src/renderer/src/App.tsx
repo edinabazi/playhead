@@ -3517,6 +3517,32 @@ export function App() {
       .forEach(analyzeTrackKey);
   }, [analyzeTrackKey, keyColumnVisible, library.trackKeys, sourceTracks]);
 
+  const [discordConfigured, setDiscordConfigured] = useState(false);
+  useEffect(() => {
+    void window.playhead.isDiscordConfigured().then(setDiscordConfigured);
+  }, []);
+  const discordEnabled = discordConfigured && library.settings.discord.enabled;
+  useEffect(() => {
+    if (discordConfigured) void window.playhead.setDiscordEnabled(discordEnabled);
+  }, [discordConfigured, discordEnabled]);
+
+  // Discord shows the playing track; pausing clears it.
+  useEffect(() => {
+    if (!discordEnabled) return;
+    if (!activeTrack || !isPlaying) {
+      void window.playhead.updateDiscordPresence(null);
+      return;
+    }
+    void window.playhead.updateDiscordPresence({
+      title: activeTrack.title,
+      artist: activeTrack.artist,
+      album: activeTrack.album,
+      durationSeconds: duration || activeTrack.duration,
+      positionSeconds: playbackClock.getTime(),
+      artworkUrl: activeTrack.soundcloud?.artworkUrl,
+    });
+  }, [activeTrack, discordEnabled, duration, isPlaying, playbackClock]);
+
   const queueTracks = useCallback(
     (tracksToQueue: LibraryTrack[], position: "next" | "later") =>
       playbackQueue.addTracks(
@@ -4214,6 +4240,14 @@ export function App() {
               soundcloudSettings={library.settings.soundcloud}
               soundcloudActionPending={soundcloudActionPending}
               onLastfmSettingsChange={(settings) => void updateLastfmSettings(settings)}
+              discordConfigured={discordConfigured}
+              discordSettings={library.settings.discord}
+              onDiscordSettingsChange={(discord) =>
+                void persistLibrary({
+                  ...libraryRef.current,
+                  settings: { ...libraryRef.current.settings, discord },
+                })
+              }
               onStartLastfmAuth={startLastfmAuth}
               onCompleteLastfmAuth={completeLastfmAuth}
               onCancelLastfmAuth={disconnectLastfm}

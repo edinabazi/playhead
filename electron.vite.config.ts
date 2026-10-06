@@ -16,16 +16,14 @@ export default defineConfig(({ mode }) => {
     "process.env.PLAYHEAD_INTEGRATIONS_BROKER_URL": JSON.stringify(
       env.PLAYHEAD_INTEGRATIONS_BROKER_URL || "",
     ),
+    // Discord application ids are public, so release builds may embed one.
+    "process.env.DISCORD_CLIENT_ID": JSON.stringify(env.DISCORD_CLIENT_ID || ""),
   };
 
   if (mode !== "production") {
     mainDefine["process.env.LASTFM_API_KEY"] = JSON.stringify(env.LASTFM_API_KEY || "");
-    mainDefine["process.env.LASTFM_SHARED_SECRET"] = JSON.stringify(
-      env.LASTFM_SHARED_SECRET || "",
-    );
-    mainDefine["process.env.SOUNDCLOUD_CLIENT_ID"] = JSON.stringify(
-      env.SOUNDCLOUD_CLIENT_ID || "",
-    );
+    mainDefine["process.env.LASTFM_SHARED_SECRET"] = JSON.stringify(env.LASTFM_SHARED_SECRET || "");
+    mainDefine["process.env.SOUNDCLOUD_CLIENT_ID"] = JSON.stringify(env.SOUNDCLOUD_CLIENT_ID || "");
     mainDefine["process.env.SOUNDCLOUD_CLIENT_SECRET"] = JSON.stringify(
       env.SOUNDCLOUD_CLIENT_SECRET || "",
     );

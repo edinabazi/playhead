@@ -199,6 +199,12 @@ npm run dev
 The renderer hot-reloads. Changes to the main process or preload script rebuild and restart
 the app, which stops playback.
 
+To show the playing track as Discord status, create an application in the
+[Discord Developer Portal](https://discord.com/developers/applications) and set its
+application ID as `DISCORD_CLIENT_ID` in `.env`. The ID is public, so release builds embed it.
+Upload an image named `playhead` under Rich Presence → Art Assets to show it for local
+files. Without an ID, the Discord setting is hidden.
+
 Run checks:
 
 ```bash

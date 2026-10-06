@@ -3,6 +3,7 @@ import type { IconComponent } from "@/lib/icon-context";
 import { useState } from "react";
 import type {
   LastfmSettings,
+  DiscordSettings,
   LastfmState,
   SoundCloudCollectionId,
   SoundCloudSettings,
@@ -43,6 +44,9 @@ export function IntegrationsSettingsPane({
   onCompleteSoundCloudAuth,
   onCancelSoundCloudAuth,
   onDisconnectSoundCloud,
+  discordConfigured,
+  discordSettings,
+  onDiscordSettingsChange,
 }: {
   lastfmState: LastfmState;
   lastfmSettings: LastfmSettings;
@@ -65,6 +69,9 @@ export function IntegrationsSettingsPane({
   onCompleteSoundCloudAuth: (input: string) => void;
   onCancelSoundCloudAuth: () => void;
   onDisconnectSoundCloud: () => void;
+  discordConfigured: boolean;
+  discordSettings: DiscordSettings;
+  onDiscordSettingsChange: (settings: DiscordSettings) => void;
 }) {
   const LoaderIcon = icons.loader;
   const XIcon = icons.x;
@@ -205,6 +212,16 @@ export function IntegrationsSettingsPane({
         onCancelAuth={onCancelSoundCloudAuth}
         onDisconnect={onDisconnectSoundCloud}
       />
+      {discordConfigured && (
+        <div className="overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.035]">
+          <IntegrationSwitch
+            title="Show in Discord"
+            description="Display the track you're playing as your Discord status while Discord is open."
+            checked={discordSettings.enabled}
+            onCheckedChange={(enabled) => onDiscordSettingsChange({ ...discordSettings, enabled })}
+          />
+        </div>
+      )}
     </div>
   );
 }
