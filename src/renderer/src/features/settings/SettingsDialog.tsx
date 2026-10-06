@@ -83,6 +83,7 @@ export function SettingsDialog({
   onAdvancedAction,
   batchAnalysis,
   onAnalyzeMissingAudioData,
+  onFindDuplicates,
   onClose,
 }: {
   librarySettings: LibrarySettings;
@@ -125,6 +126,7 @@ export function SettingsDialog({
     currentTrackTitle: string;
   };
   onAnalyzeMissingAudioData: () => Promise<string>;
+  onFindDuplicates: () => void;
   onClose: () => void;
 }) {
   const icons = useIcons();
@@ -540,6 +542,7 @@ export function SettingsDialog({
                 onToggleExtension={toggleExtension}
                 onAddFolder={onAddLibraryFolder}
                 onAnalyzeMissingAudioData={() => void runAudioAnalysis()}
+                onFindDuplicates={onFindDuplicates}
                 onDropFolderPaths={onDropLibraryFolderPaths}
                 onRemoveFolder={onRemoveLibraryFolder}
                 onReset={resetLibrarySettings}

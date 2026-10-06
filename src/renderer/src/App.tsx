@@ -128,6 +128,7 @@ import {
 import { getPathName } from "@/features/library/folder-tree";
 import { useLibraryActions } from "@/features/library/use-library-actions";
 import { EmptyLibraryState } from "@/features/library/EmptyLibraryState";
+import { DuplicatesDialog } from "@/features/library/DuplicatesDialog";
 import { LibraryDetailHeader } from "@/features/library/LibraryDetailHeader";
 import { LibraryBrowser } from "@/features/library/LibraryBrowser";
 import { normalizeSourceForMode } from "@/features/library/source";
@@ -532,6 +533,7 @@ export function App() {
   const [sleepTimer, setSleepTimer] = useState<SleepTimer>(null);
   const [playbackLoop, setPlaybackLoop] = useState<PlaybackLoop | null>(null);
   const [markerPendingRename, setMarkerPendingRename] = useState<TrackMarker | null>(null);
+  const [isDuplicatesOpen, setIsDuplicatesOpen] = useState(false);
   const [smartPlaylistEditor, setSmartPlaylistEditor] = useState<{
     playlist: SmartPlaylist | null;
   } | null>(null);
@@ -4186,6 +4188,10 @@ export function App() {
         <AnimatePresence>
           {isSettingsOpen && (
             <SettingsDialog
+              onFindDuplicates={() => {
+                setIsSettingsOpen(false);
+                setIsDuplicatesOpen(true);
+              }}
               key="settings"
               librarySettings={library.settings.library}
               libraryFolders={library.folders}
@@ -4246,6 +4252,15 @@ export function App() {
                 void removeFolderFromPlayhead(folderId);
               }}
               onClose={() => setFolderPendingRemoval(null)}
+            />
+          )}
+          {isDuplicatesOpen && (
+            <DuplicatesDialog
+              key="duplicates"
+              tracks={Object.values(library.tracks)}
+              onPlay={(track) => void selectTrack(track, true)}
+              onShowInFolder={(track) => window.playhead.showItemInFolder(track.path)}
+              onClose={() => setIsDuplicatesOpen(false)}
             />
           )}
           {smartPlaylistEditor && (

@@ -18,6 +18,7 @@ export function LibrarySettingsPane({
   onToggleExtension,
   onAddFolder,
   onAnalyzeMissingAudioData,
+  onFindDuplicates,
   onDropFolderPaths,
   onRemoveFolder,
   onReset,
@@ -49,6 +50,7 @@ export function LibrarySettingsPane({
   onToggleExtension: (extension: string) => void;
   onAddFolder: () => void;
   onAnalyzeMissingAudioData: () => void;
+  onFindDuplicates: () => void;
   onDropFolderPaths: (folderPaths: string[]) => void;
   onRemoveFolder: (folder: LibraryFolder) => void;
   onReset: () => void;
@@ -89,6 +91,25 @@ export function LibrarySettingsPane({
           chevronRightIcon={icons.chevronRight}
           onAnalyzeMissingAudioData={onAnalyzeMissingAudioData}
         />
+        <button
+          type="button"
+          className="group flex w-full items-center justify-between gap-4 rounded-[22px] border border-white/10 bg-white/[0.035] p-4 text-left transition hover:bg-white/[0.065]"
+          onClick={onFindDuplicates}
+        >
+          <span className="min-w-0">
+            <span className="block text-[14px] font-semibold leading-5 text-foreground">
+              Find duplicate tracks
+            </span>
+            <span className="mt-1 block max-w-[520px] text-[12px] font-medium leading-4 text-muted-foreground">
+              List tracks that appear more than once with the same artist, title and length.
+            </span>
+          </span>
+          <icons.chevronRight
+            size={17}
+            strokeWidth={1.8}
+            className="shrink-0 text-muted-foreground transition group-hover:text-foreground"
+          />
+        </button>
         <FileFormatsCard
           settings={settings}
           checkIcon={icons.check}
