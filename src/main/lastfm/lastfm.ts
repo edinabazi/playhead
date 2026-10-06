@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile, writeFile, rm } from "node:fs/promises";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { LastfmState, LastfmTrackPayload } from "../../shared/library";
 import { electron } from "../electron";
@@ -98,17 +98,80 @@ function createForm(params: Record<string, string | number | undefined>): URLSea
   return form;
 }
 
-async function readJson<T>(path: string, fallback: T): Promise<T> {
-  try {
-    return JSON.parse(await readFile(path, "utf8")) as T;
-  } catch {
-    return fallback;
-  }
+// Each file lives in memory and is written through to disk. Last.fm calls overlap (now playing,
+// scrobbles, queue flushes); re-reading the file on each one could catch a half-written file,
+// parse it as empty and then save that over the user's session or queue.
+type JsonStore<T> = {
+  read: () => Promise<T>;
+  write: (value: T) => Promise<void>;
+  // Read-modify-write under a lock, so two callers never both start from the same snapshot.
+  update: (change: (current: T) => T) => Promise<void>;
+  remove: () => Promise<void>;
+};
+
+function createJsonStore<T>(
+  path: () => string,
+  parse: (value: unknown) => T,
+  empty: () => T,
+): JsonStore<T> {
+  let cached: T | null = null;
+  let load: Promise<T> | null = null;
+  let writes: Promise<void> = Promise.resolve();
+  let updates: Promise<void> = Promise.resolve();
+
+  const store: JsonStore<T> = {
+    async read() {
+      if (cached) return cached;
+      load ??= readFile(path(), "utf8")
+        .then((raw) => parse(JSON.parse(raw)))
+        .catch(() => empty());
+      const loaded = await load;
+      cached ??= loaded;
+      return cached;
+    },
+    async write(value) {
+      cached = value;
+      const contents = `${JSON.stringify(value, null, 2)}\n`;
+      // Serialise writes and replace the file atomically so readers never see a partial file.
+      writes = writes
+        .catch(() => undefined)
+        .then(async () => {
+          const temporary = `${path()}.${process.pid}.tmp`;
+          await writeFile(temporary, contents, { encoding: "utf8", mode: 0o600 });
+          await rename(temporary, path());
+        });
+      await writes;
+    },
+    update(change) {
+      const run = updates.then(async () => {
+        const current = await store.read();
+        const next = change(current);
+        if (next !== current) await store.write(next);
+      });
+      updates = run.catch(() => undefined);
+      return run;
+    },
+    async remove() {
+      cached = empty();
+      await updates;
+      await writes.catch(() => undefined);
+      await rm(path(), { force: true });
+    },
+  };
+  return store;
 }
 
-async function writeJson(path: string, value: unknown): Promise<void> {
-  await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-}
+const stateStore = createJsonStore<LastfmStoredState>(
+  statePath,
+  (value) => (value && typeof value === "object" ? (value as LastfmStoredState) : {}),
+  () => ({}),
+);
+
+const queueStore = createJsonStore<LastfmQueueJob[]>(
+  queuePath,
+  (value) => (Array.isArray(value) ? (value as LastfmQueueJob[]) : []),
+  () => [],
+);
 
 function encryptSessionKey(sessionKey: string): string {
   if (!safeStorage?.isEncryptionAvailable()) return sessionKey;
@@ -121,20 +184,15 @@ function decryptSessionKey(session: LastfmSession): string {
 }
 
 async function readStoredState(): Promise<LastfmStoredState> {
-  return readJson<LastfmStoredState>(statePath(), {});
+  return stateStore.read();
 }
 
 async function writeStoredState(state: LastfmStoredState): Promise<void> {
-  await writeJson(statePath(), state);
+  await stateStore.update(() => state);
 }
 
 async function readQueue(): Promise<LastfmQueueJob[]> {
-  const queue = await readJson<LastfmQueueJob[]>(queuePath(), []);
-  return Array.isArray(queue) ? queue : [];
-}
-
-async function writeQueue(queue: LastfmQueueJob[]): Promise<void> {
-  await writeJson(queuePath(), queue);
+  return queueStore.read();
 }
 
 async function getSessionKey(): Promise<string | null> {
@@ -143,14 +201,19 @@ async function getSessionKey(): Promise<string | null> {
   try {
     return decryptSessionKey(state.session);
   } catch {
-    await writeStoredState({ ...state, session: undefined, lastError: "Last.fm session expired." });
+    await stateStore.update((current) => ({
+      ...current,
+      session: undefined,
+      lastError: "Last.fm session expired.",
+    }));
     return null;
   }
 }
 
 async function setLastError(message?: string): Promise<void> {
-  const state = await readStoredState();
-  await writeStoredState({ ...state, lastError: message });
+  await stateStore.update((state) =>
+    state.lastError === message ? state : { ...state, lastError: message },
+  );
 }
 
 export async function getLastfmState(): Promise<LastfmState> {
@@ -213,16 +276,14 @@ async function postLastfm<T>(
 }
 
 async function enqueue(job: Omit<LastfmQueueJob, "id">): Promise<void> {
-  const queue = await readQueue();
   const normalized = normalizeTrack(job.track);
   if (!normalized) return;
   const nextJob = { ...job, track: normalized, id: `${Date.now()}-${Math.random()}` };
-  const nextQueue =
-    job.type === "love" || job.type === "unlove"
-      ? collapseLastfmLoveQueue(queue, job)
-      : queue;
-  nextQueue.push(nextJob);
-  await writeQueue(nextQueue);
+  await queueStore.update((queue) => {
+    const nextQueue =
+      job.type === "love" || job.type === "unlove" ? collapseLastfmLoveQueue(queue, job) : queue;
+    return [...nextQueue, nextJob];
+  });
 }
 
 async function runQueueJob(job: LastfmQueueJob, sessionKey: string): Promise<LastfmApiResponse<unknown>> {
@@ -247,7 +308,12 @@ async function flushQueueInternal(): Promise<void> {
       break;
     }
   }
-  await writeQueue(remaining);
+  // Jobs enqueued while this flush was sending must survive the rewrite.
+  const flushedIds = new Set(queue.map((job) => job.id));
+  await queueStore.update((current) => [
+    ...remaining,
+    ...current.filter((job) => !flushedIds.has(job.id)),
+  ]);
 }
 
 async function sendNowPlaying(track: LastfmTrackPayload, sessionKey: string): Promise<LastfmApiResponse<unknown>> {
@@ -308,8 +374,11 @@ export async function startLastfmAuth(): Promise<LastfmState> {
         "/lastfm/auth-token",
         {},
       );
-      const state = await readStoredState();
-      await writeStoredState({ ...state, pendingToken: response.token, lastError: undefined });
+      await stateStore.update((state) => ({
+        ...state,
+        pendingToken: response.token,
+        lastError: undefined,
+      }));
       await shell.openExternal(response.authUrl);
     } catch (error) {
       await setLastError(error instanceof Error ? error.message : "Last.fm auth failed.");
@@ -323,8 +392,11 @@ export async function startLastfmAuth(): Promise<LastfmState> {
     return getLastfmState();
   }
 
-  const state = await readStoredState();
-  await writeStoredState({ ...state, pendingToken: response.data.token, lastError: undefined });
+  await stateStore.update((state) => ({
+    ...state,
+    pendingToken: response.data.token,
+    lastError: undefined,
+  }));
   await shell.openExternal(createLastfmAuthUrl(response.data.token));
   return getLastfmState();
 }
@@ -375,8 +447,8 @@ export async function completeLastfmAuth(): Promise<LastfmState> {
 }
 
 export async function disconnectLastfm(): Promise<LastfmState> {
-  await rm(statePath(), { force: true });
-  await rm(queuePath(), { force: true });
+  await stateStore.remove();
+  await queueStore.remove();
   return getLastfmState();
 }
 
