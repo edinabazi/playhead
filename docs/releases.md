@@ -22,7 +22,7 @@ install.
 - macOS Apple Silicon: `Playhead-mac-arm64.dmg` and `Playhead-mac-arm64.zip`
 - macOS Intel: `Playhead-mac-x64.dmg` and `Playhead-mac-x64.zip`
 - Windows Intel/AMD: `Playhead-win-x64.exe` and `Playhead-win-x64.zip`
-- Linux Intel/AMD: `Playhead-linux-x64.AppImage`, `Playhead-linux-x64.deb`, and
+- Linux Intel/AMD: `Playhead-linux-x86_64.AppImage`, `Playhead-linux-amd64.deb`, and
   `Playhead-linux-x64.tar.gz`
 
 macOS release builds are signed and notarized when the required Apple Developer secrets are present
@@ -80,8 +80,8 @@ Stable download URLs:
 https://github.com/edinabazi/playhead/releases/latest/download/Playhead-mac-arm64.dmg
 https://github.com/edinabazi/playhead/releases/latest/download/Playhead-mac-x64.dmg
 https://github.com/edinabazi/playhead/releases/latest/download/Playhead-win-x64.exe
-https://github.com/edinabazi/playhead/releases/latest/download/Playhead-linux-x64.AppImage
-https://github.com/edinabazi/playhead/releases/latest/download/Playhead-linux-x64.deb
+https://github.com/edinabazi/playhead/releases/latest/download/Playhead-linux-x86_64.AppImage
+https://github.com/edinabazi/playhead/releases/latest/download/Playhead-linux-amd64.deb
 ```
 
 ## Local Builds
