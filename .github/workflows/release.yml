@@ -167,20 +167,22 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const path = require('node:path');
-          const { execFileSync } = require('node:child_process');
           const yaml = require('js-yaml');
-          const { appBuilderPath } = require('app-builder-bin');
-          const manifestPath = 'release/latest-mac.yml';
-          const manifest = yaml.load(fs.readFileSync(manifestPath, 'utf8'));
-          for (const file of manifest.files.filter(file => file.url.endsWith('.dmg'))) {
-            const dmg = path.join('release', decodeURIComponent(file.url));
-            const info = JSON.parse(execFileSync(appBuilderPath, [
-              'blockmap', '--input', dmg, '--output', `${dmg}.blockmap`,
-            ], { encoding: 'utf8' }));
-            file.sha512 = info.sha512;
-            file.size = info.size;
-          }
-          fs.writeFileSync(manifestPath, yaml.dump(manifest));
+          const { buildBlockMap } = require('app-builder-lib/out/targets/blockmap/blockmap');
+          (async () => {
+            const manifestPath = 'release/latest-mac.yml';
+            const manifest = yaml.load(fs.readFileSync(manifestPath, 'utf8'));
+            for (const file of manifest.files.filter(file => file.url.endsWith('.dmg'))) {
+              const dmg = path.join('release', decodeURIComponent(file.url));
+              const info = await buildBlockMap(dmg, 'gzip', `${dmg}.blockmap`);
+              file.sha512 = info.sha512;
+              file.size = info.size;
+            }
+            fs.writeFileSync(manifestPath, yaml.dump(manifest));
+          })().catch(error => {
+            console.error(error);
+            process.exitCode = 1;
+          });
           NODE
       - uses: actions/upload-artifact@v7
         with:
