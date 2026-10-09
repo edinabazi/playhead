@@ -44,6 +44,8 @@ wait for the **Update** button.
 - `POSTHOG_PROJECT_API_KEY`: optional. This is baked into the main-process bundle during CI builds.
   If it is missing, release builds still work and in-app telemetry cannot send events.
 - `POSTHOG_HOST`: optional repository variable. Defaults to `https://eu.i.posthog.com`.
+- `HOMEBREW_TAP_DEPLOY_KEY`: private half of a write deploy key on `edinabazi/homebrew-tap`. Publishing a
+  release runs `.github/workflows/homebrew.yml`, which points `Casks/playhead.rb` at the new version.
 - `PLAYHEAD_INTEGRATIONS_BROKER_URL`: repository variable for the secure Last.fm/SoundCloud broker.
   Production builds must use this URL instead of bundling provider secrets.
 

@@ -1,0 +1,60 @@
+name: Homebrew
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published release tag to point the cask at, e.g. v0.3.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cask:
+    name: Update Homebrew cask
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Download macOS disk images
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" \
+            -p Playhead-mac-arm64.dmg -p Playhead-mac-x64.dmg -D dmg
+
+      - name: Check out tap
+        uses: actions/checkout@v4
+        with:
+          repository: edinabazi/homebrew-tap
+          ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          path: tap
+
+      - name: Update cask
+        run: |
+          set -euo pipefail
+
+          export VERSION="${TAG#v}"
+          export ARM_SHA="$(sha256sum dmg/Playhead-mac-arm64.dmg | cut -d' ' -f1)"
+          export INTEL_SHA="$(sha256sum dmg/Playhead-mac-x64.dmg | cut -d' ' -f1)"
+
+          perl -0pi -e '
+            s/version "[^"]+"/version "$ENV{VERSION}"/;
+            s/arm:(\s+)"[0-9a-f]{64}"/arm:$1"$ENV{ARM_SHA}"/;
+            s/intel:(\s+)"[0-9a-f]{64}"/intel:$1"$ENV{INTEL_SHA}"/;
+          ' tap/Casks/playhead.rb
+
+          cd tap
+          if git diff --quiet; then
+            echo "Cask already points at $VERSION"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "playhead $VERSION"
+          git push

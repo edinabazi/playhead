@@ -27,6 +27,10 @@
   <a href="https://github.com/edinabazi/playhead/releases/latest/download/Playhead-linux-x64.tar.gz">Linux tar.gz</a>
 </p>
 
+<p align="center">
+  <strong>Homebrew</strong>: <code>brew install --cask edinabazi/tap/playhead</code>
+</p>
+
 ---
 
 ## Why Playhead exists
