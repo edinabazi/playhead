@@ -2,7 +2,7 @@ import type { FSWatcher } from "chokidar";
 import chokidar from "chokidar";
 import { watch, type FSWatcher as NativeWatcher } from "node:fs";
 import { platform } from "node:os";
-import { extname, sep } from "node:path";
+import { extname } from "node:path";
 import type { LibraryFolder } from "../../shared/library";
 import { electron } from "../electron";
 import { audioExtensions } from "./constants";
@@ -151,12 +151,27 @@ export async function closeFolderWatcher(): Promise<void> {
 
 function notifyFolderForPath(filePath: string) {
   for (const folder of watchedFolders) {
-    if (
-      filePath === folder.path ||
-      filePath.startsWith(folder.path.endsWith(sep) ? folder.path : `${folder.path}${sep}`)
-    )
-      notifyFolder(folder.id);
+    if (isSamePathOrInside(filePath, folder.path)) notifyFolder(folder.id);
   }
+}
+
+/**
+ * Compares a reported path against a watched folder root.
+ *
+ * Both separators are accepted because the OS notification and chokidar disagree
+ * about which one they report, and Windows paths are compared case-insensitively
+ * so a drive or folder spelled differently in settings still matches.
+ */
+function isSamePathOrInside(filePath: string, folderPath: string): boolean {
+  const file = normalizePathForComparison(filePath);
+  const folder = normalizePathForComparison(folderPath).replace(/\/+$/, "");
+  if (!folder) return false;
+  return file === folder || file.startsWith(`${folder}/`);
+}
+
+function normalizePathForComparison(value: string): string {
+  const normalized = value.replace(/[\\/]+/g, "/");
+  return platform() === "win32" ? normalized.toLowerCase() : normalized;
 }
 
 function notifyFolder(folderId: string) {

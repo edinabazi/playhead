@@ -550,10 +550,33 @@ function parseRekordboxXml(filePath: string, text: string): PlaylistImportParseR
   return { format: "rekordbox", playlists };
 }
 
+/**
+ * Traktor stores a path as `VOLUME`, `DIR` and `FILE`, using `:` between
+ * components, with `/:` marking an absolute root. Files written on one platform
+ * are routinely opened on another, so both separator styles are folded into the
+ * running platform's separator, and a bare leading `/` or `\` is also treated as
+ * an absolute root — otherwise a Unix path like `/music/` would lose its leading
+ * separator and stop matching the collection entry's key.
+ */
 function normalizeTraktorPathPart(value: string): string {
   const trimmed = value.trim();
-  if (trimmed.startsWith("/:")) return `${sep}${trimmed.slice(2).replace(/:/g, sep)}`;
-  return trimmed.replace(/:/g, sep);
+  if (!trimmed) return "";
+
+  // A drive prefix ("C:") is part of the path, not a component separator, so it
+  // is preserved before the remaining colons are folded into separators.
+  const driveMatch = /^([A-Za-z]):(.*)$/.exec(trimmed);
+  const drive = driveMatch ? `${driveMatch[1]}:` : "";
+  const rest = driveMatch ? driveMatch[2] : trimmed;
+
+  const explicitRoot = rest.startsWith("/:") || rest.startsWith("\\:");
+  const bareRoot = !explicitRoot && /^[\\/]/.test(rest);
+  const body = explicitRoot ? rest.slice(2) : bareRoot ? rest.slice(1) : rest;
+  const parts = body.split(/[:\\/]+/).filter(Boolean);
+  const joined = parts.join(sep);
+
+  if (drive) return joined ? `${drive}${sep}${joined}` : `${drive}${sep}`;
+  if (explicitRoot || bareRoot) return parts.length ? `${sep}${joined}` : sep;
+  return joined;
 }
 
 function getTraktorPath(locationAttrs: Record<string, string>): string | undefined {
@@ -570,13 +593,26 @@ function getTraktorPath(locationAttrs: Record<string, string>): string | undefin
   return volume ? join(volume, combined) : combined;
 }
 
+/**
+ * Canonical form used to match a track against `PRIMARYKEY` references.
+ *
+ * The collection entry's path and the playlist's key are produced by different
+ * code paths (and often by different operating systems), so they can differ in
+ * separator style or letter case. Comparing canonical keys keeps the track's
+ * metadata attached instead of silently falling back to a bare path.
+ */
+function normalizeTrackKey(value: string): string {
+  const normalized = value.trim().replace(/[\\/]+/g, "/");
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+
 function addTrackKeys(
   tracksByKey: Map<string, PlaylistImportTrack>,
   track: PlaylistImportTrack,
   keys: Array<string | undefined>,
 ): void {
   for (const key of keys) {
-    if (key) tracksByKey.set(key, track);
+    if (key) tracksByKey.set(normalizeTrackKey(key), track);
   }
 }
 
@@ -621,7 +657,9 @@ function parseTraktorNml(filePath: string, text: string): PlaylistImportParseRes
       .map((primaryKeyMatch) => {
         const primaryKeyAttrs = parseXmlAttributes(primaryKeyMatch[1]);
         const key = primaryKeyAttrs.KEY;
-        return key ? tracksByKey.get(key) || { path: parsePathValue(key) } : null;
+        return key
+          ? tracksByKey.get(normalizeTrackKey(key)) || { path: parsePathValue(key) }
+          : null;
       })
       .filter((track): track is PlaylistImportTrack => Boolean(track));
 
@@ -696,10 +734,16 @@ function findSeratoTrackPaths(records: SeratoRecord[]): string[] {
   return paths;
 }
 
+/**
+ * Finds the crate's root directory by locating the `_Serato_/Subcrates` marker.
+ *
+ * The marker is matched with either separator because a crate exported on macOS
+ * (`/Volumes/USB/_Serato_/Subcrates/…`) is often read on Windows and vice versa.
+ */
 function getSeratoCrateRoot(filePath: string): string {
-  const marker = `${sep}_Serato_${sep}Subcrates${sep}`;
-  const markerIndex = filePath.indexOf(marker);
-  return markerIndex >= 0 ? filePath.slice(0, markerIndex) : dirname(filePath);
+  const markerPattern = /[\\/]_Serato_[\\/]Subcrates[\\/]/;
+  const match = markerPattern.exec(filePath);
+  return match ? filePath.slice(0, match.index) : dirname(filePath);
 }
 
 function parseSeratoCrate(filePath: string, bytes: Buffer): PlaylistImportParseResult {

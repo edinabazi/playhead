@@ -61,7 +61,13 @@ describe("Last.fm storage", () => {
     const saved = JSON.parse(await readFile(statePath(), "utf8"));
     expect(saved.session).toEqual({ username: "listener", sessionKey: "sk", encrypted: false });
     expect(saved.lastError).toBe("Down");
-    expect((await stat(statePath())).mode & 0o777).toBe(0o600);
+
+    // The state file holds a session key, so it is created owner-only. Windows has
+    // no POSIX permission bits and reports a synthetic mode instead, so the
+    // assertion only applies where the mode is actually enforced.
+    if (process.platform !== "win32") {
+      expect((await stat(statePath())).mode & 0o777).toBe(0o600);
+    }
 
     const queue = JSON.parse(await readFile(queuePath(), "utf8"));
     expect(queue.map((job: { type: string }) => job.type).sort()).toEqual(["love", "scrobble"]);

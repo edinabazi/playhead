@@ -1,3 +1,4 @@
+import { join, parse as parsePath } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { LibraryPlaylist } from "../../../shared/library";
 import {
@@ -5,6 +6,16 @@ import {
   parsePlaylistImportFile,
   sanitizePlaylistExportFileName,
 } from "../playlist-export";
+
+/**
+ * A platform-native absolute directory used to build fixtures.
+ *
+ * The parser resolves relative paths and serialises absolute ones, so fixtures
+ * must look like real paths on the host. Hard-coding "/music" made these tests
+ * pass on macOS and fail on Windows; deriving from the volume root exercises the
+ * same logic on both.
+ */
+const mediaRoot = join(parsePath(process.cwd()).root, "media");
 
 const playlist: LibraryPlaylist = {
   id: "playlist-1",
@@ -109,7 +120,7 @@ describe("playlist export", () => {
 
   it("parses M3U files with relative paths and EXTINF metadata", () => {
     const imported = parsePlaylistImportFile(
-      "/music/sets/warmup.m3u8",
+      join(mediaRoot, "sets", "warmup.m3u8"),
       Buffer.from("#EXTM3U\n#EXTINF:210,Artist - Title\n../Artist/Title.mp3\n", "utf8"),
     );
 
@@ -122,7 +133,7 @@ describe("playlist export", () => {
             {
               artist: "Artist",
               duration: 210,
-              path: "/music/Artist/Title.mp3",
+              path: join(mediaRoot, "Artist", "Title.mp3"),
               title: "Title",
             },
           ],
@@ -138,7 +149,7 @@ describe("playlist export", () => {
         {
           artist: "A",
           duration: 123,
-          path: "/music/a.mp3",
+          path: join(mediaRoot, "a.mp3"),
           title: "First",
           album: "Album",
           bpm: 128,
@@ -146,7 +157,10 @@ describe("playlist export", () => {
       ],
       "rekordbox",
     );
-    const imported = parsePlaylistImportFile("/tmp/rekordbox.xml", Buffer.from(exported.content));
+    const imported = parsePlaylistImportFile(
+      join(mediaRoot, "rekordbox.xml"),
+      Buffer.from(exported.content),
+    );
 
     expect(imported.format).toBe("rekordbox");
     expect(imported.playlists[0]).toEqual({
@@ -157,7 +171,7 @@ describe("playlist export", () => {
           artist: "A",
           bpm: 128,
           duration: 123,
-          path: "/music/a.mp3",
+          path: join(mediaRoot, "a.mp3"),
           title: "First",
         },
       ],
@@ -165,22 +179,29 @@ describe("playlist export", () => {
   });
 
   it("builds and parses Traktor NML playlists", () => {
+    const trackPath = join(mediaRoot, "a.mp3");
     const exported = buildPlaylistExportContent(
       playlist,
       [
         {
           artist: "A",
           duration: 123,
-          path: "/music/a.mp3",
+          path: trackPath,
           title: "First",
           bpm: 128,
         },
       ],
       "traktor",
     );
-    const imported = parsePlaylistImportFile("/tmp/traktor.nml", Buffer.from(exported.content));
+    const imported = parsePlaylistImportFile(
+      join(mediaRoot, "traktor.nml"),
+      Buffer.from(exported.content),
+    );
 
     expect(imported.format).toBe("traktor");
+    // The playlist entry is keyed on the collection path, so metadata survives
+    // the round trip. It used to arrive as a bare { path } on Windows because
+    // the written DIR used "\" while the key used "/".
     expect(imported.playlists[0]).toEqual({
       name: "Peak Time",
       tracks: [
@@ -188,31 +209,33 @@ describe("playlist export", () => {
           artist: "A",
           bpm: 128,
           duration: 123,
-          path: "/music/a.mp3",
+          path: trackPath,
           title: "First",
         },
       ],
     });
   });
 
-  it("parses Serato crate track paths", () => {
-    const imported = parsePlaylistImportFile(
-      "/Volumes/USB/_Serato_/Subcrates/Set.crate",
-      Buffer.concat([
-        seratoRecord("vrsn", utf16be("1.0/Serato ScratchLive Crate")),
-        seratoRecord("otrk", seratoRecord("ptrk", utf16be("Music/Track.mp3"))),
-      ]),
-    );
-
-    expect(imported).toEqual({
+  it("reads Serato crates whose path uses either separator style", () => {
+    const crateBytes = Buffer.concat([
+      seratoRecord("vrsn", utf16be("1.0/Serato ScratchLive Crate")),
+      seratoRecord("otrk", seratoRecord("ptrk", utf16be("Music/Track.mp3"))),
+    ]);
+    const expected = {
       format: "serato-crate",
-      playlists: [
-        {
-          name: "Set",
-          tracks: [{ path: "/Volumes/USB/Music/Track.mp3" }],
-        },
-      ],
-    });
+      playlists: [{ name: "Set", tracks: [{ path: join(mediaRoot, "Music", "Track.mp3") }] }],
+    };
+
+    // Native separators, and a crate written on the other platform.
+    const cratePaths = [
+      join(mediaRoot, "_Serato_", "Subcrates", "Set.crate"),
+      `${mediaRoot}${"/_Serato_/Subcrates/Set.crate"}`,
+      `${mediaRoot}${"\\_Serato_\\Subcrates\\Set.crate"}`,
+    ];
+
+    for (const cratePath of cratePaths) {
+      expect(parsePlaylistImportFile(cratePath, crateBytes)).toEqual(expected);
+    }
   });
 });
 

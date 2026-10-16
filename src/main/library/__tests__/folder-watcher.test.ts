@@ -93,6 +93,43 @@ describe("folder watcher", () => {
     expect(watcherMocks.watch).toHaveBeenCalledTimes(2);
     expect(watcherMocks.close).toHaveBeenCalledOnce();
   });
+
+  it("matches chokidar-reported paths regardless of separator or case on Windows", async () => {
+    vi.useFakeTimers();
+    watcherMocks.platform.mockReturnValue("win32");
+    // Windows uses the native recursive watcher, but on filesystems that do not
+    // support it the watcher throws and chokidar takes over. That is the path
+    // where reported names must be matched against the root themselves.
+    watcherMocks.nativeWatch.mockImplementationOnce(() => {
+      throw new Error("recursive watching unsupported");
+    });
+
+    const windowsFolder: LibraryFolder = {
+      id: "folder-1",
+      name: "Music",
+      path: "D:\\Music",
+      trackIds: [],
+    };
+    await watchLibraryFolders([windowsFolder]);
+
+    const onHandlers = new Map(
+      watcherMocks.on.mock.calls.map(([event, handler]) => [event as string, handler as unknown]),
+    );
+    const onChange = onHandlers.get("change") as (path: string) => void;
+    expect(onChange).toBeTypeOf("function");
+
+    // Forward-slash reports and differently-cased roots must still count as inside.
+    onChange("D:/Music/album/song.mp3");
+    onChange("d:\\music\\album\\song.mp3");
+    await vi.advanceTimersByTimeAsync(651);
+    expect(watcherMocks.send).toHaveBeenCalledExactlyOnceWith("library:folder-changed", "folder-1");
+
+    watcherMocks.send.mockClear();
+    // A sibling directory that merely shares a prefix must not match.
+    onChange("D:\\MusicArchive\\song.mp3");
+    await vi.advanceTimersByTimeAsync(651);
+    expect(watcherMocks.send).not.toHaveBeenCalled();
+  });
 });
 
 it("uses one native recursive subscription per music root and coalesces changes", async () => {
