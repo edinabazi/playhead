@@ -1,5 +1,6 @@
 import { getFolderTree, type FolderTreeNode } from "@/features/library/folder-tree";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
 import type {
   AppUpdateState,
@@ -38,8 +39,13 @@ function SidebarDetailSpinner() {
 }
 
 function SidebarGroupSkeleton() {
+  const t = useTranslation();
   return (
-    <div className="flex flex-col gap-1" role="status" aria-label="Loading SoundCloud collections">
+    <div
+      className="flex flex-col gap-1"
+      role="status"
+      aria-label={t("nav.loadingSoundCloudCollections")}
+    >
       {[72, 54, 64].map((width, index) => (
         <div
           key={index}
@@ -180,6 +186,7 @@ export function Sidebar({
   onToggleQueue: () => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
   const [foldersCollapsed, setFoldersCollapsed] = useState(false);
   const [playlistsCollapsed, setPlaylistsCollapsed] = useState(false);
   const [tagsCollapsed, setTagsCollapsed] = useState(false);
@@ -294,10 +301,10 @@ export function Sidebar({
     libraryMode === "library" ? (
       <SidebarGroup
         key="library"
-        title="Library"
+        title={t("nav.library")}
         collapsed={foldersCollapsed}
         onToggleCollapsed={() => setFoldersCollapsed((value) => !value)}
-        actionLabel="Add folder"
+        actionLabel={t("library.addFolder")}
         actionIcon={icons["folder-plus"]}
         onAction={onAddFolder}
         {...groupDragProps("library")}
@@ -306,7 +313,7 @@ export function Sidebar({
           key="library-artists"
           active={selectedSource?.type === "library-artists"}
           icon={icons.user}
-          label="Artists"
+          label={t("nav.artists")}
           detail={`${artistCount}`}
           onClick={() => onSelectSource({ type: "library-artists" })}
         />
@@ -314,7 +321,7 @@ export function Sidebar({
           key="library-albums"
           active={selectedSource?.type === "library-albums"}
           icon={icons["square-library"]}
-          label="Albums"
+          label={t("nav.albums")}
           detail={`${albumCount}`}
           onClick={() => onSelectSource({ type: "library-albums" })}
         />
@@ -322,7 +329,7 @@ export function Sidebar({
           key="library-tracks"
           active={selectedSource?.type === "library-tracks"}
           icon={icons.music}
-          label="Tracks"
+          label={t("nav.tracks")}
           detail={`${trackCount}`}
           onClick={() => onSelectSource({ type: "library-tracks" })}
         />
@@ -330,17 +337,17 @@ export function Sidebar({
     ) : (
       <SidebarGroup
         key="library"
-        title="Folders"
+        title={t("nav.foldersGroup")}
         collapsed={foldersCollapsed}
         onToggleCollapsed={() => setFoldersCollapsed((value) => !value)}
-        actionLabel="Add folder"
+        actionLabel={t("library.addFolder")}
         actionIcon={icons["folder-plus"]}
         onAction={onAddFolder}
         {...groupDragProps("library")}
       >
         {folders.length === 0 ? (
           <SidebarEmpty key="folders-empty">
-            {isScanning ? "Scanning..." : "No folders added"}
+            {isScanning ? t("library.scanning") : t("nav.noFolders")}
           </SidebarEmpty>
         ) : (
           folders.map((folder, index) =>
@@ -365,20 +372,20 @@ export function Sidebar({
     playlists: (
       <SidebarGroup
         key="playlists"
-        title="Playlists"
+        title={t("nav.playlists")}
         collapsed={playlistsCollapsed}
         onToggleCollapsed={() => setPlaylistsCollapsed((value) => !value)}
-        actionLabel="Create playlist"
+        actionLabel={t("nav.newPlaylist")}
         actionIcon={icons.plus}
         onAction={onCreatePlaylist}
         secondaryActions={[
           {
-            label: "New smart playlist",
+            label: t("nav.smartPlaylist"),
             icon: icons["list-filter"],
             onClick: onCreateSmartPlaylist,
           },
           {
-            label: "Import playlist",
+            label: t("nav.importPlaylist"),
             icon: icons.upload,
             onClick: onImportPlaylist,
           },
@@ -386,7 +393,7 @@ export function Sidebar({
         {...groupDragProps("playlists")}
       >
         {lovedCount === 0 && playlists.length === 0 && smartPlaylists.length === 0 ? (
-          <SidebarEmpty key="playlists-empty">No playlists yet</SidebarEmpty>
+          <SidebarEmpty key="playlists-empty">{t("nav.noPlaylists")}</SidebarEmpty>
         ) : (
           <>
             {lovedCount > 0 && (
@@ -395,7 +402,7 @@ export function Sidebar({
                 active={selectedSource?.type === "loved"}
                 icon={icons.heart}
                 iconFilled
-                label="Loved"
+                label={t("nav.loved")}
                 detail={`${lovedCount}`}
                 onClick={() => onSelectSource({ type: "loved" })}
               />
@@ -435,16 +442,16 @@ export function Sidebar({
     tags: (
       <SidebarGroup
         key="tags"
-        title="Tags"
+        title={t("nav.tags")}
         collapsed={tagsCollapsed}
         onToggleCollapsed={() => setTagsCollapsed((value) => !value)}
-        actionLabel="Create tag"
+        actionLabel={t("nav.createTag")}
         actionIcon={icons.plus}
         onAction={onCreateTag}
         {...groupDragProps("tags")}
       >
         {tags.length === 0 ? (
-          <SidebarEmpty key="tags-empty">No tags yet</SidebarEmpty>
+          <SidebarEmpty key="tags-empty">{t("nav.noTags")}</SidebarEmpty>
         ) : (
           tags.map((tag) => (
             <SidebarItem
@@ -464,14 +471,18 @@ export function Sidebar({
     soundcloud: (
       <SidebarGroup
         key="soundcloud"
-        title="SoundCloud"
+        title={t("nav.soundcloud")}
         collapsed={soundcloudCollapsed}
         onToggleCollapsed={() => setSoundcloudCollapsed((value) => !value)}
-        actionLabel="New SoundCloud playlist"
+        actionLabel={t("nav.newSoundCloudPlaylist")}
         actionIcon={icons.plus}
         onAction={onCreateSoundCloudPlaylist}
         secondaryActions={[
-          { label: "Refresh SoundCloud", icon: icons["rotate-ccw"], onClick: onRefreshSoundCloud },
+          {
+            label: t("nav.refreshSoundCloud"),
+            icon: icons["rotate-ccw"],
+            onClick: onRefreshSoundCloud,
+          },
         ]}
         {...groupDragProps("soundcloud")}
       >
@@ -479,7 +490,7 @@ export function Sidebar({
           soundcloudLoadingCollectionId ? (
             <SidebarGroupSkeleton />
           ) : (
-            <SidebarEmpty key="soundcloud-empty">No SoundCloud collections</SidebarEmpty>
+            <SidebarEmpty key="soundcloud-empty">{t("nav.noSoundCloudCollections")}</SidebarEmpty>
           )
         ) : (
           soundcloudSidebarCollections.map((collection) => (
@@ -526,7 +537,7 @@ export function Sidebar({
       footer={
         <button
           className="no-drag mt-[18px] hidden h-[49px] w-full shrink-0 items-center justify-center gap-2 rounded-[33px] bg-primary px-4 text-[14px] font-medium leading-none text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.48),0_14px_34px_rgba(255,255,0,0.08)] transition-colors disabled:opacity-55"
-          title={isLibraryMode ? "Manage library" : "Add folder"}
+          title={isLibraryMode ? t("nav.manageLibrary") : t("nav.addFolderTitle")}
           disabled={!isLibraryMode && isScanning}
           onClick={isLibraryMode ? onOpenSettings : onAddFolder}
         >
@@ -535,7 +546,11 @@ export function Sidebar({
           ) : (
             <FolderPlusIcon size={17} strokeWidth={1.9} />
           )}
-          {isLibraryMode ? "Manage Library" : isScanning ? "Scanning..." : "Add Folder"}
+          {isLibraryMode
+            ? t("nav.manageLibrary")
+            : isScanning
+              ? t("library.scanning")
+              : t("library.addFolder")}
         </button>
       }
     >

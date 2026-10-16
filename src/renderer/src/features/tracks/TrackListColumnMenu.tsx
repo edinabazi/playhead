@@ -4,6 +4,7 @@ import { motion, useIsPresent } from "framer-motion";
 import { Dropdown, DropdownLabel, DropdownSeparator } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { useIcons, type IconName } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import { springs } from "@/lib/springs";
 import {
   defaultTrackListSettings,
@@ -11,7 +12,6 @@ import {
   type TrackColumnId,
   type TrackListSettings,
 } from "../../../../shared/track-list";
-import { trackColumns } from "./track-columns";
 
 export const columnIcons: Record<TrackColumnId, IconName> = {
   title: "music",
@@ -26,6 +26,24 @@ export const columnIcons: Record<TrackColumnId, IconName> = {
   key: "audio-waveform",
   duration: "clock",
 };
+
+/**
+ * Maps each track column to its translation key. `track-columns.ts` keeps the
+ * untranslated labels for layout/measurement, so translation happens at render.
+ */
+export const columnLabelKeys = {
+  title: "column.title",
+  artist: "column.artist",
+  album: "column.album",
+  albumArtist: "column.albumArtist",
+  genre: "column.genre",
+  disc: "column.disc",
+  year: "column.year",
+  composer: "column.composer",
+  bpm: "column.bpm",
+  key: "column.key",
+  duration: "column.time",
+} as const satisfies Record<TrackColumnId, string>;
 
 export function getColumnMenuPosition(trigger: HTMLElement) {
   const rect = trigger.getBoundingClientRect();
@@ -63,6 +81,7 @@ export function TrackListColumnMenu({
   onClose: (restoreFocus?: boolean) => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
   const isPresent = useIsPresent();
 
@@ -114,14 +133,14 @@ export function TrackListColumnMenu({
     >
       <Dropdown
         id={id}
-        aria-label="Visible columns"
+        aria-label={t("columns.visibleAria")}
         className="thin-scrollbar w-[248px] overflow-y-auto [&>*]:shrink-0 bg-[rgba(10,10,10,0.96)] shadow-[0_12px_40px_rgba(0,0,0,0.4)]"
         style={{ maxHeight: position.maxHeight }}
       >
         <DropdownLabel className="flex items-center justify-between px-2 pb-2 pt-2">
-          <span>Show columns</span>
+          <span>{t("columns.show")}</span>
           <span className="font-mono text-[10px] tabular-nums text-muted-foreground/60">
-            {settings.columns.length} visible
+            {t("columns.visibleCount", { count: settings.columns.length })}
           </span>
         </DropdownLabel>
         {trackColumnIds.map((id, index) => (
@@ -129,11 +148,11 @@ export function TrackListColumnMenu({
             key={id}
             role="menuitemcheckbox"
             icon={icons[columnIcons[id]]}
-            label={trackColumns[id].label}
+            label={t(columnLabelKeys[id])}
             index={index}
             checked={settings.columns.includes(id)}
             aria-disabled={id === "title" || undefined}
-            title={id === "title" ? "Title is always shown" : undefined}
+            title={id === "title" ? t("columns.titleAlwaysShown") : undefined}
             tabIndex={index === 1 ? 0 : -1}
             className={id === "title" ? "cursor-default opacity-40" : "cursor-pointer"}
             onSelect={() => {
@@ -156,7 +175,7 @@ export function TrackListColumnMenu({
             role="menuitem"
             aria-checked={undefined}
             icon={icons["list-music"]}
-            label="Reset sort"
+            label={t("library.resetSort")}
             index={trackColumnIds.length + 1}
             className="cursor-pointer"
             onSelect={() => {
@@ -169,7 +188,7 @@ export function TrackListColumnMenu({
           role="menuitem"
           aria-checked={undefined}
           icon={icons["rotate-ccw"]}
-          label="Reset columns"
+          label={t("columns.resetColumns")}
           index={trackColumnIds.length}
           className="cursor-pointer"
           onSelect={() => {

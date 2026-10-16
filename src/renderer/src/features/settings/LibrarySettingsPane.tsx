@@ -1,5 +1,6 @@
 import { Switch } from "@/components/ui/switch";
 import type { IconComponent } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import { getFolderPickerName } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import type { LibraryFolder, LibrarySettings } from "../../../../shared/library";
@@ -56,6 +57,7 @@ export function LibrarySettingsPane({
   onReset: () => void;
   onSave: () => void;
 }) {
+  const t = useTranslation();
   const FolderOpenIcon = icons.folderOpen;
   const FolderPlusIcon = icons.folderPlus;
 
@@ -98,10 +100,10 @@ export function LibrarySettingsPane({
         >
           <span className="min-w-0">
             <span className="block text-[14px] font-semibold leading-5 text-foreground">
-              Find duplicate tracks
+              {t("settings.library.duplicates.title2")}
             </span>
             <span className="mt-1 block max-w-[520px] text-[12px] font-medium leading-4 text-muted-foreground">
-              List tracks that appear more than once with the same artist, title and length.
+              {t("settings.library.duplicates.description2")}
             </span>
           </span>
           <icons.chevronRight
@@ -120,10 +122,10 @@ export function LibrarySettingsPane({
       <SettingsFooter
         status={
           isScanning
-            ? "Saving and rescanning..."
+            ? t("settings.library.footer.savingAndRescanning")
             : changed
-              ? "Changes will apply after saving."
-              : "Library settings are up to date."
+              ? t("settings.status.unsaved")
+              : t("settings.status.upToDate", { category: t("settings.category.library") })
         }
         changed={changed}
         disabled={isScanning}
@@ -157,6 +159,7 @@ function AudioAnalysisCard({
   chevronRightIcon: IconComponent;
   onAnalyzeMissingAudioData: () => void;
 }) {
+  const t = useTranslation();
   const isRunning = batchAnalysis.status === "running";
   const isPreparing = isPending && !isRunning;
   const progress =
@@ -166,12 +169,12 @@ function AudioAnalysisCard({
         ? 100
         : 0;
   const description = isPreparing
-    ? "Preparing audio analysis..."
+    ? t("settings.library.analysis.preparing")
     : isRunning
       ? batchAnalysis.currentTrackTitle
-        ? `Analyzing ${batchAnalysis.currentTrackTitle}`
-        : "Analyzing library audio data."
-      : "Generate missing waveforms and BPM estimates. This can take a while with large libraries or slower computers.";
+        ? t("settings.library.analysis.analyzingTrack", { title: batchAnalysis.currentTrackTitle })
+        : t("settings.library.analysis.analyzingLibrary")
+      : t("settings.library.analysis.description");
 
   return (
     <button
@@ -186,7 +189,7 @@ function AudioAnalysisCard({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[14px] font-semibold leading-5 text-foreground">
-            Analyze missing audio data
+            {t("settings.library.analysis.title")}
           </span>
           <span className="mt-1 block max-w-[520px] text-[12px] font-medium leading-4 text-muted-foreground">
             {description}
@@ -227,18 +230,19 @@ function DisplayModeCard({
   libraryIcon: IconComponent;
   onChange: (settings: LibrarySettings) => void;
 }) {
+  const t = useTranslation();
   const options = [
     {
       mode: "library" as const,
-      label: "Library",
+      label: t("settings.library.displayMode.library"),
       icon: libraryIcon,
-      description: "Combines folders into one library.",
+      description: t("settings.library.displayMode.libraryDescription"),
     },
     {
       mode: "folder" as const,
-      label: "Folder",
+      label: t("settings.library.displayMode.folder"),
       icon: folderIcon,
-      description: "Keeps your folders visible.",
+      description: t("settings.library.displayMode.folderDescription"),
     },
   ];
 
@@ -247,10 +251,10 @@ function DisplayModeCard({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h4 className="text-balance text-[14px] font-semibold leading-5 text-foreground">
-            Display mode
+            {t("settings.library.displayMode.title")}
           </h4>
           <p className="mt-1 max-w-[520px] text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
-            Choose how Playhead displays your music library.
+            {t("settings.library.displayMode.description")}
           </p>
         </div>
       </div>
@@ -297,17 +301,21 @@ function ShowSubfoldersCard({
   settings: LibrarySettings;
   onChange: (settings: LibrarySettings) => void;
 }) {
+  const t = useTranslation();
+
   return (
     <div className="rounded-[22px] border border-white/10 bg-white/[0.035] p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h4 className="text-[14px] font-semibold leading-5 text-foreground">Show subfolders</h4>
+          <h4 className="text-[14px] font-semibold leading-5 text-foreground">
+            {t("settings.library.displayMode.showSubfolders")}
+          </h4>
           <p className="mt-1 max-w-[460px] text-[12px] font-medium leading-4 text-muted-foreground">
-            Show a collapsible subfolder tree under each watched folder.
+            {t("settings.library.displayMode.showSubfoldersDescription")}
           </p>
         </div>
         <Switch
-          aria-label="Show subfolders"
+          aria-label={t("settings.library.displayMode.showSubfolders")}
           checked={settings.showSubfolders}
           onCheckedChange={(showSubfolders) => onChange({ ...settings, showSubfolders })}
         />
@@ -338,6 +346,7 @@ function WatchedFoldersCard({
   onRemoveFolder: (folder: LibraryFolder) => void;
 }) {
   const folderPickerName = getFolderPickerName();
+  const t = useTranslation();
 
   const setDragging = (
     event: React.DragEvent<HTMLDivElement | HTMLButtonElement>,
@@ -377,9 +386,11 @@ function WatchedFoldersCard({
     >
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h4 className="text-[14px] font-semibold leading-5 text-foreground">Watched folders</h4>
+          <h4 className="text-[14px] font-semibold leading-5 text-foreground">
+            {t("settings.library.watchedFolders.title")}
+          </h4>
           <p className="mt-1 max-w-[420px] text-[12px] font-medium leading-4 text-muted-foreground">
-            Playhead scans these folders and uses them in both modes.
+            {t("settings.library.watchedFolders.description")}
           </p>
         </div>
         <button
@@ -393,7 +404,9 @@ function WatchedFoldersCard({
           ) : (
             <FolderPlusIcon size={15} strokeWidth={1.8} />
           )}
-          <span>{isScanning ? "Scanning..." : "Add Folder"}</span>
+          <span>
+            {isScanning ? t("library.scanning") : t("settings.library.watchedFolders.addFolder")}
+          </span>
         </button>
       </div>
 
@@ -402,7 +415,7 @@ function WatchedFoldersCard({
           <button
             type="button"
             className="group flex min-h-[92px] w-full flex-col items-center justify-center rounded-[16px] border border-dashed border-white/15 bg-white/[0.03] px-4 py-4 text-center transition-colors hover:border-primary/45 hover:bg-primary/[0.07] disabled:opacity-55 data-[dragging=true]:border-primary/65 data-[dragging=true]:bg-primary/[0.1]"
-            title="Add folder"
+            title={t("library.addFolder")}
             disabled={isScanning}
             onClick={onAddFolder}
             onDragOver={handleDragOver}
@@ -417,10 +430,12 @@ function WatchedFoldersCard({
               )}
             </span>
             <span className="mt-2 text-[13px] font-semibold leading-5 text-foreground">
-              {isScanning ? "Scanning..." : "Drop folders here"}
+              {isScanning
+                ? t("library.scanning")
+                : t("settings.library.watchedFolders.dropHere")}
             </span>
             <span className="text-[12px] font-medium leading-5 text-muted-foreground">
-              or click to choose from {folderPickerName}
+              {t("settings.library.watchedFolders.orClick", { picker: folderPickerName })}
             </span>
           </button>
         ) : (
@@ -448,7 +463,7 @@ function WatchedFoldersCard({
               <button
                 type="button"
                 className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-red-500/15 hover:text-red-300"
-                title={`Remove ${folder.name}`}
+                title={t("settings.library.watchedFolders.remove", { name: folder.name })}
                 onClick={() => onRemoveFolder(folder)}
               >
                 <RemoveIcon size={15} strokeWidth={1.9} />
@@ -470,13 +485,17 @@ function FileFormatsCard({
   checkIcon: IconComponent;
   onToggleExtension: (extension: string) => void;
 }) {
+  const t = useTranslation();
+
   return (
     <div className="rounded-[22px] border border-white/10 bg-white/[0.035] p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h4 className="text-[14px] font-semibold leading-5 text-foreground">File formats</h4>
+          <h4 className="text-[14px] font-semibold leading-5 text-foreground">
+            {t("settings.library.fileFormats.title")}
+          </h4>
           <p className="mt-1 max-w-[420px] text-[12px] font-medium leading-4 text-muted-foreground">
-            Choose which audio files Playhead scans and shows in folders.
+            {t("settings.library.fileFormats.scanDescription")}
           </p>
         </div>
       </div>

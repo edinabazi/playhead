@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Dropdown } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import { clampMenuPoint, shouldOpenSubmenuLeft, type MenuAnchorPoint } from "@/lib/menu-position";
 import { TrackCell } from "@/features/tracks/TrackCell";
 import type { LibraryAlbum, LibraryArtist } from "./library-model";
@@ -40,6 +41,7 @@ export function LibraryBrowser({
   onScrollPositionChange: (scrollTop: number) => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
   const MusicIcon = icons.music;
   const ChevronRightIcon = icons["chevron-right"];
   const rows = artists || albums || [];
@@ -74,7 +76,11 @@ export function LibraryBrowser({
 
     event.dataTransfer.effectAllowed = "move";
     setDraggedTrackIds(event.dataTransfer, trackIds, trackIds[0]);
-    const dragImage = createCollectionDragImage(draggedItems, trackIds.length);
+    const dragImage = createCollectionDragImage(
+      draggedItems,
+      trackIds.length,
+      t("library.trackCount", { count: trackIds.length }),
+    );
     document.body.appendChild(dragImage);
     event.dataTransfer.setDragImage(dragImage, 26, 24);
     window.setTimeout(() => dragImage.remove(), 0);
@@ -142,14 +148,15 @@ export function LibraryBrowser({
                             {artist.name}
                           </span>
                           <span className="mt-1 block truncate text-[13px] font-medium leading-[1.25] text-muted-foreground">
-                            Artist
+                            {t("library.artistsSubtitle")}
                           </span>
                         </span>
                       </div>
                       <div className="flex shrink-0 items-center gap-0 text-[13px] font-medium tabular-nums text-muted-foreground">
                         <span>
-                          {artist.trackIds.length}{" "}
-                          {artist.trackIds.length === 1 ? "track" : "tracks"}
+                          {artist.trackIds.length === 1
+                            ? t("library.trackCountOne")
+                            : t("library.trackCount", { count: artist.trackIds.length })}
                         </span>
                         <span className="grid size-8 place-items-center rounded-full text-muted-foreground transition group-hover:text-foreground">
                           <ChevronRightIcon size={17} strokeWidth={1.8} />
@@ -205,7 +212,9 @@ export function LibraryBrowser({
                       </div>
                       <div className="flex shrink-0 items-center gap-4 text-[13px] font-medium tabular-nums text-muted-foreground">
                         <span>
-                          {album.trackIds.length} {album.trackIds.length === 1 ? "track" : "tracks"}
+                          {album.trackIds.length === 1
+                            ? t("library.trackCountOne")
+                            : t("library.trackCount", { count: album.trackIds.length })}
                         </span>
                         <span className="grid size-8 place-items-center rounded-full text-muted-foreground transition group-hover:text-foreground">
                           <ChevronRightIcon size={17} strokeWidth={1.8} />
@@ -245,6 +254,7 @@ export function LibraryCollectionContextMenu({
   onClose: () => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [playlistSide, setPlaylistSide] = useState<"left" | "right">("right");
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -283,7 +293,7 @@ export function LibraryCollectionContextMenu({
         >
           <MenuItem
             icon={icons["list-plus"]}
-            label="Add to Playlist"
+            label={t("library.addToPlaylist")}
             index={0}
             className="pr-8"
             onSelect={() => setPlaylistOpen((value) => !value)}
@@ -322,7 +332,7 @@ export function LibraryCollectionContextMenu({
                 ) : (
                   <MenuItem
                     icon={icons["list-music"]}
-                    label="No Playlists"
+                    label={t("library.noPlaylistsMenu")}
                     index={0}
                     onSelect={() => undefined}
                   />
@@ -336,7 +346,11 @@ export function LibraryCollectionContextMenu({
   );
 }
 
-function createCollectionDragImage(items: Array<LibraryArtist | LibraryAlbum>, trackCount: number) {
+function createCollectionDragImage(
+  items: Array<LibraryArtist | LibraryAlbum>,
+  trackCount: number,
+  trackCountLabel: string,
+) {
   const preview = document.createElement("div");
   const visibleItems = items.slice(0, 3);
 
@@ -414,7 +428,7 @@ function createCollectionDragImage(items: Array<LibraryArtist | LibraryAlbum>, t
       });
 
       title.textContent = "title" in item ? item.title : item.name;
-      detail.textContent = `${item.trackIds.length} ${item.trackIds.length === 1 ? "track" : "tracks"}`;
+      detail.textContent = trackCountLabel;
       badge.textContent = `${trackCount}`;
       card.append(title, detail, badge);
       preview.appendChild(card);

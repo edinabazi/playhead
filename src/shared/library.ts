@@ -3,6 +3,7 @@ import type { PlaybackCopyResult } from "./playback";
 import type { TrackLyrics } from "./lyrics";
 import { defaultTrackListSettings, type TrackListSettings } from "./track-list";
 import type { SmartPlaylist } from "./smart-playlist";
+import { defaultAppLanguage, type AppLanguage } from "./language";
 
 export const libraryTrackMetadataVersion = 2;
 
@@ -289,6 +290,8 @@ export type AppearanceSettings = {
   reduceMotion: boolean;
   /** Corner radius of the main window in CSS pixels. */
   windowCornerRadius: number;
+  /** UI language. `system` follows the OS locale. */
+  language: AppLanguage;
 };
 
 export type TelemetrySettings = {
@@ -555,6 +558,8 @@ export type PlayheadApi = {
   onSoundCloudStateChanged: (callback: (state: SoundCloudState) => void) => () => void;
   minimizeWindow: () => Promise<void>;
   toggleMaximizeWindow: () => Promise<void>;
+  isWindowMaximized: () => Promise<boolean>;
+  onWindowMaximizedChanged: (callback: (maximized: boolean) => void) => () => void;
   closeWindow: () => Promise<void>;
   moveWindowTo: (x: number, y: number) => Promise<void>;
   trackEvent: (eventName: string, properties?: Record<string, string | number | boolean>) => void;
@@ -617,6 +622,7 @@ export const defaultAppearanceSettings = (): AppearanceSettings => ({
   appTransparency: 95,
   reduceMotion: false,
   windowCornerRadius: defaultWindowCornerRadius,
+  language: defaultAppLanguage,
 });
 
 export const defaultTelemetrySettings = (): TelemetrySettings => ({

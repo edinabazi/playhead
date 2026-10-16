@@ -4,6 +4,7 @@ import { DragRegionBlocker } from "@/components/ui/drag-region-blocker";
 import { showSimpleActionToast } from "@/features/toasts/action-toasts";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import type { LibraryTrack, SoundCloudComment } from "../../../../shared/library";
 import { IconButton } from "./IconButton";
 import type { PlaybackClock } from "./playback-clock";
@@ -18,6 +19,7 @@ export function CommentComposer({
   playbackClock: PlaybackClock;
   onPosted: (trackId: string, comment: SoundCloudComment) => void;
 }) {
+  const t = useTranslation();
   const icons = useIcons();
   const CommentIcon = icons["message-circle"];
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,7 @@ export function CommentComposer({
       setOpen(null);
     } catch (error) {
       showSimpleActionToast(
-        error instanceof Error ? error.message : "Could not post the comment.",
+        error instanceof Error ? error.message : t("player.commentPostFailed"),
         "error",
       );
     } finally {
@@ -68,8 +70,8 @@ export function CommentComposer({
       onKeyDown={(event) => event.stopPropagation()}
     >
       <IconButton
-        title="Comment"
-        tooltip={open ? "Close comment" : "Comment at this moment"}
+        title={t("player.comment")}
+        tooltip={open ? t("player.closeComment") : t("player.commentAtMoment")}
         active={Boolean(open)}
         ariaExpanded={Boolean(open)}
         onClick={() => setOpen((current) => (current ? null : { time: playbackClock.getTime() }))}
@@ -94,7 +96,7 @@ export function CommentComposer({
               <input
                 autoFocus
                 className="selectable h-9 min-w-0 flex-1 rounded-full border border-white/10 bg-black/30 px-3 text-[13px] font-medium text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/70"
-                placeholder={`Comment at ${formatTime(open.time)}`}
+                placeholder={t("player.commentAt", { time: formatTime(open.time) })}
                 value={body}
                 maxLength={500}
                 disabled={posting}
@@ -108,7 +110,7 @@ export function CommentComposer({
                 className="h-9 rounded-full bg-primary px-3 text-[13px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-45"
                 disabled={posting || !body.trim()}
               >
-                Post
+                {t("player.post")}
               </button>
             </div>
           </motion.form>

@@ -40,9 +40,12 @@ import {
   defaultSoundCloudSettings,
 } from "../../shared/library";
 import { getMediaArtworkSrc } from "@/lib/artwork";
+import { I18nProvider } from "@/lib/i18n";
 import { isEditableTarget } from "@/lib/dom";
 import { formatTime } from "@/lib/format";
 import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
+import { usesWindowsWindowControls } from "@/lib/platform";
+import { WindowsWindowControls } from "@/components/WindowsWindowControls";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
 import { QueueSidebar } from "@/features/player/QueueSidebar";
@@ -136,6 +139,7 @@ import { getPlayingTrackSource } from "@/features/library/playing-track-source";
 import { usePlayerKeyboardShortcuts } from "@/hooks/use-player-keyboard-shortcuts";
 import { useWindowDrag } from "@/hooks/use-window-drag";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
+import { useTranslation } from "@/lib/i18n";
 import { TrackRowMenu } from "@/features/tracks/TrackRowMenu";
 
 const waveformCachePeakRate = waveformAnalysisPeakRate;
@@ -402,6 +406,7 @@ function dismissUpdateMessage(version: string): void {
 }
 
 export function App() {
+  const t = useTranslation();
   const topGapWindowDragHandlers = useWindowDrag<HTMLDivElement>();
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -1547,7 +1552,7 @@ export function App() {
           source: "picker",
           track_count: scanned.tracks.length,
         });
-        showFolderActionToast({ folder: scanned.folder, trackCount: scanned.tracks.length });
+        showFolderActionToast({ folder: scanned.folder, trackCount: scanned.tracks.length, t });
       }
 
       const latest = libraryRef.current;
@@ -1569,7 +1574,7 @@ export function App() {
     } finally {
       finishScan(scanId);
     }
-  }, [library, persistLibrary, startScan, finishScan]);
+  }, [library, persistLibrary, startScan, finishScan, t]);
 
   const addFolderPaths = useCallback(
     async (folderPaths: string[]) => {
@@ -1600,7 +1605,11 @@ export function App() {
             source: "drop",
             track_count: scanned.tracks.length,
           });
-          showFolderActionToast({ folder: scanned.folder, trackCount: scanned.tracks.length });
+          showFolderActionToast({
+            folder: scanned.folder,
+            trackCount: scanned.tracks.length,
+            t,
+          });
         }
 
         const latest = libraryRef.current;
@@ -1623,7 +1632,7 @@ export function App() {
         finishScan(scanId);
       }
     },
-    [library, persistLibrary, startScan, finishScan],
+    [library, persistLibrary, startScan, finishScan, t],
   );
 
   const rescanLibrary = useCallback(
@@ -3680,7 +3689,8 @@ export function App() {
     !(library.settings.soundcloud.enabled && soundcloudState.connected);
 
   return (
-    <MotionConfig reducedMotion={reduceMotion ? "always" : "never"}>
+    <I18nProvider language={library.settings.appearance.language}>
+      <MotionConfig reducedMotion={reduceMotion ? "always" : "never"}>
       <main
         className={`app-window app-drag h-dvh overflow-hidden bg-transparent text-foreground ${
           reduceMotion ? "reduce-motion" : ""
@@ -3800,12 +3810,17 @@ export function App() {
             )}
           </div>
 
-          <main className="app-drag relative flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
+          <main
+            className={`app-drag relative flex min-h-0 min-w-0 flex-1 flex-col gap-[10px] ${
+              usesWindowsWindowControls() ? "pt-8" : ""
+            }`}
+          >
             <div
               className="app-drag absolute inset-x-0 top-0 z-40 h-8"
               aria-hidden="true"
               {...topGapWindowDragHandlers}
             />
+            {usesWindowsWindowControls() && <WindowsWindowControls />}
             {isLibraryEmpty ? (
               <EmptyLibraryState
                 isScanning={isScanning}
@@ -4490,6 +4505,7 @@ export function App() {
           )}
         </AnimatePresence>
       </main>
-    </MotionConfig>
+      </MotionConfig>
+    </I18nProvider>
   );
 }

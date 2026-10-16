@@ -8,6 +8,7 @@ import {
   dialogPanelMotion,
 } from "@/components/ui/dialog-motion";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import type { LibraryFolder } from "../../../../shared/library";
 
 export function RemoveFolderDialog({
@@ -20,6 +21,7 @@ export function RemoveFolderDialog({
   onClose: () => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -44,17 +46,16 @@ export function RemoveFolderDialog({
         <div className="flex items-start justify-between gap-3 px-2 pt-1">
           <div>
             <h2 className="text-[15px] font-semibold leading-6 text-foreground">
-              Remove {folder.name}?
+              {t("nav.removeFolderTitle", { folder: folder.name })}
             </h2>
             <p className="mt-1 text-[13px] font-medium leading-5 text-muted-foreground">
-              This removes the folder from Playhead. If any of its tracks are in playlists, they
-              will be removed from those playlists too. Your music files will stay where they are.
+              {t("nav.removeFolderDescription")}
             </p>
           </div>
           <button
             type="button"
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-            title="Close"
+            title={t("common.close")}
             onClick={onClose}
           >
             <icons.x size={16} strokeWidth={1.8} />
@@ -63,14 +64,14 @@ export function RemoveFolderDialog({
 
         <div className="mt-4 flex justify-end gap-2 px-2 pb-1">
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
             className="bg-red-500 text-white hover:bg-red-400 active:bg-red-600"
             onClick={onConfirm}
           >
-            Remove Folder
+            {t("nav.removeFolderConfirm")}
           </Button>
         </div>
       </DialogPanel>

@@ -8,9 +8,10 @@ import {
   dialogPanelMotion,
 } from "@/components/ui/dialog-motion";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 export function DeletePlaylistDialog({
   name,
-  description = "This removes the playlist from Playhead. Your music files will stay where they are.",
+  description,
   onConfirm,
   onClose,
 }: {
@@ -20,6 +21,8 @@ export function DeletePlaylistDialog({
   onClose: () => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
+  const resolvedDescription = description ?? t("nav.deletePlaylistDescription");
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -43,15 +46,17 @@ export function DeletePlaylistDialog({
       >
         <div className="flex items-start justify-between gap-3 px-2 pt-1">
           <div>
-            <h2 className="text-[15px] font-semibold leading-6 text-foreground">Delete {name}?</h2>
+            <h2 className="text-[15px] font-semibold leading-6 text-foreground">
+              {t("nav.deletePlaylistTitle", { name })}
+            </h2>
             <p className="mt-1 text-[13px] font-medium leading-5 text-muted-foreground">
-              {description}
+              {resolvedDescription}
             </p>
           </div>
           <button
             type="button"
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-            title="Close"
+            title={t("common.close")}
             onClick={onClose}
           >
             <icons.x size={16} strokeWidth={1.8} />
@@ -60,14 +65,14 @@ export function DeletePlaylistDialog({
 
         <div className="mt-4 flex justify-end gap-2 px-2 pb-1">
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
             className="bg-red-500 text-white hover:bg-red-400 active:bg-red-600"
             onClick={onConfirm}
           >
-            Delete Playlist
+            {t("nav.deletePlaylistConfirm")}
           </Button>
         </div>
       </DialogPanel>

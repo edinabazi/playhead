@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
 import { formatTime } from "@/lib/format";
+import { useTranslation } from "@/lib/i18n";
 import type { PlaybackClock } from "../player/playback-clock";
 import { useTrackLyrics } from "./use-track-lyrics";
 import { LyricsMenu } from "./LyricsMenu";
@@ -23,6 +24,7 @@ export function LyricsPanel({
   onSeek: (time: number) => void;
   onClose: () => void;
 }) {
+  const t = useTranslation();
   const local = Boolean(track && track.source !== "soundcloud" && !track.soundcloud);
   const { result, loading, choosing, error, setError, refresh, choose } = useTrackLyrics(
     local ? track!.id : null,
@@ -37,7 +39,7 @@ export function LyricsPanel({
   return (
     <motion.section
       id="lyrics-panel"
-      aria-label="Lyrics"
+      aria-label={t("lyrics.title")}
       className="no-drag relative -mb-4 flex min-h-0 flex-1 flex-col"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -80,25 +82,27 @@ export function LyricsPanel({
         if (!local) return;
         const files = [...event.dataTransfer.files];
         if (files.length !== 1 || !files[0].name.toLowerCase().endsWith(".lrc")) {
-          setError("Drop one .lrc lyrics file here.");
+          setError(t("lyrics.dropSingleLrc"));
           return;
         }
         const path = window.playhead.getDroppedFilePath(files[0]);
         if (path) void choose(path);
-        else setError("Couldn't open that file. Try Choose lyrics file instead.");
+        else setError(t("lyrics.openFileFailed"));
       }}
     >
       <div className="mx-4 flex h-11 shrink-0 items-center gap-2 border-b border-white/[0.08]">
         <LyricsIcon size={15} strokeWidth={1.6} className="text-muted-foreground" />
-        <h2 className="text-[12px] font-medium">Lyrics</h2>
+        <h2 className="text-[12px] font-medium">{t("lyrics.title")}</h2>
         <span
           className="min-w-0 flex-1 truncate pl-1 text-[11px] text-muted-foreground"
           title={result?.fileName}
         >
           {lyrics
-            ? `${lyrics.synced ? "Synced" : "Text"} · ${result?.source === "embedded" ? "Embedded" : result?.fileName}`
+            ? `${lyrics.synced ? t("lyrics.synced") : t("lyrics.text")} · ${
+                result?.source === "embedded" ? t("lyrics.embedded") : result?.fileName
+              }`
             : loading
-              ? "Loading…"
+              ? t("common.loading")
               : ""}
         </span>
         <LyricsMenu
@@ -109,8 +113,13 @@ export function LyricsPanel({
           onRefresh={() => void refresh()}
           onAutomatic={() => void choose(null)}
         />
-        <Tooltip content="Back to library">
-          <Button variant="ghost" size="icon-sm" aria-label="Close lyrics" onClick={onClose}>
+        <Tooltip content={t("lyrics.backToLibrary")}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t("lyrics.close")}
+            onClick={onClose}
+          >
             <CloseIcon size={14} />
           </Button>
         </Tooltip>
@@ -122,7 +131,7 @@ export function LyricsPanel({
         >
           <span className="flex-1">{message}</span>
           <Button variant="ghost" size="sm" onClick={() => void refresh()}>
-            Retry
+            {t("common.retry")}
           </Button>
         </div>
       )}
@@ -144,19 +153,19 @@ export function LyricsPanel({
             />
             <p role="status" className="text-[15px] font-medium">
               {loading
-                ? "Loading lyrics…"
+                ? t("lyrics.loading")
                 : !track
-                  ? "Play a track to see its lyrics"
+                  ? t("lyrics.playTrackToSee")
                   : !local
-                    ? "Lyrics are available for local tracks"
+                    ? t("lyrics.localOnly")
                     : message
-                      ? "Lyrics unavailable"
-                      : "No lyrics found"}
+                      ? t("lyrics.unavailable")
+                      : t("lyrics.empty")}
             </p>
             {!loading && local && (
               <>
                 <p className="mt-2 max-w-[320px] text-[13px] leading-relaxed text-muted-foreground">
-                  Choose a lyrics file, or place a matching .lrc file beside this track.
+                  {t("lyrics.chooseOrPlaceFile")}
                 </p>
                 <Button
                   className="mt-5 shrink-0 [@media(max-height:650px)]:mt-3"
@@ -166,10 +175,10 @@ export function LyricsPanel({
                   loading={choosing}
                   onClick={() => void choose()}
                 >
-                  Choose lyrics file…
+                  {t("lyrics.chooseFile")}
                 </Button>
                 <p className="mt-3 text-[11px] text-muted-foreground/60 [@media(max-height:650px)]:hidden">
-                  You can also drop an .lrc file here
+                  {t("lyrics.canDropLrc")}
                 </p>
               </>
             )}
@@ -179,7 +188,7 @@ export function LyricsPanel({
       {dragging && (
         <div className="pointer-events-none absolute inset-2 z-40 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-primary/60 bg-[rgba(15,15,15,0.96)] text-primary">
           <LyricsIcon size={32} />
-          <span className="text-[14px] font-medium">Drop lyrics for this track</span>
+          <span className="text-[14px] font-medium">{t("lyrics.dropForTrack")}</span>
         </div>
       )}
     </motion.section>
@@ -201,6 +210,7 @@ function LyricLines({
   const index = useSyncExternalStore(clock.subscribePrecise, () =>
     lyrics.synced ? activeLyricIndex(lyrics.lines, clock.getTime()) : -1,
   );
+  const t = useTranslation();
   const [following, setFollowing] = useState(true);
   const container = useRef<HTMLDivElement>(null);
   const icons = useIcons();
@@ -222,7 +232,7 @@ function LyricLines({
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div
         ref={container}
-        aria-label="Lyric lines"
+        aria-label={t("lyrics.lines")}
         tabIndex={0}
         className="thin-scrollbar relative min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/40"
         style={{
@@ -249,7 +259,10 @@ function LyricLines({
                 key={lineIndex}
                 type="button"
                 aria-current={active ? "true" : undefined}
-                aria-label={`${line.text || "Instrumental"} — seek to ${formatTime(line.time)}`}
+                aria-label={t("lyrics.seekLine", {
+                  text: line.text || t("lyrics.instrumental"),
+                  time: formatTime(line.time),
+                })}
                 onClick={() => {
                   onSeek(line.time!);
                   setFollowing(true);
@@ -291,14 +304,14 @@ function LyricLines({
               className="pointer-events-auto border border-white/10 bg-[rgba(35,35,35,0.96)] shadow-lg"
               onClick={() => setFollowing(true)}
             >
-              Follow playback
+              {t("lyrics.followPlayback")}
             </Button>
           )}
         </div>
       )}
       <div className="mx-4 flex h-7 shrink-0 items-center justify-between text-[10px] text-muted-foreground/60">
-        <span>{lyrics.synced ? "Click a line to seek" : "These lyrics have no timestamps"}</span>
-        <span>{lyrics.synced && following ? "Following playback" : ""}</span>
+        <span>{lyrics.synced ? t("lyrics.clickLineToSeek") : t("lyrics.noTimestamps")}</span>
+        <span>{lyrics.synced && following ? t("lyrics.followingPlayback") : ""}</span>
       </div>
     </div>
   );

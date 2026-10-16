@@ -8,6 +8,7 @@ import {
   dialogPanelMotion,
 } from "@/components/ui/dialog-motion";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import type { LibraryTag, LibraryTrack } from "../../../../shared/library";
 import {
   buildSmartPlaylistContext,
@@ -51,6 +52,7 @@ export function SmartPlaylistDialog({
   onClose: () => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
   const [name, setName] = useState(initial?.name ?? "");
   const [match, setMatch] = useState<SmartPlaylistDraft["match"]>(initial?.match ?? "all");
   const [rules, setRules] = useState<SmartPlaylistRule[]>(initial?.rules ?? [newRule()]);
@@ -98,16 +100,16 @@ export function SmartPlaylistDialog({
         <div className="flex items-start justify-between gap-3 px-2 pt-1">
           <div>
             <h2 className="text-[15px] font-semibold leading-6 text-foreground">
-              {initial ? "Edit Smart Playlist" : "New Smart Playlist"}
+              {t(initial ? "playlistDialog.editSmart.title" : "playlistDialog.newSmart.title")}
             </h2>
             <p className="mt-1 text-[13px] font-medium leading-5 text-muted-foreground">
-              Tracks that match the rules are added automatically as your library changes.
+              {t("playlistDialog.smart.description")}
             </p>
           </div>
           <button
             type="button"
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-            title="Close"
+            title={t("common.close")}
             onClick={onClose}
           >
             <icons.x size={16} strokeWidth={1.8} />
@@ -120,19 +122,19 @@ export function SmartPlaylistDialog({
             value={name}
             onChange={(event) => setName(event.target.value)}
             className="h-10 w-full rounded-[18px] border border-white/10 bg-white/[0.055] px-3 text-[14px] font-medium text-foreground outline-none"
-            placeholder="Playlist name"
+            placeholder={t("playlist.name")}
           />
           <div className="flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
-            Match
+            {t("playlistDialog.match")}
             <select
               className={controlClass}
               value={match}
               onChange={(event) => setMatch(event.target.value as SmartPlaylistDraft["match"])}
             >
-              <option value="all">all</option>
-              <option value="any">any</option>
+              <option value="all">{t("playlistDialog.matchAll")}</option>
+              <option value="any">{t("playlistDialog.matchAny")}</option>
             </select>
-            of these rules
+            {t("playlistDialog.ofTheseRules")}
           </div>
           <div className="thin-scrollbar max-h-[300px] space-y-2 overflow-y-auto">
             {rules.map((rule) => {
@@ -140,7 +142,7 @@ export function SmartPlaylistDialog({
               return (
                 <div key={rule.id} className="flex items-center gap-2">
                   <select
-                    aria-label="Field"
+                    aria-label={t("playlistDialog.field")}
                     className={controlClass}
                     value={rule.field}
                     onChange={(event) =>
@@ -149,12 +151,12 @@ export function SmartPlaylistDialog({
                   >
                     {fieldOrder.map((field) => (
                       <option key={field} value={field}>
-                        {smartPlaylistFields[field].label}
+                        {t(smartPlaylistFields[field].labelKey)}
                       </option>
                     ))}
                   </select>
                   <select
-                    aria-label="Condition"
+                    aria-label={t("playlistDialog.condition")}
                     className={controlClass}
                     value={rule.operator}
                     onChange={(event) =>
@@ -165,18 +167,18 @@ export function SmartPlaylistDialog({
                   >
                     {smartPlaylistOperators[kind].map((operator) => (
                       <option key={operator.value} value={operator.value}>
-                        {operator.label}
+                        {t(operator.labelKey)}
                       </option>
                     ))}
                   </select>
                   {kind === "tag" ? (
                     <select
-                      aria-label="Tag"
+                      aria-label={t("playlistDialog.tag")}
                       className={`${controlClass} min-w-0 flex-1`}
                       value={rule.value}
                       onChange={(event) => updateRule(rule.id, { value: event.target.value })}
                     >
-                      <option value="">Choose a tag</option>
+                      <option value="">{t("playlistDialog.chooseTag")}</option>
                       {tags.map((tag) => (
                         <option key={tag.id} value={tag.id}>
                           {tag.name}
@@ -185,12 +187,12 @@ export function SmartPlaylistDialog({
                     </select>
                   ) : kind === "boolean" ? (
                     <span className="flex-1 text-[13px] font-medium text-muted-foreground">
-                      loved
+                      {t("playlistDialog.loved")}
                     </span>
                   ) : (
                     <>
                       <input
-                        aria-label="Value"
+                        aria-label={t("playlistDialog.value")}
                         className={`${controlClass} min-w-0 flex-1`}
                         inputMode={kind === "text" ? undefined : "decimal"}
                         value={rule.value}
@@ -198,9 +200,11 @@ export function SmartPlaylistDialog({
                       />
                       {rule.operator === "between" && (
                         <>
-                          <span className="text-[13px] text-muted-foreground">and</span>
+                          <span className="text-[13px] text-muted-foreground">
+                            {t("playlistDialog.and")}
+                          </span>
                           <input
-                            aria-label="Upper value"
+                            aria-label={t("playlistDialog.upperValue")}
                             className={`${controlClass} w-20`}
                             inputMode="decimal"
                             value={rule.value2 ?? ""}
@@ -214,7 +218,7 @@ export function SmartPlaylistDialog({
                   )}
                   <button
                     type="button"
-                    aria-label="Remove rule"
+                    aria-label={t("playlistDialog.removeRule")}
                     className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground disabled:opacity-30"
                     disabled={rules.length === 1}
                     onClick={() =>
@@ -233,20 +237,22 @@ export function SmartPlaylistDialog({
             onClick={() => setRules((current) => [...current, newRule()])}
           >
             <icons.plus size={14} strokeWidth={1.8} />
-            Add rule
+            {t("playlistDialog.addRule")}
           </button>
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-2 px-2 pb-1">
           <span className="text-[12px] font-medium tabular-nums text-muted-foreground">
-            {matchCount} {matchCount === 1 ? "track matches" : "tracks match"}
+            {t(matchCount === 1 ? "playlistDialog.trackMatches" : "playlistDialog.tracksMatch", {
+              count: matchCount,
+            })}
           </span>
           <div className="flex gap-2">
             <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={!name.trim() || rules.length === 0}>
-              {initial ? "Save" : "Create"}
+              {t(initial ? "common.save" : "common.create")}
             </Button>
           </div>
         </div>

@@ -8,12 +8,13 @@ import {
   dialogPanelMotion,
 } from "@/components/ui/dialog-motion";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 
 export function CreatePlaylistDialog({
-  title = "Create Playlist",
-  description = "Name the playlist before adding it to Playhead.",
+  title,
+  description,
   initialName = "",
-  submitLabel = "Create",
+  submitLabel,
   onCreate,
   onClose,
 }: {
@@ -25,6 +26,10 @@ export function CreatePlaylistDialog({
   onClose: () => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
+  const resolvedTitle = title ?? t("playlistDialog.create.title");
+  const resolvedDescription = description ?? t("playlistDialog.create.description");
+  const resolvedSubmitLabel = submitLabel ?? t("playlistDialog.create.submit");
   const [name, setName] = useState(initialName);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -62,15 +67,17 @@ export function CreatePlaylistDialog({
       >
         <div className="flex items-start justify-between gap-3 px-2 pt-1">
           <div>
-            <h2 className="text-[15px] font-semibold leading-6 text-foreground">{title}</h2>
+            <h2 className="text-[15px] font-semibold leading-6 text-foreground">
+              {resolvedTitle}
+            </h2>
             <p className="mt-1 text-[13px] font-medium leading-5 text-muted-foreground">
-              {description}
+              {resolvedDescription}
             </p>
           </div>
           <button
             type="button"
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-            title="Close"
+            title={t("common.close")}
             onClick={onClose}
           >
             <icons.x size={16} strokeWidth={1.8} />
@@ -83,16 +90,16 @@ export function CreatePlaylistDialog({
             value={name}
             onChange={(event) => setName(event.target.value)}
             className="h-10 w-full rounded-[18px] border border-white/10 bg-white/[0.055] px-3 text-[14px] font-medium text-foreground outline-none"
-            placeholder="Playlist name"
+            placeholder={t("playlist.name")}
           />
         </div>
 
         <div className="mt-4 flex justify-end gap-2 px-2 pb-1">
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="submit" disabled={!name.trim()}>
-            {submitLabel}
+            {resolvedSubmitLabel}
           </Button>
         </div>
       </DialogForm>

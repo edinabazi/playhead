@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatTime } from "@/lib/format";
+import { useTranslation } from "@/lib/i18n";
 import type { SoundCloudComment } from "../../../../shared/library";
 import type { PlaybackClock } from "./playback-clock";
 import { bucketComments, findActiveComment } from "./waveform-comments";
@@ -26,6 +27,7 @@ export function WaveformComments({
   reduceMotion: boolean;
   onSeek: (time: number) => void;
 }) {
+  const t = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [hovered, setHovered] = useState<{ comment: SoundCloudComment; position: number } | null>(
@@ -69,9 +71,17 @@ export function WaveformComments({
     <div ref={containerRef} className="pointer-events-none absolute inset-0 z-[1]">
       {slots.map((slot) => {
         const left = slot.position * width;
-        const title = `${slot.comment.username} at ${formatTime(slot.comment.time)}${
-          slot.count > 1 ? ` (+${slot.count - 1} more)` : ""
-        }`;
+        const title =
+          slot.count > 1
+            ? t("waveform.commentMore", {
+                username: slot.comment.username,
+                time: formatTime(slot.comment.time),
+                count: slot.count - 1,
+              })
+            : t("waveform.commentAt", {
+                username: slot.comment.username,
+                time: formatTime(slot.comment.time),
+              });
         return (
           <button
             key={slot.comment.id}

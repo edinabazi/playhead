@@ -1,6 +1,7 @@
 import { scheduleMeterFrames } from "./meter-scheduler";
 import type { ChannelLevels } from "@/features/audio/audio-engine";
 import { useWindowDrag } from "@/hooks/use-window-drag";
+import { useTranslation } from "@/lib/i18n";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -49,6 +50,7 @@ export function LevelsPanel({
   onMeteringChange: (enabled: boolean) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const t = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const channelsRef = useRef([createMeterChannelState(), createMeterChannelState()]);
   const levelsRef = useRef<ChannelLevels>({ peak: [0, 0] });
@@ -165,7 +167,7 @@ export function LevelsPanel({
               className="app-drag block w-full"
               style={{ height: ledMeterHeight }}
               role="img"
-              aria-label="Left and right channel level meters"
+              aria-label={t("levels.aria")}
             />
           </div>
         </motion.div>

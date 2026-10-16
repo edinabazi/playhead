@@ -13,6 +13,7 @@ import {
 import { electron } from "../electron";
 import { materializeStoredArtwork } from "../artwork";
 import { normalizeTrackListSettings } from "../../shared/track-list";
+import { normalizeAppLanguage } from "../../shared/language";
 
 const { app } = electron;
 let operationQueue: Promise<void> = Promise.resolve();
@@ -327,7 +328,11 @@ export function normalizeSettings(
     return {
       library: { ...defaults.library, ...(grouped.library || {}) },
       playback: { ...defaults.playback, ...(grouped.playback || {}) },
-      appearance: { ...defaults.appearance, ...(grouped.appearance || {}) },
+      appearance: {
+        ...defaults.appearance,
+        ...(grouped.appearance || {}),
+        language: normalizeAppLanguage(grouped.appearance?.language),
+      },
       telemetry: { ...defaults.telemetry, ...(grouped.telemetry || {}) },
       lastfm: { ...defaults.lastfm, ...(grouped.lastfm || {}) },
       soundcloud: { ...defaults.soundcloud, ...(grouped.soundcloud || {}) },

@@ -9,6 +9,7 @@ import type { LibraryAlbum, LibraryArtist } from "@/features/library/library-mod
 import { LibraryCollectionContextMenu } from "@/features/library/LibraryBrowser";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
 import type {
   LibraryFolder,
@@ -122,6 +123,7 @@ export function TrackSearchDialog({
   onShowMetadata: (track: LibraryTrack) => void;
   onClose: () => void;
 }) {
+  const t = useTranslation();
   const icons = useIcons();
   const MusicIcon = icons.music;
   const ArtistIcon = icons.user;
@@ -146,7 +148,12 @@ export function TrackSearchDialog({
     setRequestedMode(
       modes[(modes.indexOf(mode) + direction + modes.length) % modes.length] || "all",
     );
-  const modeLabel = isScoped && scope ? scope.title : isSoundCloud ? "SoundCloud" : "All tracks";
+  const modeLabel =
+    isScoped && scope
+      ? scope.title
+      : isSoundCloud
+        ? t("search.soundcloud")
+        : t("search.allTracks");
   const searchTracks = isScoped && scope ? scope.tracks : tracks;
   const [soundcloudResults, setSoundCloudResults] = useState<{
     query: string;
@@ -172,7 +179,7 @@ export function TrackSearchDialog({
             setSoundCloudResults({
               query: soundcloudQuery,
               tracks: [],
-              error: error instanceof Error ? error.message : "SoundCloud search failed.",
+              error: error instanceof Error ? error.message : t("search.soundCloudFailed"),
             });
         });
     }, 300);
@@ -180,7 +187,7 @@ export function TrackSearchDialog({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [soundcloudQuery]);
+  }, [soundcloudQuery, t]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [contextMenu, setContextMenu] = useState<
     | { type: "track"; track: LibraryTrack; point: MenuAnchorPoint }
@@ -353,10 +360,10 @@ export function TrackSearchDialog({
             value={query}
             placeholder={
               isScoped && scope
-                ? `Search in ${scope.title}`
+                ? t("search.inScope", { scope: scope.title })
                 : isSoundCloud
-                  ? "Search SoundCloud"
-                  : "Search tracks"
+                  ? t("search.soundcloud")
+                  : t("search.tracksPlaceholder")
             }
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -389,8 +396,8 @@ export function TrackSearchDialog({
           {modes.length > 1 ? (
             <button
               type="button"
-              aria-label={`Searching ${modeLabel}. Press Tab to change.`}
-              title="Press Tab to switch what you're searching"
+              aria-label={t("search.searchingMode", { mode: modeLabel })}
+              title={t("search.pressTabToSwitch")}
               className={`flex max-w-[220px] shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium transition-colors ${
                 mode !== "all"
                   ? "border-primary/40 bg-primary/15 text-foreground"
@@ -416,11 +423,11 @@ export function TrackSearchDialog({
             <div className="grid h-32 place-items-center text-[13px] text-muted-foreground">
               {isSoundCloud
                 ? !soundcloudQuery
-                  ? "Type to search SoundCloud."
+                  ? t("search.typeToSearchSoundCloud")
                   : soundcloudLoading
-                    ? "Searching SoundCloud…"
-                    : soundcloudResults?.error || "No tracks found on SoundCloud."
-                : "No tracks found."}
+                    ? t("search.searchingSoundCloud")
+                    : soundcloudResults?.error || t("search.noSoundCloudResults")
+                : t("search.noTracksFound")}
             </div>
           ) : (
             results.map((result, index) => {
@@ -486,9 +493,9 @@ export function TrackSearchDialog({
                     </div>
                     <div className="mt-1 truncate text-[13px] font-medium leading-[1.2] text-muted-foreground">
                       {result.type === "artist"
-                        ? `${result.artist.trackIds.length} ${
-                            result.artist.trackIds.length === 1 ? "track" : "tracks"
-                          }`
+                        ? result.artist.trackIds.length === 1
+                          ? t("search.trackCountOne")
+                          : t("search.trackCount", { count: result.artist.trackIds.length })
                         : result.type === "album"
                           ? result.album.artist
                           : result.track.artist}
@@ -503,19 +510,19 @@ export function TrackSearchDialog({
                     !result.track.soundcloud &&
                     libraryMode === "folder" && (
                       <div className="max-w-[170px] truncate text-right text-[12px] font-medium text-[var(--text-tertiary)]">
-                        {folderNames.get(result.track.folderId) || "Folder"}
+                        {folderNames.get(result.track.folderId) || t("search.folderFallback")}
                       </div>
                     )}
                   {result.type === "track" &&
                     !result.track.soundcloud &&
                     libraryMode === "library" && (
                       <div className="max-w-[120px] truncate text-right text-[12px] font-medium text-[var(--text-tertiary)]">
-                        Track
+                        {t("search.kindTrack")}
                       </div>
                     )}
                   {result.type !== "track" && (
                     <div className="max-w-[120px] truncate text-right text-[12px] font-medium text-[var(--text-tertiary)]">
-                      {result.type === "artist" ? "Artist" : "Album"}
+                      {result.type === "artist" ? t("search.kindArtist") : t("search.kindAlbum")}
                     </div>
                   )}
                 </button>

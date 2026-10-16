@@ -1,4 +1,5 @@
 import { Switch } from "@/components/ui/switch";
+import { useTranslation } from "@/lib/i18n";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import type { EqualizerSettings } from "../../../../shared/library";
@@ -42,6 +43,7 @@ export function SoundPanel({
   onEqualizerChange: (equalizer: EqualizerSettings) => void;
   onVolumeBoostChange: (enabled: boolean) => void;
 }) {
+  const t = useTranslation();
   const [draft, setDraft] = useState(equalizer);
   const draftRef = useRef(equalizer);
 
@@ -68,7 +70,7 @@ export function SoundPanel({
         <motion.div
           id={id}
           role="region"
-          aria-label="Sound settings"
+          aria-label={t("sound.aria")}
           onKeyDown={(event) => {
             if (event.key !== "Escape") event.stopPropagation();
           }}
@@ -81,14 +83,16 @@ export function SoundPanel({
         >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h4 className="text-[14px] font-semibold leading-5 text-foreground">Equalizer</h4>
+              <h4 className="text-[14px] font-semibold leading-5 text-foreground">
+                {t("sound.equalizer")}
+              </h4>
               <p className="mt-1 text-[12px] font-medium leading-4 text-muted-foreground">
-                Applies to everything Playhead plays.
+                {t("sound.equalizer.description")}
               </p>
             </div>
             <Switch
               checked={draft.enabled}
-              aria-label="Equalizer"
+              aria-label={t("sound.equalizer")}
               onCheckedChange={(enabled) => commit({ ...draftRef.current, enabled })}
             />
           </div>
@@ -119,7 +123,9 @@ export function SoundPanel({
           {draft.preset === "quiet" && (
             <div className="mt-2.5 rounded-[14px] border border-primary/15 bg-primary/[0.05] px-3 py-2">
               <div className="flex items-center gap-2.5">
-                <span className="text-[12px] font-medium text-muted-foreground">Strength</span>
+                <span className="text-[12px] font-medium text-muted-foreground">
+                  {t("sound.strength")}
+                </span>
                 <div className="flex rounded-full bg-white/[0.06] p-0.5">
                   {quietListeningStrengthOrder.map((strength) => (
                     <button
@@ -144,7 +150,7 @@ export function SoundPanel({
                 </div>
               </div>
               <p className="mt-1.5 text-[12px] font-medium leading-4 text-muted-foreground">
-                Bass stays put, mids and highs step back. For low system volume.
+                {t("sound.quiet.description")}
               </p>
             </div>
           )}
@@ -156,8 +162,8 @@ export function SoundPanel({
           <div className="mt-2 flex items-start gap-0.5">
             <div className="mr-2 flex">
               <EqualizerBandSlider
-                label="Pre"
-                ariaLabel="Preamp"
+                label={t("sound.preampShort")}
+                ariaLabel={t("sound.preamp")}
                 gainDb={draft.preampDb}
                 disabled={!draft.enabled}
                 onPreview={(gainDb) =>
@@ -187,27 +193,30 @@ export function SoundPanel({
 
           <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/[0.08] pt-3">
             <div>
-              <h4 className="text-[13px] font-semibold leading-5 text-foreground">Volume boost</h4>
+              <h4 className="text-[13px] font-semibold leading-5 text-foreground">
+                {t("sound.volumeBoost")}
+              </h4>
               <p className="mt-0.5 text-[12px] font-medium leading-4 text-muted-foreground">
-                Lets volume go up to 200% and lifts quiet tracks when normalizing. A limiter
-                controls output peaks.
+                {t("sound.volumeBoost.description")}
               </p>
             </div>
             <Switch
               checked={volumeBoostEnabled}
-              aria-label="Volume boost"
+              aria-label={t("sound.volumeBoost")}
               onCheckedChange={onVolumeBoostChange}
             />
           </div>
 
           <div className="mt-4 border-t border-white/[0.08] pt-3">
             <div className="flex items-center justify-between gap-4">
-              <h4 className="text-[13px] font-semibold leading-5 text-foreground">Speed</h4>
+              <h4 className="text-[13px] font-semibold leading-5 text-foreground">
+                {t("sound.speed")}
+              </h4>
               <label className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
-                Keep pitch
+                {t("sound.keepPitch")}
                 <Switch
                   checked={preservePitch}
-                  aria-label="Keep pitch"
+                  aria-label={t("sound.keepPitch")}
                   onCheckedChange={(checked) => onPlaybackRateChange(playbackRate, checked)}
                 />
               </label>

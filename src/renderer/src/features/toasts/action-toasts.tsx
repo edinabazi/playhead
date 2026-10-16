@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import type { LibraryFolder, LibraryTrack } from "../../../../shared/library";
 import { getArtworkSrc } from "@/lib/artwork";
+import type { Translate } from "@/lib/i18n";
 
 const richToastDuration = 2600;
 const simpleToastDuration = 2200;
@@ -43,13 +44,24 @@ export function showTrackActionToast({
   );
 }
 
+/**
+ * `showFolderActionToast` is called from event handlers rather than rendered as a
+ * component, so it has no hook context: the caller passes the translator in, exactly
+ * as it already does for `action` on `showTrackActionToast`.
+ */
 export function showFolderActionToast({
   folder,
   trackCount,
+  t,
 }: {
   folder: LibraryFolder;
   trackCount: number;
+  t: Translate;
 }) {
+  const scannedLabel =
+    trackCount === 1
+      ? t("toast.trackScanned", { count: trackCount })
+      : t("toast.tracksScanned", { count: trackCount });
   toast.custom(
     () => (
       <div className="flex w-[320px] items-center gap-3 rounded-[20px] border border-white/10 bg-[rgba(10,10,10,0.96)] p-3 text-foreground shadow-2xl backdrop-blur-xl">
@@ -57,12 +69,14 @@ export function showFolderActionToast({
           {folder.name.slice(0, 1).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-semibold leading-4 text-primary">Folder added</p>
+          <p className="text-[12px] font-semibold leading-4 text-primary">
+            {t("toast.folderAdded")}
+          </p>
           <p className="mt-0.5 truncate text-[13px] font-semibold leading-4 text-foreground">
             {folder.name}
           </p>
           <p className="mt-0.5 truncate text-[12px] font-medium leading-4 text-muted-foreground">
-            {trackCount} {trackCount === 1 ? "track" : "tracks"} scanned
+            {scannedLabel}
           </p>
         </div>
       </div>

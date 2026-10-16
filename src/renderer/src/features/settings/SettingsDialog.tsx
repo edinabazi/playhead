@@ -26,12 +26,13 @@ import {
 } from "@/components/ui/dialog-motion";
 import { showSimpleActionToast } from "@/features/toasts/action-toasts";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import { getPrimaryModifierLabel } from "@/lib/platform";
 import {
   advancedConfirmationCopy,
   destructiveAdvancedActions,
   fileFormatOptions,
-  settingsHeaderDescriptions,
+  settingsHeaderDescriptionKeys,
   type SettingsCategoryId,
 } from "./settings-config";
 import { AdvancedSettingsPane } from "./AdvancedSettingsPane";
@@ -137,6 +138,7 @@ export function SettingsDialog({
   onClose: () => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
   const FolderOpenIcon = icons["folder-open"];
   const FolderPlusIcon = icons["folder-plus"];
   const CheckIcon = icons.check;
@@ -191,7 +193,8 @@ export function SettingsDialog({
   const appearanceSettingsChanged =
     savedAppearanceSettings.appTransparency !== draftAppearanceSettings.appTransparency ||
     savedAppearanceSettings.reduceMotion !== draftAppearanceSettings.reduceMotion ||
-    savedAppearanceSettings.windowCornerRadius !== draftAppearanceSettings.windowCornerRadius;
+    savedAppearanceSettings.windowCornerRadius !== draftAppearanceSettings.windowCornerRadius ||
+    savedAppearanceSettings.language !== draftAppearanceSettings.language;
   const telemetrySettingsChanged =
     savedTelemetrySettings.enabled !== draftTelemetrySettings.enabled;
   const hasUnsavedChanges =
@@ -200,12 +203,12 @@ export function SettingsDialog({
     appearanceSettingsChanged ||
     telemetrySettingsChanged;
   const categories = [
-    { id: "library", label: "Library", icon: FolderOpenIcon },
-    { id: "playback", label: "Playback", icon: icons.play },
-    { id: "appearance", label: "Appearance", icon: icons.palette },
-    { id: "shortcuts", label: "Shortcuts", icon: icons.keyboard },
-    { id: "integrations", label: "Integrations", icon: icons["radio-tower"] },
-    { id: "advanced", label: "Advanced", icon: icons.settings },
+    { id: "library", label: t("settings.category.library"), icon: FolderOpenIcon },
+    { id: "playback", label: t("settings.category.playback"), icon: icons.play },
+    { id: "appearance", label: t("settings.category.appearance"), icon: icons.palette },
+    { id: "shortcuts", label: t("settings.category.shortcuts"), icon: icons.keyboard },
+    { id: "integrations", label: t("settings.category.integrations"), icon: icons["radio-tower"] },
+    { id: "advanced", label: t("settings.category.advanced"), icon: icons.settings },
   ] satisfies Array<{
     id: SettingsCategoryId;
     label: string;
@@ -216,84 +219,104 @@ export function SettingsDialog({
   const shiftSeekStep = savedPlaybackSettings.seekStepSeconds * 2;
   const shiftVolumeStep = savedPlaybackSettings.volumeStepPercent * 2;
   const shortcuts = [
-    { action: "Play or pause", keys: ["Space"] },
+    { action: t("settings.shortcuts.playPause"), keys: ["Space"] },
     {
-      action: "Search tracks",
+      action: t("settings.shortcuts.search"),
       keys: [`${modifierLabel} K`],
       secondaryKeys: [`${modifierLabel} F`],
     },
-    { action: "Open settings", keys: [`${modifierLabel} ,`] },
-    { action: "Jump to currently playing song", keys: [`${modifierLabel} J`] },
+    { action: t("settings.shortcuts.openSettings"), keys: [`${modifierLabel} ,`] },
+    { action: t("settings.shortcuts.jumpToPlaying"), keys: [`${modifierLabel} J`] },
     {
-      action: "Seek backward",
+      action: t("settings.shortcuts.seekBackward"),
       keys: ["←"],
-      detail: `${savedPlaybackSettings.seekStepSeconds} seconds. Hold Shift for ${shiftSeekStep} seconds.`,
+      detail: t("settings.shortcuts.seekDetail", {
+        seconds: savedPlaybackSettings.seekStepSeconds,
+        shift: shiftSeekStep,
+      }),
     },
     {
-      action: "Seek forward",
+      action: t("settings.shortcuts.seekForward"),
       keys: ["→"],
-      detail: `${savedPlaybackSettings.seekStepSeconds} seconds. Hold Shift for ${shiftSeekStep} seconds.`,
+      detail: t("settings.shortcuts.seekDetail", {
+        seconds: savedPlaybackSettings.seekStepSeconds,
+        shift: shiftSeekStep,
+      }),
     },
-    { action: "Select previous track", keys: ["↑"], detail: "Hold Shift to jump 10 tracks." },
-    { action: "Select next track", keys: ["↓"], detail: "Hold Shift to jump 10 tracks." },
-    { action: "Play selected track", keys: ["Enter"] },
-    { action: "Love selected track", keys: ["L"] },
     {
-      action: "Add marker",
+      action: t("settings.shortcuts.selectPrevious"),
+      keys: ["↑"],
+      detail: t("settings.shortcuts.jumpTracksDetail"),
+    },
+    {
+      action: t("settings.shortcuts.selectNext"),
+      keys: ["↓"],
+      detail: t("settings.shortcuts.jumpTracksDetail"),
+    },
+    { action: t("settings.shortcuts.playSelected"), keys: ["Enter"] },
+    { action: t("settings.shortcuts.loveSelected"), keys: ["L"] },
+    {
+      action: t("settings.shortcuts.addMarker"),
       keys: ["M"],
-      detail: "Drops a marker at the playhead. Double-click a marker to rename it.",
+      detail: t("settings.shortcuts.markerDetail"),
     },
     {
-      action: "Loop a section",
+      action: t("settings.shortcuts.loopSection"),
       keys: ["Shift", "Drag"],
-      detail: "Drag across the waveform while holding Shift.",
+      detail: t("settings.shortcuts.loopDetail"),
     },
     {
-      action: "Volume up",
+      action: t("settings.shortcuts.volumeUp"),
       keys: [`${modifierLabel} ↑`],
-      detail: `${savedPlaybackSettings.volumeStepPercent}%. Hold Shift for ${shiftVolumeStep}%.`,
+      detail: t("settings.shortcuts.volumeDetail", {
+        percent: savedPlaybackSettings.volumeStepPercent,
+        shift: shiftVolumeStep,
+      }),
     },
     {
-      action: "Volume down",
+      action: t("settings.shortcuts.volumeDown"),
       keys: [`${modifierLabel} ↓`],
-      detail: `${savedPlaybackSettings.volumeStepPercent}%. Hold Shift for ${shiftVolumeStep}%.`,
+      detail: t("settings.shortcuts.volumeDetail", {
+        percent: savedPlaybackSettings.volumeStepPercent,
+        shift: shiftVolumeStep,
+      }),
     },
   ];
   const advancedActions = [
     {
       id: "open-data-folder",
-      title: "Open data folder",
-      description: "Open Playhead's app data folder.",
+      title: t("settings.advanced.list.openDataFolder.title"),
+      description: t("settings.advanced.list.openDataFolder.description"),
       icon: icons["folder-open"],
     },
     {
       id: "clear-waveform-cache",
-      title: "Clear waveform cache",
-      description: "Remove generated waveform files so they can be rebuilt.",
+      title: t("settings.advanced.list.clearWaveformCache.title"),
+      description: t("settings.advanced.list.clearWaveformCache.description"),
       icon: icons["audio-waveform"],
     },
     {
       id: "rebuild-library-index",
-      title: "Rebuild library index",
-      description: "Rescan every folder and remove tracks that no longer exist.",
+      title: t("settings.advanced.list.rebuildIndex.title"),
+      description: t("settings.advanced.list.rebuildIndex.description"),
       icon: icons["rotate-ccw"],
     },
     {
       id: "reset-app-state",
-      title: "Reset app state",
-      description: "Clear saved playback/session state without removing your library.",
+      title: t("settings.advanced.list.resetState.title"),
+      description: t("settings.advanced.list.resetState.description"),
       icon: icons["trash-2"],
     },
     {
       id: "export-library-backup",
-      title: "Export library backup",
-      description: "Save a JSON backup of your library and settings.",
+      title: t("settings.advanced.list.exportBackup.title"),
+      description: t("settings.advanced.list.exportBackup.description"),
       icon: icons["folder-open"],
     },
     {
       id: "import-library-backup",
-      title: "Import library backup",
-      description: "Restore a previously exported Playhead backup.",
+      title: t("settings.advanced.list.importBackup.title"),
+      description: t("settings.advanced.list.importBackup.description"),
       icon: icons["folder-plus"],
     },
   ] satisfies Array<{
@@ -458,7 +481,7 @@ export function SettingsDialog({
           }`}
         >
           <div className="pt-3 px-3.5">
-            <h3 className="font-semibold">Playhead Settings</h3>
+            <h3 className="font-semibold">{t("settings.title")}</h3>
           </div>
           <nav className="flex flex-col gap-1 pt-7">
             {categories.map((category) => {
@@ -484,7 +507,7 @@ export function SettingsDialog({
           <div className="mt-auto px-3.5 pb-1 text-[11px] leading-4 text-muted-foreground/65">
             <p>Playhead {__APP_VERSION__}</p>
             <p>
-              Designed and built by{" "}
+              {t("settings.designedBy")}{" "}
               <a
                 href="https://edinabazi.com"
                 className="hover:text-muted-foreground cursor-pointer!"
@@ -507,7 +530,7 @@ export function SettingsDialog({
                 {activeCategoryMeta.label}
               </h3>
               <p className="mt-0.5 text-[12px] font-medium leading-4 text-muted-foreground">
-                {settingsHeaderDescriptions[activeCategory]}
+                {t(settingsHeaderDescriptionKeys[activeCategory])}
               </p>
             </div>
             <button
@@ -637,16 +660,16 @@ export function SettingsDialog({
             <div className="flex items-start justify-between gap-3 px-2 pt-1">
               <div>
                 <h2 className="text-[15px] font-semibold leading-6 text-foreground">
-                  {advancedConfirmationCopy[advancedActionPendingConfirmation].title}
+                  {t(advancedConfirmationCopy[advancedActionPendingConfirmation].titleKey)}
                 </h2>
                 <p className="mt-1 text-[13px] font-medium leading-5 text-muted-foreground">
-                  {advancedConfirmationCopy[advancedActionPendingConfirmation].description}
+                  {t(advancedConfirmationCopy[advancedActionPendingConfirmation].descriptionKey)}
                 </p>
               </div>
               <button
                 type="button"
                 className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-                title="Close"
+                title={t("common.close")}
                 onClick={() => setAdvancedActionPendingConfirmation(null)}
               >
                 <icons.x size={16} strokeWidth={1.8} />
@@ -659,7 +682,7 @@ export function SettingsDialog({
                 variant="ghost"
                 onClick={() => setAdvancedActionPendingConfirmation(null)}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 type="button"
@@ -667,7 +690,7 @@ export function SettingsDialog({
                 disabled={Boolean(pendingAdvancedAction)}
                 onClick={() => void executeAdvancedAction(advancedActionPendingConfirmation)}
               >
-                {advancedConfirmationCopy[advancedActionPendingConfirmation].actionLabel}
+                {t(advancedConfirmationCopy[advancedActionPendingConfirmation].actionLabelKey)}
               </Button>
             </div>
           </DialogPanel>

@@ -1,5 +1,6 @@
 import { Switch } from "@/components/ui/switch";
 import type { IconComponent } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import { useState } from "react";
 import type {
   LastfmSettings,
@@ -12,17 +13,29 @@ import type {
 
 const soundcloudCollections: Array<{
   id: SoundCloudCollectionId;
-  title: string;
-  description: string;
+  titleKey: string;
+  descriptionKey: string;
 }> = [
-  { id: "playlists", title: "Playlists", description: "Show your SoundCloud playlists." },
+  {
+    id: "playlists",
+    titleKey: "settings.integrations.collection.playlists.title",
+    descriptionKey: "settings.integrations.collection.playlists.description",
+  },
   {
     id: "liked-tracks",
-    title: "Loved tracks",
-    description: "Show tracks you liked on SoundCloud.",
+    titleKey: "settings.integrations.collection.loved.title",
+    descriptionKey: "settings.integrations.collection.loved.description",
   },
-  { id: "uploads", title: "Uploads", description: "Show tracks uploaded by your account." },
-  { id: "reposted-tracks", title: "Reposted tracks", description: "Show tracks you reposted." },
+  {
+    id: "uploads",
+    titleKey: "settings.integrations.collection.uploads.title",
+    descriptionKey: "settings.integrations.collection.uploads.description",
+  },
+  {
+    id: "reposted-tracks",
+    titleKey: "settings.integrations.collection.reposted.title",
+    descriptionKey: "settings.integrations.collection.reposted.description",
+  },
 ];
 
 export function IntegrationsSettingsPane({
@@ -73,19 +86,20 @@ export function IntegrationsSettingsPane({
   discordSettings: DiscordSettings;
   onDiscordSettingsChange: (settings: DiscordSettings) => void;
 }) {
+  const t = useTranslation();
   const LoaderIcon = icons.loader;
   const XIcon = icons.x;
   const disabled = lastfmPendingAction || !lastfmState.configured;
   const status = !lastfmState.configured
-    ? "Missing credentials"
+    ? t("settings.integrations.status.missingCredentials")
     : lastfmState.connected
-      ? "Connected"
+      ? t("settings.integrations.status.connected")
       : lastfmState.pendingAuth
-        ? "Waiting for approval"
-        : "Not connected";
+        ? t("settings.integrations.status.waitingForApproval")
+        : t("settings.integrations.status.notConnected");
   const accountLabel = lastfmState.username
-    ? `Signed in as ${lastfmState.username}`
-    : "Connect your account to start syncing.";
+    ? t("settings.integrations.signedInAs", { username: lastfmState.username })
+    : t("settings.integrations.lastfm.connectDescription");
 
   return (
     <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pb-5 pr-1">
@@ -132,13 +146,13 @@ export function IntegrationsSettingsPane({
                   disabled={lastfmPendingAction}
                   onClick={onCompleteLastfmAuth}
                 >
-                  I approved
+                  {t("settings.integrations.lastfm.iApproved")}
                 </button>
                 <button
                   type="button"
                   className="grid size-9 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground active:scale-[0.98] disabled:opacity-45"
-                  aria-label="Cancel Last.fm connection"
-                  title="Cancel"
+                  aria-label={t("settings.integrations.lastfm.cancelAria")}
+                  title={t("common.cancel")}
                   disabled={lastfmPendingAction}
                   onClick={onCancelLastfmAuth}
                 >
@@ -153,29 +167,29 @@ export function IntegrationsSettingsPane({
                 disabled={lastfmPendingAction}
                 onClick={onDisconnectLastfm}
               >
-                Disconnect
+                {t("settings.integrations.lastfm.disconnect")}
               </button>
             )}
           </div>
         </div>
         {!lastfmState.configured && (
           <p className="mt-3 max-w-[420px] text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
-            The secure integrations broker is not configured for this build.
+            {t("settings.integrations.brokerMissing")}
           </p>
         )}
         {lastfmState.connected && (
           <div className="mt-4 w-full overflow-hidden rounded-[16px] border border-white/10 bg-white/[0.025]">
             <IntegrationSwitch
-              title="Scrobble plays"
-              description="Add completed plays to your listening history."
+              title={t("settings.integrations.lastfm.scrobble.title")}
+              description={t("settings.integrations.lastfm.scrobble.description")}
               checked={lastfmSettings.scrobblingEnabled}
               onCheckedChange={(scrobblingEnabled) =>
                 onLastfmSettingsChange({ ...lastfmSettings, scrobblingEnabled })
               }
             />
             <IntegrationSwitch
-              title="Sync loved"
-              description="Sync love and unlove changes. Existing loved tracks won't get synced."
+              title={t("settings.integrations.lastfm.loved.title")}
+              description={t("settings.integrations.lastfm.loved.description")}
               checked={lastfmSettings.loveSyncEnabled}
               onCheckedChange={(loveSyncEnabled) =>
                 onLastfmSettingsChange({ ...lastfmSettings, loveSyncEnabled })
@@ -191,7 +205,7 @@ export function IntegrationsSettingsPane({
               disabled={lastfmPendingAction}
               onClick={onFlushLastfmQueue}
             >
-              Retry {lastfmState.queueSize} queued
+              {t("settings.integrations.lastfm.retryQueued", { count: lastfmState.queueSize })}
             </button>
           </div>
         )}
@@ -215,8 +229,8 @@ export function IntegrationsSettingsPane({
       {discordConfigured && (
         <div className="overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.035]">
           <IntegrationSwitch
-            title="Show in Discord"
-            description="Display the track you're playing as your Discord status while Discord is open."
+            title={t("settings.integrations.discord.title")}
+            description={t("settings.integrations.discord.description")}
             checked={discordSettings.enabled}
             onCheckedChange={(enabled) => onDiscordSettingsChange({ ...discordSettings, enabled })}
           />
@@ -247,15 +261,16 @@ function SoundCloudIntegrationCard({
   onCancelAuth: () => void;
   onDisconnect: () => void;
 }) {
+  const t = useTranslation();
   const disabled = pendingAction || !state.configured;
   const [authInput, setAuthInput] = useState("");
   const status = !state.configured
-    ? "Missing credentials"
+    ? t("settings.integrations.status.missingCredentials")
     : state.connected
-      ? "Connected"
+      ? t("settings.integrations.status.connected")
       : state.pendingAuth
-        ? "Waiting for code"
-        : "Not connected";
+        ? t("settings.integrations.status.waitingForCode")
+        : t("settings.integrations.status.notConnected");
   const visible = new Set(settings.visibleCollections);
 
   const setCollection = (id: SoundCloudCollectionId, checked: boolean) => {
@@ -283,8 +298,8 @@ function SoundCloudIntegrationCard({
             </div>
             <p className="mt-0.5 max-w-[420px] text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
               {state.username
-                ? `Signed in as ${state.username}`
-                : "Stream your SoundCloud collections in Playhead."}
+                ? t("settings.integrations.signedInAs", { username: state.username })
+                : t("settings.integrations.soundcloud.connectDescription")}
             </p>
           </div>
         </div>
@@ -297,7 +312,7 @@ function SoundCloudIntegrationCard({
               disabled={disabled}
               onClick={onConnect}
             >
-              Connect SoundCloud
+              {t("settings.integrations.soundcloud.connect")}
             </button>
           )}
           {!state.connected && state.pendingAuth && (
@@ -307,7 +322,7 @@ function SoundCloudIntegrationCard({
               disabled={pendingAction}
               onClick={onCancelAuth}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           )}
           {state.connected && (
@@ -317,7 +332,7 @@ function SoundCloudIntegrationCard({
               disabled={pendingAction}
               onClick={onDisconnect}
             >
-              Disconnect
+              {t("settings.integrations.lastfm.disconnect")}
             </button>
           )}
         </div>
@@ -330,13 +345,13 @@ function SoundCloudIntegrationCard({
       {!state.connected && state.pendingAuth && (
         <div className="mt-4 rounded-[16px] border border-white/10 bg-white/[0.025] p-3">
           <label className="block text-[12px] font-semibold leading-4 text-foreground">
-            Authorization code or callback URL
+            {t("settings.integrations.soundcloud.authLabel")}
           </label>
           <div className="mt-2 flex gap-2">
             <input
               className="h-9 min-w-0 flex-1 rounded-full border border-white/10 bg-black/30 px-3 text-[13px] font-medium text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary/70"
               value={authInput}
-              placeholder="Paste code or playhead://soundcloud/callback?code=..."
+              placeholder={t("settings.integrations.soundcloud.codePlaceholder")}
               onChange={(event) => setAuthInput(event.target.value)}
             />
             <button
@@ -345,40 +360,39 @@ function SoundCloudIntegrationCard({
               disabled={pendingAction || authInput.trim().length === 0}
               onClick={() => onCompleteAuth(authInput)}
             >
-              Connect
+              {t("settings.integrations.soundcloud.connectAction")}
             </button>
           </div>
           <p className="mt-2 text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
-            SoundCloud redirects to the URI registered for the app. If the browser shows a callback
-            page or address bar with code=, paste the whole URL here.
+            {t("settings.integrations.soundcloud.authHelp")}
           </p>
         </div>
       )}
       {state.connected && (
         <div className="mt-4 w-full overflow-hidden rounded-[16px] border border-white/10 bg-white/[0.025]">
           <IntegrationSwitch
-            title="Show SoundCloud in sidebar"
-            description="Enable browsing and playback from SoundCloud."
+            title={t("settings.integrations.soundcloud.sidebar.title")}
+            description={t("settings.integrations.soundcloud.sidebar.description")}
             checked={settings.enabled}
             onCheckedChange={(enabled) => onSettingsChange({ ...settings, enabled })}
           />
           <IntegrationSwitch
-            title="Sync likes"
-            description="Loving a SoundCloud track also likes it on SoundCloud, and tracks you've liked there show as loved."
+            title={t("settings.integrations.soundcloud.likes.title")}
+            description={t("settings.integrations.soundcloud.likes.description")}
             checked={settings.likeSyncEnabled}
             onCheckedChange={(likeSyncEnabled) =>
               onSettingsChange({ ...settings, likeSyncEnabled })
             }
           />
           <IntegrationSwitch
-            title="Keep playing similar tracks"
-            description="When the queue ends on a SoundCloud track, add related tracks and keep going."
+            title={t("settings.integrations.soundcloud.station.title")}
+            description={t("settings.integrations.soundcloud.station.description")}
             checked={settings.stationEnabled}
             onCheckedChange={(stationEnabled) => onSettingsChange({ ...settings, stationEnabled })}
           />
           <IntegrationSwitch
-            title="Show comments on the waveform"
-            description="Display timed comments along SoundCloud tracks, like on SoundCloud."
+            title={t("settings.integrations.soundcloud.comments.title")}
+            description={t("settings.integrations.soundcloud.comments.description")}
             checked={settings.commentsEnabled}
             onCheckedChange={(commentsEnabled) =>
               onSettingsChange({ ...settings, commentsEnabled })
@@ -386,8 +400,8 @@ function SoundCloudIntegrationCard({
           />
           {settings.commentsEnabled && (
             <IntegrationSwitch
-              title="Pop up comments while playing"
-              description="Briefly show each comment as the playhead reaches it."
+              title={t("settings.integrations.soundcloud.commentPopups.title")}
+              description={t("settings.integrations.soundcloud.commentPopups.description")}
               checked={settings.commentPopupsEnabled}
               onCheckedChange={(commentPopupsEnabled) =>
                 onSettingsChange({ ...settings, commentPopupsEnabled })
@@ -397,8 +411,8 @@ function SoundCloudIntegrationCard({
           {soundcloudCollections.map((collection) => (
             <IntegrationSwitch
               key={collection.id}
-              title={collection.title}
-              description={collection.description}
+              title={t(collection.titleKey)}
+              description={t(collection.descriptionKey)}
               checked={visible.has(collection.id)}
               onCheckedChange={(checked) => setCollection(collection.id, checked)}
             />
@@ -407,8 +421,7 @@ function SoundCloudIntegrationCard({
       )}
       {state.connected && (
         <p className="mt-3 max-w-[420px] text-pretty text-[12px] font-medium leading-4 text-muted-foreground">
-          SoundCloud playback uses streamable tracks only and keeps attribution visible in the
-          player.
+          {t("settings.integrations.soundcloud.playbackNote")}
         </p>
       )}
       {state.lastError && (

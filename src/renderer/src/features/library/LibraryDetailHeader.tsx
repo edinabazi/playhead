@@ -1,4 +1,5 @@
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import type { LibraryAlbum, LibraryArtist } from "./library-model";
 import { ArtistArtwork } from "./ArtistArtwork";
 
@@ -12,6 +13,7 @@ export function LibraryDetailHeader({
   onBack: () => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
   const ChevronLeftIcon = icons["chevron-left"];
   const UserIcon = icons.user;
   const MusicIcon = icons.music;
@@ -19,14 +21,14 @@ export function LibraryDetailHeader({
   if (!artist && !album) return null;
 
   const title = artist?.name || album?.title || "";
-  const type = artist ? "Artist" : "Album";
+  const type = artist ? t("library.detail.type.artist") : t("library.detail.type.album");
   const trackCount = artist?.trackIds.length || album?.trackIds.length || 0;
   const albumArtworkSrc = album?.artwork?.dataUrl || album?.artwork?.src || null;
+  const trackCountLabel =
+    trackCount === 1 ? t("library.trackCountOne") : t("library.trackCount", { count: trackCount });
   const subtitle = artist
-    ? `${trackCount} ${trackCount === 1 ? "track" : "tracks"}`
-    : [album?.artist, `${trackCount} ${trackCount === 1 ? "track" : "tracks"}`]
-        .filter(Boolean)
-        .join(" · ");
+    ? trackCountLabel
+    : [album?.artist, trackCountLabel].filter(Boolean).join(" · ");
 
   return (
     <div className="no-drag mr-2 flex shrink-0 items-center gap-3 rounded-[16px] border border-white/10 bg-white/[0.035] px-[10px] py-[7px]">
@@ -34,7 +36,9 @@ export function LibraryDetailHeader({
         type="button"
         style={{ marginRight: -8 }}
         className="grid size-6 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-        aria-label={`Back to ${artist ? "artists" : "albums"}`}
+        aria-label={t("library.detail.backTo", {
+          collection: artist ? t("nav.artists") : t("nav.albums"),
+        })}
         onClick={onBack}
       >
         <ChevronLeftIcon size={14} strokeWidth={1.8} />

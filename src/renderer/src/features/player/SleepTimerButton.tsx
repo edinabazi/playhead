@@ -4,6 +4,7 @@ import { DragRegionBlocker } from "@/components/ui/drag-region-blocker";
 import { Dropdown, DropdownSeparator } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import { IconButton } from "./IconButton";
 
 export type SleepTimer = { kind: "minutes"; endsAt: number } | { kind: "end-of-track" } | null;
@@ -21,6 +22,7 @@ export function SleepTimerButton({
   timer: SleepTimer;
   onChange: (timer: SleepTimer) => void;
 }) {
+  const t = useTranslation();
   const icons = useIcons();
   const MoonIcon = icons.moon;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -46,10 +48,10 @@ export function SleepTimerButton({
 
   const label =
     timer?.kind === "minutes"
-      ? `Sleep in ${remainingMinutes(timer, now)} min`
+      ? t("player.sleepTimer.sleepIn", { minutes: remainingMinutes(timer, now) })
       : timer?.kind === "end-of-track"
-        ? "Sleep after this track"
-        : "Sleep timer";
+        ? t("player.sleepTimer.sleepAfterTrack")
+        : t("player.sleepTimer");
   const choose = (next: SleepTimer) => {
     onChange(next);
     setOpen(false);
@@ -65,7 +67,7 @@ export function SleepTimerButton({
       }}
     >
       <IconButton
-        title="Sleep timer"
+        title={t("player.sleepTimer")}
         // The tooltip sits below the button, where the open menu is.
         tooltip={open ? undefined : label}
         active={Boolean(timer)}
@@ -76,7 +78,7 @@ export function SleepTimerButton({
       </IconButton>
       {timer?.kind === "minutes" && (
         <span className="pointer-events-none -ml-1 text-[11px] font-medium tabular-nums text-primary">
-          {remainingMinutes(timer, now)}m
+          {t("player.sleepTimer.minutesShort", { minutes: remainingMinutes(timer, now) })}
         </span>
       )}
       {open && <DragRegionBlocker />}
@@ -94,7 +96,7 @@ export function SleepTimerButton({
                 <MenuItem
                   key={minutes}
                   icon={icons.clock}
-                  label={`${minutes} minutes`}
+                  label={t("player.sleepTimer.minutes", { minutes })}
                   index={index}
                   onSelect={() =>
                     choose({ kind: "minutes", endsAt: Date.now() + minutes * 60_000 })
@@ -103,7 +105,7 @@ export function SleepTimerButton({
               ))}
               <MenuItem
                 icon={icons["skip-forward"]}
-                label="End of track"
+                label={t("player.sleepTimer.endOfTrack")}
                 index={minuteOptions.length}
                 checked={timer?.kind === "end-of-track"}
                 onSelect={() => choose({ kind: "end-of-track" })}
@@ -113,7 +115,7 @@ export function SleepTimerButton({
                   <DropdownSeparator />
                   <MenuItem
                     icon={icons.x}
-                    label="Turn off"
+                    label={t("player.sleepTimer.turnOff")}
                     index={minuteOptions.length + 1}
                     onSelect={() => choose(null)}
                   />
