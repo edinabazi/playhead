@@ -687,4 +687,10 @@ export const en = {
   "smart.op.lessThan": "is less than",
   "smart.op.between": "is between",
   "smart.op.inLastDays": "in the last (days)",
+
+  // Window controls
+  "window.close": "Close window",
+  "window.minimize": "Minimize window",
+  "window.maximize": "Maximize window",
+  "window.restore": "Restore window",
 } as const satisfies Dictionary;

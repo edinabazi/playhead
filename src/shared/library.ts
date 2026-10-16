@@ -558,6 +558,8 @@ export type PlayheadApi = {
   onSoundCloudStateChanged: (callback: (state: SoundCloudState) => void) => () => void;
   minimizeWindow: () => Promise<void>;
   toggleMaximizeWindow: () => Promise<void>;
+  isWindowMaximized: () => Promise<boolean>;
+  onWindowMaximizedChanged: (callback: (maximized: boolean) => void) => () => void;
   closeWindow: () => Promise<void>;
   moveWindowTo: (x: number, y: number) => Promise<void>;
   trackEvent: (eventName: string, properties?: Record<string, string | number | boolean>) => void;

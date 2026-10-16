@@ -188,6 +188,12 @@ const api: PlayheadApi = {
   },
   minimizeWindow: () => ipcRenderer.invoke("window:minimize"),
   toggleMaximizeWindow: () => ipcRenderer.invoke("window:toggle-maximize"),
+  isWindowMaximized: () => ipcRenderer.invoke("window:is-maximized"),
+  onWindowMaximizedChanged: (callback: (maximized: boolean) => void) => {
+    const listener = (_event: IpcRendererEvent, maximized: boolean) => callback(maximized);
+    ipcRenderer.on("window:maximized-changed", listener);
+    return () => ipcRenderer.removeListener("window:maximized-changed", listener);
+  },
   closeWindow: () => ipcRenderer.invoke("window:close"),
   moveWindowTo: (x: number, y: number) => ipcRenderer.invoke("window:move-to", x, y),
   trackEvent: (eventName: string, properties?: Record<string, string | number | boolean>) => {

@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { electron } from "../electron";
 import { keepPlaybackWindowAlive } from "./background-playback";
+import { watchWindowMaximizedState } from "./window-controls";
 import { minimumWindowSize, readWindowState, saveWindowState } from "./window-state";
 
 const { app, BrowserWindow, nativeImage, shell } = electron;
@@ -53,6 +54,7 @@ export function createWindow(isQuitting: () => boolean): Electron.BrowserWindow 
   win.on("maximize", scheduleSave);
   win.on("unmaximize", scheduleSave);
   win.on("closed", () => clearTimeout(saveTimer));
+  watchWindowMaximizedState(win);
   win.on("close", (event) => {
     clearTimeout(saveTimer);
     saveWindowState(win);

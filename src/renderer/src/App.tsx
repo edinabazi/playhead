@@ -44,6 +44,8 @@ import { I18nProvider } from "@/lib/i18n";
 import { isEditableTarget } from "@/lib/dom";
 import { formatTime } from "@/lib/format";
 import { moveItem, moveItemsBeforeOrAfter } from "@/lib/list";
+import { usesWindowsWindowControls } from "@/lib/platform";
+import { WindowsWindowControls } from "@/components/WindowsWindowControls";
 import { MetadataDialog, type MetadataDialogState } from "@/features/metadata/MetadataDialog";
 import { Player } from "@/features/player/Player";
 import { QueueSidebar } from "@/features/player/QueueSidebar";
@@ -3808,12 +3810,17 @@ export function App() {
             )}
           </div>
 
-          <main className="app-drag relative flex min-h-0 min-w-0 flex-1 flex-col gap-[10px]">
+          <main
+            className={`app-drag relative flex min-h-0 min-w-0 flex-1 flex-col gap-[10px] ${
+              usesWindowsWindowControls() ? "pt-8" : ""
+            }`}
+          >
             <div
               className="app-drag absolute inset-x-0 top-0 z-40 h-8"
               aria-hidden="true"
               {...topGapWindowDragHandlers}
             />
+            {usesWindowsWindowControls() && <WindowsWindowControls />}
             {isLibraryEmpty ? (
               <EmptyLibraryState
                 isScanning={isScanning}

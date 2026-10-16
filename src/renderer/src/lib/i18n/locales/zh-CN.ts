@@ -665,4 +665,10 @@ export const zhCN: Dictionary = {
   "smart.op.lessThan": "小于",
   "smart.op.between": "介于",
   "smart.op.inLastDays": "在最近若干天内",
+
+  // 窗口控件
+  "window.close": "关闭窗口",
+  "window.minimize": "最小化窗口",
+  "window.maximize": "最大化窗口",
+  "window.restore": "还原窗口",
 };
