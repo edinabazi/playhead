@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog-motion";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import { getNativeFileManagerName } from "@/lib/menu-position";
 import type { LibraryTrack } from "../../../../shared/library";
 import { findDuplicateGroups } from "./duplicates";
@@ -25,6 +26,7 @@ export function DuplicatesDialog({
   onClose: () => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
   const FolderIcon = icons["folder-search"];
   const groups = useMemo(() => findDuplicateGroups(tracks), [tracks]);
   const copies = groups.reduce((sum, group) => sum + group.length - 1, 0);
@@ -52,18 +54,24 @@ export function DuplicatesDialog({
         <div className="flex items-start justify-between gap-3 px-2 pt-1">
           <div>
             <h2 className="text-[15px] font-semibold leading-6 text-foreground">
-              Duplicate tracks
+              {t("duplicates.title")}
             </h2>
             <p className="mt-1 text-[13px] font-medium leading-5 text-muted-foreground">
               {groups.length === 0
-                ? "No duplicates found. Tracks match when artist, title and length agree."
-                : `${groups.length} ${groups.length === 1 ? "track has" : "tracks have"} copies (${copies} extra ${copies === 1 ? "file" : "files"}). Nothing is deleted; remove copies in ${fileManagerName}.`}
+                ? t("duplicates.none")
+                : t("duplicates.summary", {
+                    groups: groups.length,
+                    has: t(groups.length === 1 ? "duplicates.groupHas" : "duplicates.groupsHave"),
+                    extra: copies,
+                    files: t(copies === 1 ? "duplicates.extraFile" : "duplicates.extraFiles"),
+                    fileManager: fileManagerName,
+                  })}
             </p>
           </div>
           <button
             type="button"
             className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-            title="Close"
+            title={t("common.close")}
             onClick={onClose}
           >
             <icons.x size={16} strokeWidth={1.8} />
@@ -93,7 +101,7 @@ export function DuplicatesDialog({
                     </span>
                     <button
                       type="button"
-                      aria-label={`Play ${track.path}`}
+                      aria-label={t("duplicates.playAria", { path: track.path })}
                       className="grid size-6 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-white/10 hover:text-foreground"
                       onClick={() => onPlay(track)}
                     >
@@ -101,8 +109,8 @@ export function DuplicatesDialog({
                     </button>
                     <button
                       type="button"
-                      aria-label={`Show in ${fileManagerName}`}
-                      title={`Show in ${fileManagerName}`}
+                      aria-label={t("library.showInTooltip", { fileManager: fileManagerName })}
+                      title={t("library.showInTooltip", { fileManager: fileManagerName })}
                       className="grid size-6 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-white/10 hover:text-foreground"
                       onClick={() => onShowInFolder(track)}
                     >

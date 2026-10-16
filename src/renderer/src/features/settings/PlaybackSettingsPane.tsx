@@ -1,4 +1,5 @@
 import { Switch } from "@/components/ui/switch";
+import { useTranslation } from "@/lib/i18n";
 import type { PlaybackSettings } from "../../../../shared/library";
 import { SettingsFooter, SettingsOptionGroup } from "./SettingsControls";
 
@@ -15,12 +16,14 @@ export function PlaybackSettingsPane({
   onReset: () => void;
   onSave: () => void;
 }) {
+  const t = useTranslation();
+
   return (
     <>
       <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pb-20 pr-1">
         <SettingsOptionGroup
-          title="Seek step"
-          description="Choose how far left and right arrows jump."
+          title={t("settings.playback.seekStep.title")}
+          description={t("settings.playback.seekStep.description")}
           options={[
             { label: "5s", value: 5 },
             { label: "10s", value: 10 },
@@ -32,8 +35,8 @@ export function PlaybackSettingsPane({
         />
 
         <SettingsOptionGroup
-          title="Volume step"
-          description="Choose how much up and down arrows change volume."
+          title={t("settings.playback.volumeStep.title")}
+          description={t("settings.playback.volumeStep.description")}
           options={[
             { label: "2%", value: 2 },
             { label: "5%", value: 5 },
@@ -44,33 +47,37 @@ export function PlaybackSettingsPane({
         />
 
         <PlaybackSwitch
-          title="Normalize volume"
-          description="Keep perceived loudness more consistent when switching between tracks."
+          title={t("settings.playback.normalizeVolume.title")}
+          description={t("settings.playback.normalizeVolume.description")}
           checked={settings.normalizeVolume}
           onCheckedChange={(checked) => onChange({ ...settings, normalizeVolume: checked })}
         />
         <PlaybackSwitch
-          title="Remember playback position"
-          description="Resume tracks where you left off."
+          title={t("settings.playback.rememberPositions.title")}
+          description={t("settings.playback.rememberPositions.description")}
           checked={settings.rememberTrackPositions}
           onCheckedChange={(checked) => onChange({ ...settings, rememberTrackPositions: checked })}
         />
         <PlaybackSwitch
-          title="Restore last session"
-          description="Reopen the last track paused at its saved position."
+          title={t("settings.playback.restoreSession.title")}
+          description={t("settings.playback.restoreSession.description")}
           checked={settings.restoreLastSession}
           onCheckedChange={(checked) => onChange({ ...settings, restoreLastSession: checked })}
         />
         <PlaybackSwitch
-          title="Skip unavailable tracks"
-          description="Try the next track when a file cannot be loaded."
+          title={t("settings.playback.skipUnavailable.title")}
+          description={t("settings.playback.skipUnavailable.description")}
           checked={settings.skipUnavailableTracks}
           onCheckedChange={(checked) => onChange({ ...settings, skipUnavailableTracks: checked })}
         />
       </div>
 
       <SettingsFooter
-        status={changed ? "Changes will apply after saving." : "Playback settings are up to date."}
+        status={
+          changed
+            ? t("settings.status.unsaved")
+            : t("settings.status.upToDate", { category: t("settings.category.playback") })
+        }
         changed={changed}
         onReset={onReset}
         onSave={onSave}

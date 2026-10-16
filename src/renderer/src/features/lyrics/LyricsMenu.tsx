@@ -5,6 +5,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Dropdown } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 
 export function LyricsMenu({
   custom,
@@ -21,6 +22,7 @@ export function LyricsMenu({
   onRefresh: () => void;
   onAutomatic: () => void;
 }) {
+  const t = useTranslation();
   const icons = useIcons();
   const More = icons.ellipsis;
   const [open, setOpen] = useState(false);
@@ -61,12 +63,12 @@ export function LyricsMenu({
         }
       }}
     >
-      <Tooltip content="Lyrics options">
+      <Tooltip content={t("lyrics.options")}>
         <Button
           ref={trigger}
           variant="ghost"
           size="icon-sm"
-          aria-label="Lyrics options"
+          aria-label={t("lyrics.options")}
           aria-haspopup="menu"
           aria-expanded={open}
           disabled={disabled}
@@ -90,13 +92,16 @@ export function LyricsMenu({
             exit={{ opacity: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.12 }}
           >
-            <Dropdown aria-label="Lyrics options" className="bg-[rgba(10,10,10,0.96)] shadow-xl">
+            <Dropdown
+              aria-label={t("lyrics.options")}
+              className="bg-[rgba(10,10,10,0.96)] shadow-xl"
+            >
               <MenuItem
                 role="menuitem"
                 aria-checked={undefined}
                 icon={icons["folder-open"]}
                 index={0}
-                label="Choose lyrics file…"
+                label={t("lyrics.chooseFile")}
                 onSelect={() => action(onChoose)}
               />
               <MenuItem
@@ -104,7 +109,7 @@ export function LyricsMenu({
                 aria-checked={undefined}
                 icon={icons["rotate-ccw"]}
                 index={1}
-                label="Reload lyrics"
+                label={t("lyrics.reload")}
                 onSelect={() => action(onRefresh)}
               />
               {custom && (
@@ -113,7 +118,7 @@ export function LyricsMenu({
                   aria-checked={undefined}
                   icon={icons.music}
                   index={2}
-                  label="Use automatic lyrics"
+                  label={t("lyrics.useAutomatic")}
                   onSelect={() => action(onAutomatic)}
                 />
               )}

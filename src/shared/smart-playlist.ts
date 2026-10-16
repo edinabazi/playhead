@@ -47,47 +47,47 @@ export type SmartPlaylistFieldKind = "text" | "number" | "date" | "boolean" | "t
 
 export const smartPlaylistFields: Record<
   SmartPlaylistField,
-  { label: string; kind: SmartPlaylistFieldKind }
+  { label: string; labelKey: string; kind: SmartPlaylistFieldKind }
 > = {
-  title: { label: "Title", kind: "text" },
-  artist: { label: "Artist", kind: "text" },
-  album: { label: "Album", kind: "text" },
-  genre: { label: "Genre", kind: "text" },
-  composer: { label: "Composer", kind: "text" },
-  format: { label: "Format", kind: "text" },
-  year: { label: "Year", kind: "number" },
-  bpm: { label: "BPM", kind: "number" },
-  duration: { label: "Length (minutes)", kind: "number" },
-  modified: { label: "File modified", kind: "date" },
-  loved: { label: "Loved", kind: "boolean" },
-  tag: { label: "Tag", kind: "tag" },
+  title: { label: "Title", labelKey: "column.title", kind: "text" },
+  artist: { label: "Artist", labelKey: "column.artist", kind: "text" },
+  album: { label: "Album", labelKey: "column.album", kind: "text" },
+  genre: { label: "Genre", labelKey: "column.genre", kind: "text" },
+  composer: { label: "Composer", labelKey: "column.composer", kind: "text" },
+  format: { label: "Format", labelKey: "smart.field.format", kind: "text" },
+  year: { label: "Year", labelKey: "column.year", kind: "number" },
+  bpm: { label: "BPM", labelKey: "column.bpm", kind: "number" },
+  duration: { label: "Length (minutes)", labelKey: "smart.field.duration", kind: "number" },
+  modified: { label: "File modified", labelKey: "smart.field.modified", kind: "date" },
+  loved: { label: "Loved", labelKey: "smart.field.loved", kind: "boolean" },
+  tag: { label: "Tag", labelKey: "nav.tags", kind: "tag" },
 };
 
 export const smartPlaylistOperators: Record<
   SmartPlaylistFieldKind,
-  Array<{ value: SmartPlaylistOperator; label: string }>
+  Array<{ value: SmartPlaylistOperator; label: string; labelKey: string }>
 > = {
   text: [
-    { value: "contains", label: "contains" },
-    { value: "notContains", label: "doesn't contain" },
-    { value: "is", label: "is" },
-    { value: "isNot", label: "is not" },
-    { value: "startsWith", label: "starts with" },
+    { value: "contains", label: "contains", labelKey: "smart.op.contains" },
+    { value: "notContains", label: "doesn't contain", labelKey: "smart.op.notContains" },
+    { value: "is", label: "is", labelKey: "smart.op.is" },
+    { value: "isNot", label: "is not", labelKey: "smart.op.isNot" },
+    { value: "startsWith", label: "starts with", labelKey: "smart.op.startsWith" },
   ],
   number: [
-    { value: "is", label: "is" },
-    { value: "greaterThan", label: "is greater than" },
-    { value: "lessThan", label: "is less than" },
-    { value: "between", label: "is between" },
+    { value: "is", label: "is", labelKey: "smart.op.is" },
+    { value: "greaterThan", label: "is greater than", labelKey: "smart.op.greaterThan" },
+    { value: "lessThan", label: "is less than", labelKey: "smart.op.lessThan" },
+    { value: "between", label: "is between", labelKey: "smart.op.between" },
   ],
-  date: [{ value: "inLastDays", label: "in the last (days)" }],
+  date: [{ value: "inLastDays", label: "in the last (days)", labelKey: "smart.op.inLastDays" }],
   boolean: [
-    { value: "is", label: "is" },
-    { value: "isNot", label: "is not" },
+    { value: "is", label: "is", labelKey: "smart.op.is" },
+    { value: "isNot", label: "is not", labelKey: "smart.op.isNot" },
   ],
   tag: [
-    { value: "is", label: "is" },
-    { value: "isNot", label: "is not" },
+    { value: "is", label: "is", labelKey: "smart.op.is" },
+    { value: "isNot", label: "is not", labelKey: "smart.op.isNot" },
   ],
 };
 

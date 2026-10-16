@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useIcons } from "@/lib/icon-context";
 import { formatTime } from "@/lib/format";
+import { useTranslation } from "@/lib/i18n";
 
 export type PlaybackLoop = { start: number; end: number };
 
@@ -30,6 +31,7 @@ export function LoopRegion({
   onChange: (loop: PlaybackLoop | null) => void;
   children: React.ReactNode;
 }) {
+  const t = useTranslation();
   const icons = useIcons();
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag>(null);
@@ -102,19 +104,22 @@ export function LoopRegion({
           }}
         >
           <span
-            aria-label="Move loop start"
+            aria-label={t("waveform.moveLoopStart")}
             className="no-drag cursor-ew-resize pointer-events-auto absolute inset-y-0 -left-[5px] w-2"
             onPointerDown={startEdgeDrag("start")}
           />
           <span
-            aria-label="Move loop end"
+            aria-label={t("waveform.moveLoopEnd")}
             className="no-drag cursor-ew-resize pointer-events-auto absolute inset-y-0 -right-[5px] w-2"
             onPointerDown={startEdgeDrag("end")}
           />
           <button
             type="button"
-            title={`Looping ${formatTime(loop.start)}–${formatTime(loop.end)} · Click to clear`}
-            aria-label="Clear loop"
+            title={t("waveform.loopingRange", {
+              start: formatTime(loop.start),
+              end: formatTime(loop.end),
+            })}
+            aria-label={t("waveform.clearLoop")}
             className="no-drag pointer-events-auto absolute right-1 top-1 grid size-4 place-items-center rounded-full bg-black/60 text-primary hover:bg-black/80"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {

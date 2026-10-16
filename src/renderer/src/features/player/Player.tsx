@@ -13,6 +13,7 @@ import { SoundPanel } from "@/features/audio/SoundPanel";
 import { DragRegionBlocker } from "@/components/ui/drag-region-blocker";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation, type Translate } from "@/lib/i18n";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
 import { useWindowDrag } from "@/hooks/use-window-drag";
 import { FavoriteHeartButton } from "@/features/tracks/FavoriteHeartButton";
@@ -29,23 +30,23 @@ import { SleepTimerButton, type SleepTimer } from "./SleepTimerButton";
 import { WaveformComments } from "./WaveformComments";
 import { useSoundCloudComments } from "./use-soundcloud-comments";
 
-function formatAudioFormat(track: LibraryTrack): string {
+function formatAudioFormat(track: LibraryTrack, t: Translate): string {
   if (track.source === "soundcloud" || track.soundcloud) {
-    return track.bpm ? "" : "Sourced from SoundCloud";
+    return track.bpm ? "" : t("player.sourcedFromSoundCloud");
   }
   const extension = track.fileName.split(".").pop() || "";
   const format = extension || track.audioFormat || "";
   return format.toUpperCase();
 }
 
-function formatBitRate(bitRate?: number): string | null {
+function formatBitRate(bitRate: number | undefined, t: Translate): string | null {
   if (!bitRate) return null;
-  return `${Math.round(bitRate / 1000)} kbps`;
+  return t("player.kbps", { value: Math.round(bitRate / 1000) });
 }
 
-function formatBpm(bpm?: number): string | null {
+function formatBpm(bpm: number | undefined, t: Translate): string | null {
   if (!bpm) return null;
-  return `${Math.round(bpm)} BPM`;
+  return t("player.bpm", { value: Math.round(bpm) });
 }
 
 function ElapsedTime({ clock }: { clock: PlaybackClock }) {
@@ -157,6 +158,7 @@ export function Player({
   levels?: React.ReactNode;
 }) {
   const windowDragHandlers = useWindowDrag<HTMLDivElement>();
+  const t = useTranslation();
   const icons = useIcons();
   const MusicIcon = icons.music;
   const ShuffleIcon = icons.shuffle;
@@ -192,9 +194,9 @@ export function Player({
   }, [soundPanelOpen]);
   const trackInfo = activeTrack
     ? [
-        formatAudioFormat(activeTrack),
-        formatBitRate(activeTrack.bitRate),
-        formatBpm(activeTrack.bpm),
+        formatAudioFormat(activeTrack, t),
+        formatBitRate(activeTrack.bitRate, t),
+        formatBpm(activeTrack.bpm, t),
       ].filter((part): part is string => Boolean(part))
     : [];
   const visibleTags = activeTags.slice(0, 3);
@@ -217,8 +219,8 @@ export function Player({
             type="button"
             className="relative size-16 shrink-0 rounded-[12px] outline-none focus-visible:ring-2 focus-visible:ring-primary"
             disabled={!activeTrack}
-            aria-label="Jump to currently playing song"
-            title="Jump to currently playing song"
+            aria-label={t("player.jumpToPlaying")}
+            title={t("player.jumpToPlaying")}
             onClick={onRevealPlayingTrack}
           >
             <AnimatePresence mode="popLayout" initial={false}>
@@ -271,7 +273,7 @@ export function Player({
                   transition={{ delay: 0.03, duration: 0.16 }}
                 >
                   <h1 className="min-w-0 truncate text-[16px] font-semibold leading-[1.2]">
-                    {activeTrack?.title || "No track selected"}
+                    {activeTrack?.title || t("player.noTrackSelected")}
                   </h1>
                   {visibleTags.length > 0 && (
                     <div className="flex min-w-0 shrink-0 items-center gap-1">
@@ -297,7 +299,7 @@ export function Player({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.07, duration: 0.16 }}
                 >
-                  {activeTrack ? activeTrack.artist : "Double-click a track to play"}
+                  {activeTrack ? activeTrack.artist : t("player.doubleClickToPlay")}
                 </motion.p>
               </motion.div>
             </AnimatePresence>
@@ -313,8 +315,8 @@ export function Player({
             }}
           >
             <IconButton
-              title="Sound"
-              tooltip={soundPanelOpen ? "Hide equalizer" : "Show equalizer"}
+              title={t("player.sound")}
+              tooltip={soundPanelOpen ? t("player.hideEqualizer") : t("player.showEqualizer")}
               ariaExpanded={soundPanelOpen}
               ariaControls={soundPanelId}
               active={soundPanelOpen || equalizer.enabled || playbackRate !== 1}
@@ -345,8 +347,8 @@ export function Player({
             />
           )}
           <IconButton
-            title="Levels"
-            tooltip={levelsOpen ? "Hide levels" : "Show levels"}
+            title={t("player.levels")}
+            tooltip={levelsOpen ? t("player.hideLevels") : t("player.showLevels")}
             active={levelsOpen}
             ariaExpanded={levelsOpen}
             onClick={onToggleLevels}
@@ -354,8 +356,8 @@ export function Player({
             <LevelsIcon size={19} strokeWidth={1.8} />
           </IconButton>
           <IconButton
-            title="Lyrics"
-            tooltip={lyricsOpen ? "Hide lyrics" : "Show lyrics"}
+            title={t("player.lyrics")}
+            tooltip={lyricsOpen ? t("player.hideLyrics") : t("player.showLyrics")}
             active={lyricsOpen}
             ariaExpanded={lyricsOpen}
             ariaControls="lyrics-panel"
@@ -438,7 +440,7 @@ export function Player({
               role="status"
               className="no-drag absolute inset-0 grid place-items-center bg-background/60 text-[12px] text-muted-foreground"
             >
-              Preparing playback…
+              {t("player.preparing")}
             </div>
           )}
           {playbackError && <PlaybackError failure={playbackError} onRetry={onRetryPlayback} />}
@@ -459,7 +461,7 @@ export function Player({
         </div>
         <div className="flex items-center justify-center gap-3 @max-lg:gap-1">
           <IconButton
-            title={shuffleEnabled ? "Shuffle on" : "Shuffle"}
+            title={shuffleEnabled ? t("player.shuffleOn") : t("player.shuffle")}
             active={shuffleEnabled}
             motionType="shuffle"
             onClick={onToggleShuffle}
@@ -468,7 +470,7 @@ export function Player({
           </IconButton>
           <div className="flex items-center gap-[6px]">
             <IconButton
-              title="Previous"
+              title={t("player.previous")}
               onClick={onPreviousTrack}
               disabled={!activeTrack || isLoading}
               motionType="previous"
@@ -477,7 +479,7 @@ export function Player({
             </IconButton>
             <motion.button
               className="no-drag relative grid size-12 place-items-center overflow-hidden rounded-full bg-white text-black shadow-[0_0_0_0_rgba(255,255,255,0)]"
-              title={isPlaying ? "Pause" : "Play"}
+              title={isPlaying ? t("player.pause") : t("player.play")}
               onClick={onTogglePlayback}
               disabled={!activeTrack || isLoading}
               whileHover={
@@ -518,7 +520,7 @@ export function Player({
               </motion.span>
             </motion.button>
             <IconButton
-              title="Next"
+              title={t("player.next")}
               onClick={onNextTrack}
               disabled={!activeTrack || isLoading}
               motionType="next"
@@ -528,7 +530,11 @@ export function Player({
           </div>
           <IconButton
             title={
-              repeatMode === "one" ? "Repeat one" : repeatMode === "all" ? "Repeat all" : "Repeat"
+              repeatMode === "one"
+                ? t("player.repeatOne")
+                : repeatMode === "all"
+                  ? t("player.repeatAll")
+                  : t("player.repeat")
             }
             active={repeatMode !== "off"}
             motionType="repeat"
@@ -553,7 +559,7 @@ export function Player({
                   ? "border-red-400/60 bg-red-500/15 text-red-300"
                   : "border-white/10 text-muted-foreground/60"
               }`}
-              title="Limiter"
+              title={t("player.limiter")}
             >
               LIM
             </span>

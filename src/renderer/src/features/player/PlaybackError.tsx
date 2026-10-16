@@ -1,6 +1,7 @@
 import type { PlaybackFailure } from "../../../../shared/playback";
 import { Button } from "@/components/ui/button";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 
 export function PlaybackError({
   failure,
@@ -9,6 +10,7 @@ export function PlaybackError({
   failure: PlaybackFailure;
   onRetry: () => void;
 }) {
+  const t = useTranslation();
   const icons = useIcons();
   const InfoIcon = icons.info;
   return (
@@ -31,7 +33,7 @@ export function PlaybackError({
           if (event.key === " " || event.key === "Enter") event.stopPropagation();
         }}
       >
-        Retry
+        {t("common.retry")}
       </Button>
     </div>
   );

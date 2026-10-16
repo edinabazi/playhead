@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import { useVirtualList } from "@/lib/virtual-list";
 import {
   panelContentVariants,
@@ -39,6 +40,7 @@ export function QueuePanel({
   onAddTracks: (trackIds: string[], targetItemId: string | null, edge: QueueDropEdge) => void;
   onRemoveItem: (item: PlaybackQueueItem) => void;
 }) {
+  const t = useTranslation();
   const icons = useIcons();
   const MusicIcon = icons.music;
   const XIcon = icons.x;
@@ -112,7 +114,7 @@ export function QueuePanel({
               filter: { duration: 0.18 },
             }}
           >
-            Drop tracks here to build a queue.
+            {t("queue.dropToBuild")}
           </motion.div>
         ) : (
           <motion.div
@@ -122,7 +124,7 @@ export function QueuePanel({
             animate="show"
           >
             <motion.div className="flex flex-col gap-0.5" variants={panelSectionVariants}>
-              <SectionLabel>Now Playing</SectionLabel>
+              <SectionLabel>{t("queue.nowPlaying")}</SectionLabel>
               <QueueRow
                 item={activeItem}
                 nowPlaying
@@ -147,13 +149,13 @@ export function QueuePanel({
               className="flex min-h-0 flex-1 flex-col gap-0.5"
               variants={panelSectionVariants}
             >
-              <SectionLabel>Up Next</SectionLabel>
+              <SectionLabel>{t("queue.upNext")}</SectionLabel>
               {upcomingItems.length === 0 ? (
                 <motion.div
                   className="rounded-[18px] border border-dashed border-white/10 bg-white/[0.025] px-4 py-5 text-center text-[13px] font-medium text-muted-foreground"
                   variants={panelItemVariants}
                 >
-                  No upcoming tracks.
+                  {t("queue.noUpcoming")}
                 </motion.div>
               ) : (
                 <div
@@ -252,6 +254,7 @@ function QueueRow({
     React.SetStateAction<{ itemId: string; edge: QueueDropEdge } | null>
   >;
 }) {
+  const t = useTranslation();
   return (
     <motion.div
       layout="position"
@@ -348,7 +351,7 @@ function QueueRow({
             <button
               type="button"
               className="pointer-events-auto grid size-6 place-items-center rounded-full bg-transparent text-muted-foreground transition hover:bg-white/[0.14] hover:text-foreground"
-              aria-label="Remove from queue"
+              aria-label={t("queue.removeFromQueue")}
               onClick={(event) => {
                 event.stopPropagation();
                 onRemoveItem(item);

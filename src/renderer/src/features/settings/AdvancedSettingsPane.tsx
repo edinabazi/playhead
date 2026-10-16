@@ -1,5 +1,6 @@
 import { Switch } from "@/components/ui/switch";
 import type { IconComponent } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import type { LibrarySettings, TelemetrySettings } from "../../../../shared/library";
 import { SettingsFooter } from "./SettingsControls";
 import type { AdvancedSettingsAction } from "./SettingsDialog";
@@ -38,6 +39,8 @@ export function AdvancedSettingsPane({
   onSave: () => void;
   onRunAction: (action: AdvancedSettingsAction) => void;
 }) {
+  const t = useTranslation();
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pb-20 pr-1">
@@ -81,10 +84,10 @@ export function AdvancedSettingsPane({
           <div className="flex items-center justify-between gap-4">
             <div>
               <h4 className="text-[14px] font-semibold leading-5 text-foreground">
-                Rescan on launch
+                {t("settings.advanced.rescanOnLaunch.title")}
               </h4>
               <p className="mt-1 max-w-[460px] text-[12px] font-medium leading-4 text-muted-foreground">
-                Refresh watched folders each time Playhead opens.
+                {t("settings.advanced.rescanOnLaunch.description")}
               </p>
             </div>
             <Switch
@@ -100,12 +103,10 @@ export function AdvancedSettingsPane({
           <div className="flex items-center justify-between gap-4">
             <div>
               <h4 className="text-[14px] font-semibold leading-5 text-foreground">
-                Share anonymous usage
+                {t("settings.advanced.telemetry.title")}
               </h4>
               <p className="mt-1 max-w-[460px] text-[12px] font-medium leading-4 text-muted-foreground">
-                Send anonymous product events like app opens and feature use. Turn this off at any
-                time. Playhead never sends file paths, track names, artists, albums, artwork, or
-                library contents.
+                {t("settings.advanced.telemetry.description")}
               </p>
             </div>
             <Switch
@@ -119,8 +120,8 @@ export function AdvancedSettingsPane({
       <SettingsFooter
         status={
           changed
-            ? "Changes will apply after saving."
-            : "Advanced settings are up to date."
+            ? t("settings.status.unsaved")
+            : t("settings.status.upToDate", { category: t("settings.category.advanced") })
         }
         changed={changed}
         onReset={onReset}

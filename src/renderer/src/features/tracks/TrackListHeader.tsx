@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DragRegionBlocker } from "@/components/ui/drag-region-blocker";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import type {
   TrackListSettings,
   TrackColumnWidths,
@@ -11,7 +12,11 @@ import type {
 } from "../../../../shared/track-list";
 import { ColumnResizeHandle } from "./ColumnResizeHandle";
 import { trackColumns } from "./track-columns";
-import { getColumnMenuPosition, TrackListColumnMenu } from "./TrackListColumnMenu";
+import {
+  columnLabelKeys,
+  getColumnMenuPosition,
+  TrackListColumnMenu,
+} from "./TrackListColumnMenu";
 
 function stopPlaybackShortcut(event: React.KeyboardEvent) {
   if (event.key === "Enter" || event.key === " ") event.stopPropagation();
@@ -29,11 +34,14 @@ export function TrackListHeader({
   onChange: (settings: TrackListSettings) => void;
 }) {
   const headerRef = useRef<HTMLDivElement>(null);
+  const t = useTranslation();
   const resizedWidths = (id: TrackColumnId, width: number) => {
     const widths = { ...settings.widths, [id]: width };
     // Freeze the flexible title so other dividers follow the pointer directly.
     if (id !== "title" && widths.title === undefined) {
-      const title = headerRef.current?.querySelector('[aria-label="Sort by Title"]');
+      const title = headerRef.current?.querySelector(
+        `[aria-label="${t("columns.sortBy", { column: t("column.title") })}"]`,
+      );
       if (title) widths.title = Math.round(title.getBoundingClientRect().width);
     }
     return widths;
@@ -89,11 +97,11 @@ export function TrackListHeader({
       className="no-drag mr-2 grid h-9 shrink-0 items-center gap-2 border-b border-white/[0.08] px-[10px] text-[11px] font-medium text-muted-foreground"
       style={{ gridTemplateColumns }}
     >
-      <span role="columnheader" aria-label="Source order">
-        <Tooltip content="Restore source order">
+      <span role="columnheader" aria-label={t("columns.sourceOrder")}>
+        <Tooltip content={t("columns.restoreSourceOrder")}>
           <button
             type="button"
-            aria-label="Restore source order"
+            aria-label={t("columns.restoreSourceOrder")}
             className="grid h-7 w-full place-items-center rounded-md transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-primary"
             onClick={() => onChange({ ...settings, sort: null })}
           >
@@ -103,6 +111,7 @@ export function TrackListHeader({
       </span>
       {settings.columns.map((id) => {
         const column = trackColumns[id];
+        const columnLabel = t(columnLabelKeys[id]);
         const direction = settings.sort?.column === id ? settings.sort.direction : null;
         const SortIcon =
           direction === "asc"
@@ -114,7 +123,7 @@ export function TrackListHeader({
           <div
             key={id}
             role="columnheader"
-            aria-label={column.label}
+            aria-label={columnLabel}
             className="relative min-w-0"
             aria-sort={
               direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"
@@ -122,8 +131,11 @@ export function TrackListHeader({
           >
             <button
               type="button"
-              aria-label={`Sort by ${column.label}`}
-              title={`Sort by ${column.label}, ${direction === "asc" ? "descending" : "ascending"}`}
+              aria-label={t("columns.sortBy", { column: columnLabel })}
+              title={t("columns.sortByDirection", {
+                column: columnLabel,
+                direction: t(direction === "asc" ? "sort.descending" : "sort.ascending"),
+              })}
               className={`group flex h-7 w-full items-center gap-1 rounded-md transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-primary ${column.numeric ? "justify-end" : ""} ${direction ? "text-foreground" : ""}`}
               onClick={() =>
                 onChange({
@@ -132,7 +144,7 @@ export function TrackListHeader({
                 })
               }
             >
-              <span className="truncate">{column.label}</span>
+              <span className="truncate">{columnLabel}</span>
               <span
                 aria-hidden="true"
                 className={`shrink-0 transition-opacity duration-150 ${direction ? "text-primary opacity-100" : "opacity-0 group-hover:opacity-60 group-focus-visible:opacity-60"}`}
@@ -142,7 +154,7 @@ export function TrackListHeader({
             </button>
             <ColumnResizeHandle
               id={id}
-              label={column.label}
+              label={columnLabel}
               width={settings.widths?.[id] ?? column.width}
               onPreview={(width) =>
                 onPreviewWidths?.(width === null ? null : resizedWidths(id, width))
@@ -160,16 +172,16 @@ export function TrackListHeader({
       })}
       <span
         role="columnheader"
-        aria-label="Track actions"
+        aria-label={t("columns.trackActions")}
         className="sticky right-0 flex justify-end"
       >
-        <Tooltip content="Choose columns">
+        <Tooltip content={t("columns.choose")}>
           <Button
             ref={triggerRef}
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label="Choose columns"
+            aria-label={t("columns.choose")}
             aria-haspopup="menu"
             aria-expanded={open}
             aria-controls={open ? menuId : undefined}

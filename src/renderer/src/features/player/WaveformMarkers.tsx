@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { formatTime } from "@/lib/format";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import type { TrackMarker } from "../../../../shared/library";
 
 /** User markers drawn as thin flags along the top of the waveform. */
@@ -17,6 +18,7 @@ export function WaveformMarkers({
   onRename: (marker: TrackMarker) => void;
   onDelete: (marker: TrackMarker) => void;
 }) {
+  const t = useTranslation();
   const icons = useIcons();
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   // Hide after a short delay so the pointer can travel from the flag to the bubble's ×.
@@ -54,8 +56,11 @@ export function WaveformMarkers({
             <span className="absolute inset-y-0 -left-px w-px bg-primary/70" />
             <button
               type="button"
-              aria-label={`${marker.label} at ${formatTime(marker.time)}`}
-              title="Click to jump · Double-click to rename"
+              aria-label={t("waveform.markerAt", {
+                label: marker.label,
+                time: formatTime(marker.time),
+              })}
+              title={t("waveform.markerHint")}
               className="no-drag pointer-events-auto absolute -left-[5px] top-0 h-3 w-[10px] rounded-b-[3px] bg-primary"
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
@@ -79,7 +84,7 @@ export function WaveformMarkers({
                 </span>
                 <button
                   type="button"
-                  aria-label={`Delete ${marker.label}`}
+                  aria-label={`${t("common.delete")} ${marker.label}`}
                   className="no-drag grid size-4 place-items-center rounded-full text-muted-foreground hover:bg-white/10 hover:text-foreground"
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => {

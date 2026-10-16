@@ -72,7 +72,7 @@ export function TransparencySlider({
   );
 }
 
-export function SettingsOptionGroup({
+export function SettingsOptionGroup<T extends string | number>({
   title,
   description,
   options,
@@ -81,9 +81,9 @@ export function SettingsOptionGroup({
 }: {
   title: string;
   description: string;
-  options: Array<{ label: string; value: number }>;
-  value: number;
-  onChange: (value: number) => void;
+  options: Array<{ label: string; value: T }>;
+  value: T;
+  onChange: (value: T) => void;
 }) {
   return (
     <div className="rounded-[22px] border border-white/10 bg-white/[0.035] p-4">

@@ -1,4 +1,6 @@
 import { Switch } from "@/components/ui/switch";
+import { useTranslation } from "@/lib/i18n";
+import type { AppLanguage } from "../../../../shared/language";
 import { windowCornerRadiusOptions, type AppearanceSettings } from "../../../../shared/library";
 import { SettingsFooter, SettingsOptionGroup, TransparencySlider } from "./SettingsControls";
 
@@ -23,6 +25,13 @@ export function AppearanceSettingsPane({
   onReset: () => void;
   onSave: () => void;
 }) {
+  const t = useTranslation();
+  const languageOptions: Array<{ label: string; value: AppLanguage }> = [
+    { label: t("settings.appearance.language.system"), value: "system" },
+    { label: t("settings.appearance.language.en"), value: "en" },
+    { label: t("settings.appearance.language.zhCN"), value: "zh-CN" },
+  ];
+
   return (
     <>
       <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pb-20 pr-1">
@@ -37,10 +46,10 @@ export function AppearanceSettingsPane({
             }`}
           >
             <h4 className="text-[14px] font-semibold leading-5 text-foreground">
-              App transparency
+              {t("settings.appearance.transparency.title")}
             </h4>
             <p className="mt-1 max-w-[420px] text-[12px] font-medium leading-4 text-muted-foreground">
-              Adjust how much of the desktop shows through Playhead.
+              {t("settings.appearance.transparency.description")}
             </p>
           </div>
           <TransparencySlider
@@ -60,9 +69,11 @@ export function AppearanceSettingsPane({
         >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h4 className="text-[14px] font-semibold leading-5 text-foreground">Reduce motion</h4>
+              <h4 className="text-[14px] font-semibold leading-5 text-foreground">
+                {t("settings.appearance.reduceMotion.title")}
+              </h4>
               <p className="mt-1 max-w-[420px] text-[12px] font-medium leading-4 text-muted-foreground">
-                Simplify animation and transition effects.
+                {t("settings.appearance.reduceMotion.description")}
               </p>
             </div>
             <Switch
@@ -78,8 +89,22 @@ export function AppearanceSettingsPane({
           }`}
         >
           <SettingsOptionGroup
-            title="Window corners"
-            description="Choose how rounded the window corners are."
+            title={t("settings.appearance.language.title")}
+            description={t("settings.appearance.language.description")}
+            options={languageOptions}
+            value={settings.language}
+            onChange={(language) => onChange({ ...settings, language })}
+          />
+        </div>
+
+        <div
+          className={`transition-opacity ${
+            isTransparencyPreviewing ? "pointer-events-none opacity-0" : ""
+          }`}
+        >
+          <SettingsOptionGroup
+            title={t("settings.appearance.windowCorners.title")}
+            description={t("settings.appearance.windowCorners.description")}
             options={windowCornerRadiusOptions}
             value={settings.windowCornerRadius}
             onChange={(windowCornerRadius) => onChange({ ...settings, windowCornerRadius })}
@@ -94,7 +119,11 @@ export function AppearanceSettingsPane({
       >
         <SettingsFooter
           status={
-            changed ? "Changes will apply after saving." : "Appearance settings are up to date."
+            changed
+              ? t("settings.status.unsaved")
+              : t("settings.status.upToDate", {
+                  category: t("settings.category.appearance"),
+                })
           }
           changed={changed}
           onReset={onReset}

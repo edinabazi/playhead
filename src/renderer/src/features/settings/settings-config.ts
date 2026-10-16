@@ -20,39 +20,43 @@ export const fileFormatOptions = [
   { extension: ".aac", label: "AAC" },
 ];
 
+/**
+ * Confirmation dialog copy per advanced action, stored as translation keys so the
+ * dialog can render it in the active language.
+ */
 export const advancedConfirmationCopy: Record<
   AdvancedSettingsAction,
-  { title: string; description: string; actionLabel: string }
+  { titleKey: string; descriptionKey: string; actionLabelKey: string }
 > = {
   "open-data-folder": {
-    title: "Open data folder?",
-    description: "This opens Playhead's app data folder.",
-    actionLabel: "Open Folder",
+    titleKey: "settings.advanced.openDataFolder.title",
+    descriptionKey: "settings.advanced.openDataFolder.description",
+    actionLabelKey: "settings.advanced.action.openFolder",
   },
   "clear-waveform-cache": {
-    title: "Clear waveform cache?",
-    description: "Playhead will remove generated waveform files and rebuild them when needed.",
-    actionLabel: "Clear Cache",
+    titleKey: "settings.advanced.clearWaveformCache.title",
+    descriptionKey: "settings.advanced.clearWaveformCache.description",
+    actionLabelKey: "settings.advanced.action.clearCache",
   },
   "rebuild-library-index": {
-    title: "Rebuild library index?",
-    description: "Playhead will rescan every folder and remove tracks that no longer exist.",
-    actionLabel: "Rebuild Index",
+    titleKey: "settings.advanced.rebuildIndex.title",
+    descriptionKey: "settings.advanced.rebuildIndex.description",
+    actionLabelKey: "settings.advanced.action.rebuildIndex",
   },
   "reset-app-state": {
-    title: "Reset app state?",
-    description: "This clears saved playback position and last session. Your library stays here.",
-    actionLabel: "Reset State",
+    titleKey: "settings.advanced.resetState.title",
+    descriptionKey: "settings.advanced.resetState.description",
+    actionLabelKey: "settings.advanced.action.resetState",
   },
   "export-library-backup": {
-    title: "Export library backup?",
-    description: "This saves a JSON backup of your library and settings.",
-    actionLabel: "Export Backup",
+    titleKey: "settings.advanced.exportBackup.title",
+    descriptionKey: "settings.advanced.exportBackup.description",
+    actionLabelKey: "settings.advanced.action.exportBackup",
   },
   "import-library-backup": {
-    title: "Import library backup?",
-    description: "This replaces your current library and settings with the selected backup.",
-    actionLabel: "Import Backup",
+    titleKey: "settings.advanced.importBackup.title",
+    descriptionKey: "settings.advanced.importBackup.description",
+    actionLabelKey: "settings.advanced.action.importBackup",
   },
 };
 
@@ -63,11 +67,15 @@ export const destructiveAdvancedActions = new Set<AdvancedSettingsAction>([
   "import-library-backup",
 ]);
 
-export const settingsHeaderDescriptions: Record<SettingsCategoryId, string> = {
-  library: "Folder scanning and file visibility.",
-  playback: "Keyboard playback behavior.",
-  appearance: "Window transparency and motion.",
-  shortcuts: "Current keyboard controls.",
-  integrations: "Connected music services.",
-  advanced: "Maintenance, backup, and diagnostics.",
+/**
+ * Header copy per category, keyed by translation key rather than literal text so
+ * the dialog can render it in the active language.
+ */
+export const settingsHeaderDescriptionKeys: Record<SettingsCategoryId, string> = {
+  library: "settings.description.library",
+  playback: "settings.description.playback",
+  appearance: "settings.description.appearance",
+  shortcuts: "settings.description.shortcuts",
+  integrations: "settings.description.integrations",
+  advanced: "settings.description.advanced",
 };

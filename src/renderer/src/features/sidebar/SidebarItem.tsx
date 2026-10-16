@@ -1,4 +1,5 @@
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import type { MenuAnchorPoint } from "@/lib/menu-position";
 import { useId, useState } from "react";
 
@@ -39,9 +40,11 @@ export function SidebarItem({
   const detailId = useId();
   const hasDetail = detail !== undefined && detail !== null && detail !== "";
   const icons = useIcons();
+  const t = useTranslation();
   const ChevronIcon = icons["chevron-right"];
   const [isDropTarget, setIsDropTarget] = useState(false);
   const acceptsTrackDrop = Boolean(onDropTrack);
+  const disclosureLabel = t(expanded ? "nav.collapseWithLabel" : "nav.expandWithLabel", { label });
 
   return (
     <div
@@ -126,7 +129,7 @@ export function SidebarItem({
           <button
             type="button"
             className="pointer-events-auto grid h-[18px] w-3 shrink-0 place-items-center rounded-sm text-[var(--text-tertiary)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
-            aria-label={`${expanded ? "Collapse" : "Expand"} ${label}`}
+            aria-label={disclosureLabel}
             aria-expanded={Boolean(expanded)}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") event.stopPropagation();

@@ -1,6 +1,7 @@
 import { Dropdown } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import { clampMenuPoint, shouldOpenSubmenuLeft, type MenuAnchorPoint } from "@/lib/menu-position";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -49,6 +50,7 @@ export function SidebarContextMenu({
   onDeleteSmartPlaylist: (playlist: SmartPlaylist) => void;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const exportTriggerRef = useRef<HTMLDivElement | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -86,7 +88,7 @@ export function SidebarContextMenu({
         {state.type === "folder" ? (
           <MenuItem
             icon={icons.x}
-            label="Remove folder from Playhead"
+            label={t("nav.menu.removeFolder")}
             index={0}
             onSelect={() => {
               onRemoveFolder(state.item);
@@ -97,7 +99,7 @@ export function SidebarContextMenu({
           <>
             <MenuItem
               icon={icons.pencil}
-              label="Rename Playlist"
+              label={t("nav.menu.renamePlaylist")}
               index={0}
               onSelect={() => {
                 onRenamePlaylist(state.item);
@@ -115,7 +117,7 @@ export function SidebarContextMenu({
             >
               <MenuItem
                 icon={icons.download}
-                label="Export Playlist"
+                label={t("nav.menu.exportPlaylist")}
                 index={1}
                 className="pr-8"
                 onSelect={() => setExportOpen((value) => !value)}
@@ -158,7 +160,7 @@ export function SidebarContextMenu({
                     />
                     <MenuItem
                       icon={icons["list-music"]}
-                      label="Playhead JSON"
+                      label={t("nav.exportFormat.playheadJson")}
                       index={2}
                       onSelect={() => {
                         onExportPlaylist(state.item, "playhead");
@@ -168,7 +170,7 @@ export function SidebarContextMenu({
                     />
                     <MenuItem
                       icon={icons["list-music"]}
-                      label="rekordbox XML"
+                      label={t("nav.exportFormat.rekordboxXml")}
                       index={3}
                       onSelect={() => {
                         onExportPlaylist(state.item, "rekordbox");
@@ -178,7 +180,7 @@ export function SidebarContextMenu({
                     />
                     <MenuItem
                       icon={icons["list-music"]}
-                      label="Traktor NML"
+                      label={t("nav.exportFormat.traktorNml")}
                       index={4}
                       onSelect={() => {
                         onExportPlaylist(state.item, "traktor");
@@ -192,7 +194,7 @@ export function SidebarContextMenu({
             </div>
             <MenuItem
               icon={icons["trash-2"]}
-              label="Delete Playlist"
+              label={t("nav.menu.deletePlaylist")}
               index={2}
               onSelect={() => {
                 onDeletePlaylist(state.item);
@@ -204,7 +206,7 @@ export function SidebarContextMenu({
           <>
             <MenuItem
               icon={icons["list-filter"]}
-              label="Edit Smart Playlist"
+              label={t("nav.menu.editSmartPlaylist")}
               index={0}
               onSelect={() => {
                 onEditSmartPlaylist(state.item);
@@ -213,7 +215,7 @@ export function SidebarContextMenu({
             />
             <MenuItem
               icon={icons["trash-2"]}
-              label="Delete Smart Playlist"
+              label={t("nav.menu.deleteSmartPlaylist")}
               index={1}
               onSelect={() => {
                 onDeleteSmartPlaylist(state.item);
@@ -225,7 +227,7 @@ export function SidebarContextMenu({
           <>
             <MenuItem
               icon={icons.pencil}
-              label="Rename Playlist"
+              label={t("nav.menu.renamePlaylist")}
               index={0}
               onSelect={() => {
                 onRenameSoundCloudPlaylist(state.item);
@@ -234,7 +236,7 @@ export function SidebarContextMenu({
             />
             <MenuItem
               icon={icons["trash-2"]}
-              label="Delete from SoundCloud"
+              label={t("nav.menu.deleteFromSoundCloud")}
               index={1}
               onSelect={() => {
                 onDeleteSoundCloudPlaylist(state.item);
@@ -246,7 +248,7 @@ export function SidebarContextMenu({
           <>
             <MenuItem
               icon={icons.pencil}
-              label="Rename Tag"
+              label={t("nav.menu.renameTag")}
               index={0}
               onSelect={() => {
                 onRenameTag(state.item);
@@ -255,7 +257,7 @@ export function SidebarContextMenu({
             />
             <MenuItem
               icon={icons["trash-2"]}
-              label="Delete Tag"
+              label={t("nav.menu.deleteTag")}
               index={1}
               onSelect={() => {
                 onDeleteTag(state.item);

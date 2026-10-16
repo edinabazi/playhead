@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import type { LibraryScanProgress } from "../../../../shared/library-scan";
 
 export function LibraryScanStatus({ scanId }: { scanId: string }) {
@@ -8,6 +9,7 @@ export function LibraryScanStatus({ scanId }: { scanId: string }) {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState(false);
   const icons = useIcons();
+  const t = useTranslation();
   const FolderIcon = icons["folder-open"];
   useEffect(
     () =>
@@ -23,20 +25,23 @@ export function LibraryScanStatus({ scanId }: { scanId: string }) {
     ? Math.min(100, Math.round((progress.processed / progress.discovered) * 100))
     : 0;
   const title = cancelling
-    ? "Cancelling scan…"
+    ? t("library.scan.cancelling")
     : finishing
-      ? "Updating library…"
+      ? t("library.scan.finishing")
       : reading
-        ? "Reading tracks"
+        ? t("library.scan.readingTracks")
         : progress.phase === "queued"
-          ? "Waiting to scan…"
-          : "Finding music";
+          ? t("library.scan.queued")
+          : t("library.scan.finding");
   const count = reading
-    ? `${progress.processed.toLocaleString()} of ${progress.discovered.toLocaleString()} tracks`
-    : `${progress.discovered.toLocaleString()} tracks found`;
+    ? t("library.scan.tracksProgress", {
+        current: progress.processed.toLocaleString(),
+        total: progress.discovered.toLocaleString(),
+      })
+    : t("library.scan.foundTracks", { count: progress.discovered.toLocaleString() });
   return (
     <aside
-      aria-label="Library scan"
+      aria-label={t("library.scan.statusAria")}
       className="no-drag fixed bottom-4 right-4 z-[100] w-[340px] max-w-[calc(100vw-32px)] rounded-2xl border border-white/10 bg-[rgba(10,10,10,0.96)] p-3.5 shadow-xl backdrop-blur-xl"
     >
       <div className="flex items-center gap-3">
@@ -51,9 +56,12 @@ export function LibraryScanStatus({ scanId }: { scanId: string }) {
             className="mt-0.5 truncate text-[11px] text-muted-foreground"
             title={progress.folderName}
           >
-            {progress.folderName || "Music folders"}
+            {progress.folderName || t("library.scan.folderFallback")}
             {progress.folderCount > 1
-              ? ` · ${progress.folderIndex || 1} of ${progress.folderCount}`
+              ? t("library.scan.folderProgressSuffix", {
+                  current: progress.folderIndex || 1,
+                  total: progress.folderCount,
+                })
               : ""}
           </p>
         </div>
@@ -73,7 +81,7 @@ export function LibraryScanStatus({ scanId }: { scanId: string }) {
             });
           }}
         >
-          Cancel
+          {t("common.cancel")}
         </Button>
       </div>
       <div
@@ -92,9 +100,9 @@ export function LibraryScanStatus({ scanId }: { scanId: string }) {
       </div>
       <p className="mt-2 text-[11px] tabular-nums text-muted-foreground">
         {cancelError
-          ? "Couldn't cancel. Please try again."
+          ? t("library.scan.cancelFailed")
           : finishing
-            ? "Saving your tracks"
+            ? t("library.scan.savingTracks")
             : count}
       </p>
     </aside>

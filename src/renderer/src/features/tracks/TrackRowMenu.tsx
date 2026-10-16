@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Dropdown, DropdownSeparator } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { useIcons } from "@/lib/icon-context";
+import { useTranslation } from "@/lib/i18n";
 import {
   clampMenuPoint,
   getMenuPointFromElement,
@@ -69,6 +70,7 @@ export function TrackRowMenu({
   fileActionsEnabled?: boolean;
 }) {
   const icons = useIcons();
+  const t = useTranslation();
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [tagOpen, setTagOpen] = useState(false);
   const [playlistSide, setPlaylistSide] = useState<"left" | "right">("right");
@@ -129,7 +131,7 @@ export function TrackRowMenu({
         <button
           ref={buttonRef}
           className="no-drag grid size-[18px] place-items-center text-muted-foreground transition hover:text-foreground"
-          title="Track actions"
+          title={t("rowMenu.trackActions")}
           onClick={() => onOpenChange(!open, getMenuPointFromElement(buttonRef.current))}
         >
           <MenuIcon size={18} strokeWidth={1.7} />
@@ -157,7 +159,7 @@ export function TrackRowMenu({
                 <>
                   <MenuItem
                     icon={icons["list-start"]}
-                    label="Play Next"
+                    label={t("rowMenu.playNext")}
                     index={0}
                     onSelect={() => {
                       onQueueTracks(tracksForAction, "next");
@@ -166,7 +168,7 @@ export function TrackRowMenu({
                   />
                   <MenuItem
                     icon={icons["list-end"]}
-                    label="Play Later"
+                    label={t("rowMenu.playLater")}
                     index={1}
                     onSelect={() => {
                       onQueueTracks(tracksForAction, "later");
@@ -189,7 +191,7 @@ export function TrackRowMenu({
               >
                 <MenuItem
                   icon={ListPlusIcon}
-                  label="Add to Playlist"
+                  label={t("rowMenu.addToPlaylist")}
                   index={queueOffset}
                   className="pr-8"
                   onSelect={() => setPlaylistOpen((value) => !value)}
@@ -233,7 +235,7 @@ export function TrackRowMenu({
                         ))}
                       <MenuItem
                         icon={icons.plus}
-                        label="Create Playlist"
+                        label={t("rowMenu.createPlaylist")}
                         index={playlists.length}
                         onSelect={() => {
                           onCreatePlaylist(tracksForAction);
@@ -256,7 +258,7 @@ export function TrackRowMenu({
               >
                 <MenuItem
                   icon={TagIcon}
-                  label="Add Tag"
+                  label={t("rowMenu.addTag")}
                   index={queueOffset + 1}
                   className="pr-8"
                   onSelect={() => setTagOpen((value) => !value)}
@@ -296,7 +298,7 @@ export function TrackRowMenu({
                         ))}
                       <MenuItem
                         icon={icons.plus}
-                        label="Create Tag"
+                        label={t("rowMenu.createTag")}
                         index={tags.length}
                         onSelect={() => {
                           onCreateTag(tracksForAction);
@@ -311,7 +313,7 @@ export function TrackRowMenu({
               {canRemove && (
                 <MenuItem
                   icon={icons.x}
-                  label="Remove from Playlist"
+                  label={t("rowMenu.removeFromPlaylist")}
                   index={queueOffset + 2}
                   onSelect={() => {
                     onRemoveFromPlaylist(tracksForAction.map((item) => item.id));
@@ -322,7 +324,7 @@ export function TrackRowMenu({
               {selectedTag && (
                 <MenuItem
                   icon={icons.x}
-                  label="Remove from Tag"
+                  label={t("rowMenu.removeFromTag")}
                   index={removeTagIndex}
                   onSelect={() => {
                     onRemoveFromTag(tracksForAction.map((item) => item.id));
@@ -333,7 +335,7 @@ export function TrackRowMenu({
               {showNewSoundCloudPlaylist && onCreateSoundCloudPlaylist && (
                 <MenuItem
                   icon={icons.plus}
-                  label="New SoundCloud Playlist…"
+                  label={t("rowMenu.newSoundCloudPlaylist")}
                   index={newSoundCloudPlaylistIndex}
                   onSelect={() => {
                     onCreateSoundCloudPlaylist(tracksForAction);
@@ -346,7 +348,7 @@ export function TrackRowMenu({
                   <DropdownSeparator />
                   <MenuItem
                     icon={icons.globe}
-                    label="Open on SoundCloud"
+                    label={t("rowMenu.openOnSoundCloud")}
                     index={soundCloudOpenIndex}
                     onSelect={() => {
                       window.open(track.soundcloud?.permalinkUrl, "_blank", "noopener,noreferrer");
@@ -361,7 +363,7 @@ export function TrackRowMenu({
                   {onViewArtist && (
                     <MenuItem
                       icon={UserIcon}
-                      label="View Artist"
+                      label={t("rowMenu.viewArtist")}
                       index={trailingIndex}
                       onSelect={() => {
                         onViewArtist(track);
@@ -372,7 +374,7 @@ export function TrackRowMenu({
                   {onViewAlbum && (
                     <MenuItem
                       icon={AlbumIcon}
-                      label="View Album"
+                      label={t("rowMenu.viewAlbum")}
                       index={trailingIndex + 1}
                       onSelect={() => {
                         onViewAlbum(track);
@@ -383,7 +385,7 @@ export function TrackRowMenu({
                   {(onViewArtist || onViewAlbum) && <DropdownSeparator />}
                   <MenuItem
                     icon={FinderIcon}
-                    label={`Show in ${fileManagerName}`}
+                    label={t("rowMenu.showIn", { fileManager: fileManagerName })}
                     index={trailingIndex + 2}
                     onSelect={() => {
                       onShowInFolder(track);
@@ -392,7 +394,7 @@ export function TrackRowMenu({
                   />
                   <MenuItem
                     icon={InfoIcon}
-                    label="Metadata"
+                    label={t("rowMenu.metadata")}
                     index={trailingIndex + 3}
                     onSelect={() => {
                       onShowMetadata(track);
